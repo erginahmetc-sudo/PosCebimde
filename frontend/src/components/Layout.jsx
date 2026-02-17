@@ -8,8 +8,8 @@ const menuItems = [
     { path: '/products', label: 'Ürünler', icon: 'inventory_2', permission: 'can_view_products' },
     { path: '/customers', label: 'Bakiyeler', icon: 'groups', permission: 'can_view_customers' },
     { path: '/sales', label: 'Satışlar', icon: 'receipt_long', permission: 'can_view_sales' },
-    { path: '/manual-purchase-invoice', label: 'Alış Faturası (Manuel)', icon: 'post_add', permission: 'can_view_invoices' },
-    { path: '/invoices', label: 'Faturalar', icon: 'description', permission: 'can_view_invoices' },
+    { path: '/manual-purchase-invoice', label: 'Alış Faturaları\n(Manuel)', icon: 'post_add', permission: 'can_view_invoices' },
+    { path: '/invoices', label: 'Alış Faturaları\n(Entegrasyonlu)', icon: 'description', permission: 'can_view_invoices' },
 
     { path: '/settings', label: 'Ayarlar', icon: 'settings', permission: 'can_view_users' },
 ];
@@ -41,28 +41,31 @@ export default function Layout({ children }) {
                 </div>
 
                 {/* Center: Desktop Navigation */}
-                <nav className="hidden md:flex items-center justify-center flex-1 gap-2">
+                <nav className="hidden md:flex items-center justify-center flex-1 gap-0.5">
                     {visibleMenuItems.map((item) => (
                         <Link
                             key={item.path}
                             to={item.path}
-                            className={`flex flex-col items-center justify-center px-4 lg:px-6 h-16 border-b-2 transition-all ${location.pathname === item.path
+                            className={`flex flex-col items-center justify-center px-2 lg:px-4 h-16 border-b-2 transition-all ${location.pathname === item.path
                                 ? 'border-blue-600 text-blue-600 bg-blue-50/50'
                                 : 'border-transparent text-slate-400 hover:text-slate-900 hover:bg-slate-50'
                                 }`}
                         >
                             <span className="material-symbols-outlined">{item.icon}</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wider mt-0.5 text-center leading-tight">{item.label}</span>
+                            <span className="text-[9px] font-bold uppercase mt-0.5 text-center leading-tight line-clamp-2 overflow-hidden whitespace-nowrap">{item.label.split('\n').map((line, i) => <span key={i} className="block whitespace-nowrap">{line}</span>)}</span>
                         </Link>
                     ))}
-                    <button
-                        onClick={() => setShowShortcutsModal(true)}
-                        className="flex flex-col items-center justify-center px-4 lg:px-6 h-16 border-b-2 border-transparent text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all"
-                        title="Klavye Kısayolları"
-                    >
-                        <span className="material-symbols-outlined">keyboard</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider mt-0.5">Kısayollar</span>
-                    </button>
+                    {/* Only show on non-POS pages */}
+                    {!isPOSPage && (
+                        <button
+                            onClick={() => setShowShortcutsModal(true)}
+                            className="flex flex-col items-center justify-center px-2 lg:px-4 h-16 border-b-2 border-transparent text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all"
+                            title="Klavye Kısayolları"
+                        >
+                            <span className="material-symbols-outlined">keyboard</span>
+                            <span className="text-[9px] font-bold uppercase mt-0.5">Kısayollar</span>
+                        </button>
+                    )}
                 </nav>
 
                 {/* Right Side: User Info */}

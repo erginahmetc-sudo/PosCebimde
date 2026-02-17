@@ -899,11 +899,16 @@ export default function SalesPage() {
                                                 <td className="px-6 py-2 text-sm text-slate-600 whitespace-nowrap">
                                                     {new Date(sale.date).toLocaleString('tr-TR')}
                                                 </td>
-                                                <td className="px-6 py-2 text-sm font-medium text-slate-900 font-mono">
-                                                    <span className="flex items-center gap-2">
-                                                        {sale.sale_code}
+                                                <td className="px-6 py-2 font-medium text-slate-900 font-mono whitespace-nowrap">
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        <span className={status ? 'text-xs' : 'text-sm'}>{sale.sale_code}</span>
                                                         {sale.is_deleted && (
                                                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-600 uppercase tracking-wider">Silindi</span>
+                                                        )}
+                                                        {status && (
+                                                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${status === 'FULL' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
+                                                                {status === 'FULL' ? 'Tam İade' : 'Kısmi İade'}
+                                                            </span>
                                                         )}
                                                     </span>
                                                 </td>
@@ -935,18 +940,6 @@ export default function SalesPage() {
                                                     </button>
                                                 </td>
                                             </tr>
-                                            {status && (
-                                                <tr className="bg-slate-50/50">
-                                                    <td colSpan="7" className="px-6 py-2">
-                                                        <div className={`flex items-center gap-2 text-sm font-bold ${status === 'FULL' ? 'text-red-600' : 'text-orange-600'}`}>
-                                                            <span className="material-symbols-outlined text-lg">
-                                                                {status === 'FULL' ? 'assignment_return' : 'remove_shopping_cart'}
-                                                            </span>
-                                                            {status === 'FULL' ? 'Tamamı İade Edilmiştir' : 'Kısmi İade Yapılmıştır'}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
                                         </tbody>
                                     );
                                 })}

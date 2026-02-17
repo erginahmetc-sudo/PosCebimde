@@ -13,6 +13,8 @@ import PaymentFormModal from '../components/modals/PaymentFormModal';
 import ProductSelectionModal from '../components/modals/ProductSelectionModal';
 import StatusModal from '../components/modals/StatusModal';
 import ReturnModal from '../components/modals/ReturnModal';
+import ShortcutGroupsModal from '../components/modals/ShortcutGroupsModal';
+import KeyboardShortcutsModal from '../components/modals/KeyboardShortcutsModal';
 
 // Mobile detection hook
 function useMobileRedirect() {
@@ -73,6 +75,7 @@ const ProductCard = memo(({ product, onAddToCart }) => {
 });
 
 export default function NewPOSPage() {
+    const navigate = useNavigate();
     // Mobile redirect
     useMobileRedirect();
 
@@ -95,6 +98,8 @@ export default function NewPOSPage() {
     const [showDiscountModal, setShowDiscountModal] = useState(false);
     const [showPriceModal, setShowPriceModal] = useState(false);
     const [showWaitlistModal, setShowWaitlistModal] = useState(false);
+    const [showShortcutGroupsModal, setShowShortcutGroupsModal] = useState(false);
+    const [showKeyboardShortcutsModal, setShowKeyboardShortcutsModal] = useState(false);
     const [displayLimit, setDisplayLimit] = useState(() => localStorage.getItem('pos_display_limit') || '100');
     const [currentPage, setCurrentPage] = useState(1);
     const [loading, setLoading] = useState(true); // Initial loading state
@@ -1685,6 +1690,20 @@ export default function NewPOSPage() {
                                 <span className="material-symbols-outlined text-[16px]">payments</span>
                                 Müşteriden Ödeme Al
                             </button>
+                            <button
+                                onClick={() => setShowShortcutGroupsModal(true)}
+                                className="px-3 py-2 bg-gray-900 text-white rounded-lg font-bold text-xs hover:bg-gray-800 transition-all shadow-sm flex items-center gap-1.5"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">edit_square</span>
+                                Satış Ekranı Düzenle
+                            </button>
+                            <button
+                                onClick={() => setShowKeyboardShortcutsModal(true)}
+                                className="px-3 py-2 bg-gray-900 text-white rounded-lg font-bold text-xs hover:bg-gray-800 transition-all shadow-sm flex items-center gap-1.5"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">keyboard</span>
+                                Kısayollar
+                            </button>
                         </div>
 
                         {/* Right Side: Pagination + Count Info */}
@@ -2331,6 +2350,20 @@ export default function NewPOSPage() {
                     loadCustomers();
                 }}
             />
+
+            <ShortcutGroupsModal
+                isOpen={showShortcutGroupsModal}
+                onClose={() => {
+                    setShowShortcutGroupsModal(false);
+                    loadShortcuts();
+                }}
+            />
+
+            {showKeyboardShortcutsModal && (
+                <KeyboardShortcutsModal
+                    onClose={() => setShowKeyboardShortcutsModal(false)}
+                />
+            )}
 
         </div>
     );

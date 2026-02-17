@@ -104,7 +104,14 @@ export default function ManualPurchaseInvoicePage() {
             await customersAPI.addPurchaseTransaction({
                 customer_id: supplier.customerId,
                 amount: totals.grandTotal,
-                description: `Alış Faturası - ${invoiceDetails.serialNo || 'Seri No Yok'} - ${items.length} kalem`,
+                description: JSON.stringify({
+                    summary: `Alış Faturası - ${invoiceDetails.serialNo || 'Seri No Yok'} - ${items.length} kalem`,
+                    supplier: { name: supplier.name, taxOffice: supplier.taxOffice, taxNo: supplier.taxNo, email: supplier.email, phone: supplier.phone, customerCode: supplier.customerCode, customerId: supplier.customerId },
+                    invoiceDetails,
+                    items: items.map(it => ({ stockCode: it.stockCode, name: it.name, quantity: it.quantity, price: it.price, vatRate: it.vatRate, disc1: it.disc1 || 0, disc2: it.disc2 || 0, disc3: it.disc3 || 0, disc4: it.disc4 || 0 })),
+                    note,
+                    totals,
+                }),
             });
             alert('Fatura başarıyla kaydedildi ve bakiyeye alacak olarak işlendi.');
             // Reset form

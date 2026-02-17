@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import ShortcutGroupsModal from '../components/modals/ShortcutGroupsModal';
 import ReceiptDesignerModal from '../components/modals/ReceiptDesignerModal';
 import IntegrationSettingsModal from '../components/modals/IntegrationSettingsModal';
@@ -9,6 +10,7 @@ import { settingsAPI, productsAPI } from '../services/api';
 
 export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
+    const location = useLocation();
 
     // Settings State
     const [askQuantity, setAskQuantity] = useState(false);
@@ -34,6 +36,13 @@ export default function SettingsPage() {
     useEffect(() => {
         loadSettings();
     }, []);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        if (params.get('open') === 'shortcuts') {
+            setShowShortcutModal(true);
+        }
+    }, [location]);
 
     const loadSettings = async () => {
         setLoading(true);

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import XLSX from 'xlsx-js-style';
-import { customersAPI, salesAPI } from '../services/api';
+import { customersAPI, salesAPI, productsAPI } from '../services/api';
+import { supabase } from '../lib/supabaseClient';
 import SaleDetailModal from '../components/modals/SaleDetailModal';
+import PurchaseInvoiceDetailModal from '../components/modals/PurchaseInvoiceDetailModal';
 
 export default function CustomerDetailPage() {
     const { customerName } = useParams();
@@ -12,6 +14,8 @@ export default function CustomerDetailPage() {
     const [selectedSale, setSelectedSale] = useState(null);
     const [editingPayment, setEditingPayment] = useState(null);
     const [editAmount, setEditAmount] = useState('');
+    const [selectedInvoice, setSelectedInvoice] = useState(null);
+    const [products, setProducts] = useState([]);
     const [reportFilters, setReportFilters] = useState({ productName: '', stockCode: '', barcode: '' });
 
     const handleTransactionClick = (tx) => {
@@ -43,14 +47,19 @@ export default function CustomerDetailPage() {
         }
     };
 
-    // Double-click handler for both Sales and Payments
+    // Double-click handler for Sales, Payments, and Purchase Invoices
     const handleRowDoubleClick = (tx) => {
+        // If it's a PURCHASE INVOICE (Alış Faturası)
+        if (tx.transactionType === 'Alış Faturası') {
+            setSelectedInvoice(tx);
+            return;
+        }
         // If it's a SALE (has items or sale_code)
         if (tx.items?.length > 0 || (tx.transactionType && (tx.transactionType.includes('Satış') || tx.transactionType === 'Fatura'))) {
             const saleObj = {
-                sale_code: tx.sale_code || tx.id, // Fallback
+                sale_code: tx.sale_code || tx.id,
                 customer: customer.name,
-                payment_method: tx.payment_method || 'Nakit', // Default to Nakit if missing
+                payment_method: tx.payment_method || 'Nakit',
                 date: tx.created_at,
                 total: tx.total,
                 items: tx.items || tx.products || [],
@@ -59,7 +68,7 @@ export default function CustomerDetailPage() {
             setSelectedSale(saleObj);
         }
         // If it's a PAYMENT
-        else if (tx.transactionType.includes('Ödeme')) {
+        else if (tx.transactionType?.includes('Ödeme')) {
             setEditingPayment(tx);
             setEditAmount(tx.total.toString());
         }
@@ -104,6 +113,17 @@ export default function CustomerDetailPage() {
     useEffect(() => {
         loadCustomerData();
     }, [customerName]);
+
+    // Load products for invoice editing
+    useEffect(() => {
+        const loadProducts = async () => {
+            try {
+                const res = await productsAPI.getAll();
+                if (res.data?.products) setProducts(res.data.products);
+            } catch (e) { console.error('Products fetch error:', e); }
+        };
+        loadProducts();
+    }, []);
 
     const loadCustomerData = async () => {
         try {
@@ -179,13 +199,14 @@ export default function CustomerDetailPage() {
             // This is a CREDIT (Alacak) - only Alacak Tutarı filled
             creditAmount = total;
             debtAmount = 0;
-            if (paymentType.toLowerCase().includes('nakit')) transactionType = 'Ödeme (Nakit)';
+            if (paymentType.toLowerCase().includes('fatura') && paymentType.toLowerCase().includes('alış')) transactionType = 'Alış Faturası';
+            else if (paymentType.toLowerCase().includes('nakit')) transactionType = 'Ödeme (Nakit)';
             else if (paymentType.toLowerCase().includes('kredi') || paymentType.toLowerCase().includes('kart')) transactionType = 'Ödeme (K.Kartı)';
             else transactionType = 'Ödeme';
         }
 
         // Row colors based on type
-        let rowColor = debtAmount > 0 ? 'bg-yellow-100' : 'bg-cyan-100';
+        let rowColor = transactionType === 'Alış Faturası' ? 'bg-indigo-50' : debtAmount > 0 ? 'bg-yellow-100' : 'bg-cyan-100';
 
         return {
             ...tx,
@@ -345,7 +366,7 @@ export default function CustomerDetailPage() {
                                         Math.abs(runningBalance),
                                         tx.transactionType,
                                         (tx.transactionType === 'Satış (Borç)' ? (tx.payment_method || 'Veresiye') : ''),
-                                        tx.description
+                                        tx.description ? (() => { try { const p = JSON.parse(tx.description); return p.summary || tx.description; } catch { return tx.description; } })() : ''
                                     ];
                                 });
                                 // Add headers
@@ -486,15 +507,27 @@ export default function CustomerDetailPage() {
                                                 </td>
                                                 <td className="px-2 py-1 text-left max-w-md border-r border-gray-200">
                                                     <div className="flex flex-col">
-                                                        <span className="truncate" title={tx.description || ''}>
-                                                            {tx.description || '-'}
+                                                        <span className="truncate" title={(() => { try { const p = JSON.parse(tx.description); return p.summary || tx.description; } catch { return tx.description || ''; } })()}>
+                                                            {(() => { try { const p = JSON.parse(tx.description); return p.summary || tx.description; } catch { return tx.description || '-'; } })()}
                                                         </span>
-                                                        {/* Display Product Names in Small Font */}
-                                                        {((tx.items || tx.products) && (tx.items || tx.products).length > 0) && (
-                                                            <span className="text-[10px] text-gray-500 leading-tight mt-0.5">
-                                                                {(tx.items || tx.products).map(p => p.name).join(', ')}
-                                                            </span>
-                                                        )}
+                                                        {/* Show item names from JSON data or from enriched tx */}
+                                                        {(() => {
+                                                            try {
+                                                                const p = JSON.parse(tx.description);
+                                                                if (p.items?.length > 0) return (
+                                                                    <span className="text-[10px] text-gray-500 leading-tight mt-0.5">
+                                                                        {p.items.map(it => it.name).join(', ')}
+                                                                    </span>
+                                                                );
+                                                            } catch { /* not JSON */ }
+                                                            const items = tx.items || tx.products;
+                                                            if (items?.length > 0) return (
+                                                                <span className="text-[10px] text-gray-500 leading-tight mt-0.5">
+                                                                    {items.map(p => p.name).join(', ')}
+                                                                </span>
+                                                            );
+                                                            return null;
+                                                        })()}
                                                     </div>
                                                 </td>
                                                 <td className="px-2 py-1 text-center">
@@ -631,6 +664,20 @@ export default function CustomerDetailPage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Purchase Invoice Detail Modal */}
+            {selectedInvoice && (
+                <PurchaseInvoiceDetailModal
+                    transaction={selectedInvoice}
+                    customer={customer}
+                    products={products}
+                    onClose={() => setSelectedInvoice(null)}
+                    onUpdate={() => {
+                        setSelectedInvoice(null);
+                        loadCustomerData();
+                    }}
+                />
             )}
         </div>
     );
