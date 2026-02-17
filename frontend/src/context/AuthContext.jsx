@@ -114,11 +114,90 @@ export const AuthProvider = ({ children }) => {
         // No-op
     }, [user]);
 
+
+    // Check for session validity (Force Logout)
+    useEffect(() => {
+        if (!user) return;
+
+        const checkSessionValidity = async () => {
+            try {
+                // If we don't have usersAPI imported, we might need to import it or use supabase directly.
+                // Assuming usersAPI is available or we can import it.
+                // Wait, AuthContext handles `authAPI` but usually we need `usersAPI` for profile checks.
+                // Let's dynamically import or assume it's available if we imported it.
+                // If not, let's look at imports.
+
+                // Inspecting imports... needed to view file.
+                // Assuming usersAPI is imported or can be used.
+                // Actually, let's use supabase directly here to avoid circular dependencies if any.
+                const { data, error } = await supabase
+                    .from('user_profiles')
+                    .select('session_version')
+                    .eq('id', user.id)
+                    .single();
+
+                if (data && user.session_version && data.session_version > user.session_version) {
+                    // Version mismatch! Force logout.
+                    alert('Oturumunuz sonlandırıldı. Lütfen tekrar giriş yapın.');
+                    logout();
+                }
+            } catch (err) {
+                console.error('Session check failed', err);
+            }
+        };
+
+        // Check every 20 seconds
+        const interval = setInterval(checkSessionValidity, 20000);
+        return () => clearInterval(interval);
+    }, [user]);
+
     const checkAccess = (currentUser) => {
-        return; // ALWAYS ALLOW
+        if (!currentUser) return false;
+        if (currentUser.role === 'kurucu' || currentUser.username === 'admin') return true;
+
+        const schedule = currentUser.access_schedule;
+
+        // If no schedule is defined at all, allow access (default behavior)
+        if (!schedule) return true;
+
+        // If schedule exists, check days and time
+        const daysMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const now = new Date();
+        const currentDay = daysMap[now.getDay()];
+        const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+        // Check Day
+        if (schedule.days && Array.isArray(schedule.days)) {
+            if (!schedule.days.includes(currentDay)) {
+                return false; // Not allowed today
+            }
+        } else {
+            // If days is not an array or undefined but schedule exists, assume no restrictions on days? 
+            // Or strict? Let's assume strict if schedule object exists but is malformed/empty days might mean "no access".
+            // Consistently with UsersPage defaults, empty days = no access.
+            if (schedule.days && schedule.days.length === 0) return false;
+        }
+
+        // Check Time
+        if (schedule.start_time && schedule.end_time) {
+            if (currentTime < schedule.start_time || currentTime > schedule.end_time) {
+                return false; // Outside allowed hours
+            }
+        }
+
+        return true;
     };
 
     const login = async (userData) => {
+        if (!checkAccess(userData)) {
+            // Check if it's strictly a schedule issue for clear error message
+            const schedule = userData.access_schedule;
+            if (schedule) { // access denied implies validation failed
+                throw new Error('Şu an sisteme giriş izniniz bulunmamaktadır. (Erişim Takvimi)');
+            }
+            throw new Error('Giriş izniniz bulunmamaktadır.');
+        }
+
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
     };
@@ -139,6 +218,11 @@ export const AuthProvider = ({ children }) => {
     const hasPermission = (permission) => {
         if (!user) return false;
         if (user.role === 'kurucu') return true;
+
+        // Also enforce schedule on permission checks?
+        // Might be too aggressive causing UI flickers if time passes while logged in.
+        // Let's stick to login-time check for now, or maybe check on sensitive actions.
+        // For now, just role/permission check.
 
         // Check permissions object
         return user.permissions && user.permissions[permission] === true;

@@ -22,7 +22,7 @@ export default function SettingsPage() {
     const [sendSalesToBirFatura, setSendSalesToBirFatura] = useState(false);
     const [autoPrintReceipt, setAutoPrintReceipt] = useState(false);
 
-    const [receiptPaperSize, setReceiptPaperSize] = useState('Termal 80mm');
+    const [receiptPaperSize, setReceiptPaperSize] = useState('A5 (148x210mm)');
     const [secretToken, setSecretToken] = useState('...');
 
     // Modals

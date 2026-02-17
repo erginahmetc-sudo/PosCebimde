@@ -2,16 +2,17 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
+import StatusModal from '../components/modals/StatusModal';
 
 export default function LoginPage() {
-    const [step, setStep] = useState('LOGIN'); // 'LOGIN' | 'OTP'
+    // Removed 'step' state as we are removing OTP
     const [formData, setFormData] = useState({
         email: '',
-        password: '',
-        otp: ''
+        password: ''
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
     const navigate = useNavigate();
     const { login } = useAuth();
 
@@ -21,43 +22,25 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            // Step 1: Verify Password first
+            // Direct login without OTP
             const loginResponse = await authAPI.login(formData.email, formData.password);
 
             if (loginResponse.status === 200) {
-                // If password is correct, send OTP
-                await authAPI.sendOtp(formData.email);
-                setStep('OTP');
-                setError('');
+                // Determine user role and permissions from response or defaults
+                const userData = loginResponse.data.user;
+
+                // Login successful - Await to catch permission errors from AuthContext
+                await login(userData);
+                navigate('/');
             }
         } catch (err) {
             const message = err.response?.data?.message ||
                 err.response?.data?.error ||
                 err.message ||
                 'Giriş başarısız. Bilgilerinizi kontrol edin.';
+
+            // Fallback to standard error display
             setError(message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleOtpSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-
-        try {
-            // Step 2: Verify OTP
-            const response = await authAPI.verifyOtp(formData.email, formData.otp);
-
-            if (response.status === 200) {
-                // Login successful with full user data
-                login(response.data.user);
-                navigate('/');
-            }
-        } catch (err) {
-             const message = err.response?.data?.message || err.message || 'Kod doğrulanamadı.';
-             setError(message);
         } finally {
             setLoading(false);
         }
@@ -146,12 +129,10 @@ export default function LoginPage() {
 
                         <div className="mb-8 text-center lg:text-left">
                             <h1 className="text-3xl font-bold text-slate-800 mb-2 tracking-tight">
-                                {step === 'LOGIN' ? 'Giriş Yap' : 'Güvenlik Doğrulaması'}
+                                Giriş Yap
                             </h1>
                             <p className="text-slate-500 font-normal">
-                                {step === 'LOGIN' 
-                                    ? 'Tekrar hoş geldiniz! Hesabınıza erişin.' 
-                                    : `Lütfen ${formData.email} adresine gönderilen doğrulama kodunu girin.`}
+                                Tekrar hoş geldiniz! Hesabınıza erişin.
                             </p>
                         </div>
 
@@ -162,73 +143,44 @@ export default function LoginPage() {
                             </div>
                         )}
 
-                        <form onSubmit={step === 'LOGIN' ? handleSubmit : handleOtpSubmit} className="space-y-5">
-                            
-                            {step === 'LOGIN' && (
-                                <>
-                                    <div className="space-y-1.5 group">
-                                        <label className="block text-sm font-semibold text-slate-600 ml-1">E-posta</label>
-                                        <div className="relative">
-                                            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                                <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">mail</span>
-                                            </span>
-                                            <input
-                                                className="glass-input block w-full pl-10 pr-4 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
-                                                placeholder="isim@sirket.com"
-                                                type="email"
-                                                value={formData.email}
-                                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                                required
-                                            />
-                                        </div>
-                                    </div>
+                        <form onSubmit={handleSubmit} className="space-y-5">
 
-                                    <div className="space-y-1.5 group">
-                                        <div className="flex justify-between items-center ml-1">
-                                            <label className="block text-sm font-semibold text-slate-600">Şifre</label>
-                                        </div>
-                                        <div className="relative">
-                                            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                                <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">lock</span>
-                                            </span>
-                                            <input
-                                                className="glass-input block w-full pl-10 pr-10 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
-                                                placeholder="••••••••"
-                                                type="password"
-                                                value={formData.password}
-                                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            {step === 'OTP' && (
-                                <div className="space-y-1.5 group animate-in fade-in zoom-in duration-300">
-                                    <label className="block text-sm font-semibold text-slate-600 ml-1">Doğrulama Kodu</label>
-                                    <div className="relative">
-                                        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                            <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">vpn_key</span>
-                                        </span>
-                                        <input
-                                            className="glass-input block w-full pl-10 pr-4 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80 text-center tracking-[0.5em] font-mono text-lg"
-                                            placeholder="123456"
-                                            type="text"
-                                            inputMode="numeric"
-                                            autoComplete="one-time-code"
-                                            maxLength={8}
-                                            value={formData.otp}
-                                            onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
-                                            required
-                                            autoFocus
-                                        />
-                                    </div>
-                                    <p className="text-xs text-slate-500 ml-1">
-                                        Lütfen e-posta adresinize gönderilen 6 veya 8 haneli kodu giriniz.
-                                    </p>
+                            <div className="space-y-1.5 group">
+                                <label className="block text-sm font-semibold text-slate-600 ml-1">E-posta</label>
+                                <div className="relative">
+                                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                        <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">mail</span>
+                                    </span>
+                                    <input
+                                        className="glass-input block w-full pl-10 pr-4 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
+                                        placeholder="isim@sirket.com"
+                                        type="email"
+                                        value={formData.email}
+                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                        required
+                                    />
                                 </div>
-                            )}
+                            </div>
+
+                            <div className="space-y-1.5 group">
+                                <div className="flex justify-between items-center ml-1">
+                                    <label className="block text-sm font-semibold text-slate-600">Şifre</label>
+                                </div>
+                                <div className="relative">
+                                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                        <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">lock</span>
+                                    </span>
+                                    <input
+                                        className="glass-input block w-full pl-10 pr-10 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
+                                        placeholder="••••••••"
+                                        type="password"
+                                        value={formData.password}
+                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
 
                             <button
                                 className="w-full flex items-center justify-center py-3.5 px-6 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold text-base shadow-lg shadow-teal-500/20 transition-all duration-200 hover:shadow-teal-500/30 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
@@ -238,20 +190,10 @@ export default function LoginPage() {
                                 {loading ? (
                                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                 ) : (
-                                    step === 'LOGIN' ? 'Devam Et' : 'Doğrula ve Giriş Yap'
+                                    'Giriş Yap'
                                 )}
                             </button>
 
-                            {step === 'OTP' && (
-                                <button
-                                    type="button"
-                                    onClick={() => setStep('LOGIN')}
-                                    className="w-full text-sm text-slate-500 hover:text-primary transition-colors mt-4"
-                                    disabled={loading}
-                                >
-                                    E-posta adresini değiştir
-                                </button>
-                            )}
                         </form>
 
                         <div className="mt-8 text-center">
@@ -260,10 +202,10 @@ export default function LoginPage() {
                                 <Link className="text-primary font-bold hover:text-primary-hover hover:underline decoration-2 underline-offset-4 transition-all ml-1" to="/register">Hesap Oluşturun</Link>
                             </p>
                         </div>
-                        
+
                         {/* Footer Links (Mobile) */}
                         <div className="mt-auto lg:hidden pt-8 text-center">
-                             <div className="flex justify-center gap-6">
+                            <div className="flex justify-center gap-6">
                                 <a className="text-xs font-medium text-slate-400 hover:text-primary transition-colors" href="#">Destek</a>
                                 <a className="text-xs font-medium text-slate-400 hover:text-primary transition-colors" href="#">Gizlilik</a>
                             </div>
@@ -272,6 +214,14 @@ export default function LoginPage() {
                     </div>
                 </div>
             </div>
+
+            <StatusModal
+                isOpen={statusModal.isOpen}
+                onClose={() => setStatusModal(prev => ({ ...prev, isOpen: false }))}
+                title={statusModal.title}
+                message={statusModal.message}
+                type={statusModal.type}
+            />
         </div>
     );
 }

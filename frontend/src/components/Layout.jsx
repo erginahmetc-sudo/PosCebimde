@@ -15,7 +15,7 @@ const menuItems = [
 ];
 
 export default function Layout({ children }) {
-    const { user, logout, hasPermission } = useAuth();
+    const { user, logout, hasPermission, isKurucu } = useAuth();
     const location = useLocation();
     const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
@@ -56,20 +56,20 @@ export default function Layout({ children }) {
                         </Link>
                     ))}
                     {/* Only show on non-POS pages */}
-                    {!isPOSPage && (
-                        <button
-                            onClick={() => setShowShortcutsModal(true)}
-                            className="flex flex-col items-center justify-center px-2 lg:px-4 h-16 border-b-2 border-transparent text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all"
-                            title="Klavye Kısayolları"
-                        >
-                            <span className="material-symbols-outlined">keyboard</span>
-                            <span className="text-[9px] font-bold uppercase mt-0.5">Kısayollar</span>
-                        </button>
-                    )}
                 </nav>
 
                 {/* Right Side: User Info */}
                 <div className="flex items-center justify-end gap-4 w-auto lg:w-1/4">
+                    {isKurucu && (
+                        <Link
+                            to="/users"
+                            className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors font-medium text-sm border border-indigo-200"
+                        >
+                            <span className="material-symbols-outlined text-lg">group</span>
+                            <span>Kullanıcılar</span>
+                        </Link>
+                    )}
+
                     <div className="text-right hidden lg:block leading-tight">
                         <p className="text-[10px] text-slate-400 font-bold uppercase">{user?.username || 'Kullanıcı'}</p>
                         <p className="text-xs font-extra-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded text-center">

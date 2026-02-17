@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { usersAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
+import StatusModal from '../components/modals/StatusModal';
+
 export default function UsersPage() {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [showPermModal, setShowPermModal] = useState(false);
     const [showScheduleModal, setShowScheduleModal] = useState(false);
+    const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
     const [selectedUser, setSelectedUser] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
     const [editingUserId, setEditingUserId] = useState(null);
@@ -114,6 +117,12 @@ export default function UsersPage() {
 
             setShowModal(false);
             loadUsers();
+            setStatusModal({
+                isOpen: true,
+                title: 'Başarılı',
+                message: isEditMode ? 'Kullanıcı başarıyla güncellendi.' : 'Yeni kullanıcı başarıyla oluşturuldu.',
+                type: 'success'
+            });
         } catch (error) {
             let msg = error.response?.data?.message || error.message || 'Bir hata oluştu.';
 
@@ -123,9 +132,16 @@ export default function UsersPage() {
                 msg = `Güvenlik nedeniyle işlem kısıtlandı. Lütfen ${seconds} saniye bekleyip tekrar deneyin.`;
             } else if (msg.includes('Rate limit')) {
                 msg = `Çok fazla deneme yaptınız. Lütfen biraz bekleyin.`;
+            } else if (msg.includes('User already registered') || msg.includes('already registered')) {
+                msg = 'Bu E-posta adresi ile daha önce kayıt yapılmış.';
             }
 
-            alert('Hata: ' + msg);
+            setStatusModal({
+                isOpen: true,
+                title: 'İşlem Başarısız',
+                message: msg,
+                type: 'error'
+            });
         } finally {
             setIsSubmitting(false);
         }
@@ -331,9 +347,9 @@ export default function UsersPage() {
                                                 <button
                                                     onClick={() => openPermModal(user)}
                                                     className="px-2 py-1.5 text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                                                    title="Yetkiler"
+                                                    title="Erişim Yetkileri"
                                                 >
-                                                    🔐 Yetki
+                                                    🔐 Erişim Yetkileri
                                                 </button>
                                                 <button
                                                     onClick={() => openScheduleModal(user)}
@@ -421,23 +437,6 @@ export default function UsersPage() {
                                 </div>
                             </div>
 
-                            {/* Permissions Grid */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Erişim Yetkileri</label>
-                                <div className="grid grid-cols-2 gap-2 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                                    {permissionList.map((perm) => (
-                                        <label key={perm.key} className="flex items-center gap-2 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={permissions[perm.key] || false}
-                                                onChange={(e) => setPermissions({ ...permissions, [perm.key]: e.target.checked })}
-                                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                                            />
-                                            <span className="text-sm text-gray-700">{perm.icon} {perm.label}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
 
                             <div className="flex gap-3 pt-4">
                                 <button
@@ -597,6 +596,14 @@ export default function UsersPage() {
                     </div>
                 </div>
             )}
+
+            <StatusModal
+                isOpen={statusModal.isOpen}
+                onClose={() => setStatusModal(prev => ({ ...prev, isOpen: false }))}
+                title={statusModal.title}
+                message={statusModal.message}
+                type={statusModal.type}
+            />
         </div>
     );
 }

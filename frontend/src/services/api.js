@@ -1163,18 +1163,38 @@ export const usersAPI = {
         return response({ success: true, message: 'Erişim takvimi güncellendi' }, error);
     },
     forceLogout: async (id) => {
-        // Change session_token to invalidate current sessions
-        // const newToken = crypto.randomUUID();
-        // DB Schema doesn't have session_token, so this feature is currently disabled DB-side.
-        // We will just return success to not break the UI.
-        /*
-        const { error } = await supabase
+        // Increment session_version to invalidate old sessions
+        const { error } = await supabase.rpc('increment_session_version', { user_id: id });
+
+        if (error) {
+            // Fallback if RPC doesn't exist (though we should create it, or use direct update)
+            // Direct update: session_version = session_version + 1 (not easily done in one query without RPC or fetch first)
+            // Let's fetch first then update
+            const { data: user, error: fetchError } = await supabase
+                .from('user_profiles')
+                .select('session_version')
+                .eq('id', id)
+                .single();
+
+            if (user) {
+                const newVersion = (user.session_version || 1) + 1;
+                await supabase
+                    .from('user_profiles')
+                    .update({ session_version: newVersion })
+                    .eq('id', id);
+            }
+        }
+
+        return response({ success: true, message: 'Kullanıcı oturumu kapatıldı.' }, null);
+    },
+    // Check session version
+    getSessionVersion: async (id) => {
+        const { data, error } = await supabase
             .from('user_profiles')
-            .update({ session_token: newToken })
-            .eq('id', id);
-        */
-        // No-op for now
-        return response({ success: true, message: 'Kullanıcı oturumu kapatıldı (Token yenilenemedi - DB desteği yok)' }, null);
+            .select('session_version')
+            .eq('id', id)
+            .single();
+        return { version: data?.session_version, error };
     },
     updatePassword: async (id, newPassword) => {
         // Client-side cannot update other users' passwords safely without Admin API.

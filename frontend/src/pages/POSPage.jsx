@@ -601,6 +601,11 @@ export default function POSPage() {
             result = result.replace('{{ODEME_TIPI}}', saleData.paymentMethod || 'Nakit');
             result = result.replace('{{GENEL_TOPLAM}}', saleData.total.toFixed(2));
 
+            // Company Info
+            result = result.replace('{{FIRMA_ADI}}', companySettings.name || 'Firma Adı');
+            result = result.replace('{{ADRES}}', companySettings.address || '');
+            result = result.replace('{{TELEFON}}', companySettings.phone || '');
+
             // Balance variables
             const previousBalance = saleData.customerData?.balance || 0;
             const newBalance = previousBalance + saleData.total;
@@ -677,7 +682,7 @@ white-space: nowrap;
         // Build HTML for product rows
         let productRowsHtml = '';
         let currentY = productRowTemplates.length > 0 ? productRowTemplates[0].y : 120;
-        const rowHeight = 16;
+        const rowHeight = template.row_height || 16;
 
         saleData.items.forEach((product, index) => {
             productRowTemplates.forEach(templateItem => {

@@ -4,6 +4,8 @@ const PAPER_SIZES = {
     'A5 (148x210mm)': { width: '148mm', height: '210mm' },
 };
 
+import { settingsAPI } from '../../services/api';
+
 export default function ReceiptDesignerModal({ isOpen, onClose }) {
     const [companyInfo, setCompanyInfo] = useState({
         name: 'ERCAN YAPI MARKET',
@@ -16,7 +18,7 @@ export default function ReceiptDesignerModal({ isOpen, onClose }) {
 
     useEffect(() => {
         if (isOpen) {
-            // Load saved config
+            // 1. Try to load saved config from LocalStorage
             const savedConfig = localStorage.getItem('receipt_design_config');
             if (savedConfig) {
                 try {
@@ -26,9 +28,33 @@ export default function ReceiptDesignerModal({ isOpen, onClose }) {
                 } catch (e) {
                     console.error("Error loading receipt config", e);
                 }
+            } else {
+                // 2. If no saved config, fetch Company Info from API (Settings)
+                // This ensures new users get the "Default Company Info" instead of placeholders
+                fetchCompanySettings();
             }
         }
     }, [isOpen]);
+
+    const fetchCompanySettings = async () => {
+        try {
+            const nameRes = await settingsAPI.get('company_name');
+            const addressRes = await settingsAPI.get('company_address');
+            const phoneRes = await settingsAPI.get('company_phone');
+            const logoRes = await settingsAPI.get('company_logo');
+
+            setCompanyInfo(prev => ({
+                ...prev,
+                name: nameRes.data || prev.name,
+                address: addressRes.data || prev.address,
+                phone: phoneRes.data || prev.phone,
+                logo_url: logoRes.data || undefined,
+                logo_text: (nameRes.data || prev.name).charAt(0).toUpperCase()
+            }));
+        } catch (error) {
+            console.error("Error fetching company settings for receipt default:", error);
+        }
+    };
 
     const handleSave = () => {
         const config = {
