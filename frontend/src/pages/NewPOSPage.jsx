@@ -1655,18 +1655,18 @@ export default function NewPOSPage() {
                         {/* New Left Actions */}
                         <div className="flex gap-2">
                             <button
-                                onClick={() => setShowNewProductModal(true)}
-                                className="px-3 py-2 bg-gray-900 text-white rounded-lg font-bold text-xs hover:bg-gray-800 transition-all shadow-sm flex items-center gap-1.5"
-                            >
-                                <span className="material-symbols-outlined text-[16px]">add_box</span>
-                                Yeni Ürün
-                            </button>
-                            <button
                                 onClick={() => setShowReturnModal(true)}
                                 className="px-3 py-2 bg-red-700 text-white rounded-lg font-bold text-xs hover:bg-red-800 transition-all shadow-sm flex items-center gap-1.5"
                             >
                                 <span className="material-symbols-outlined text-[16px]">assignment_return</span>
                                 İade Yap
+                            </button>
+                            <button
+                                onClick={() => setShowNewProductModal(true)}
+                                className="px-3 py-2 bg-gray-900 text-white rounded-lg font-bold text-xs hover:bg-gray-800 transition-all shadow-sm flex items-center gap-1.5"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">add_box</span>
+                                Yeni Ürün
                             </button>
                             <button
                                 onClick={() => setShowNewCustomerModal(true)}

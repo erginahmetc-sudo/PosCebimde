@@ -18,6 +18,7 @@ import CustomersPage from './pages/CustomersPage';
 import CustomerDetailPage from './pages/CustomerDetailPage';
 import SalesPage from './pages/SalesPage';
 import InvoicesPage from './pages/InvoicesPage';
+import ManualPurchaseInvoicePage from './pages/ManualPurchaseInvoicePage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
 
@@ -89,6 +90,16 @@ function App() {
               <ProtectedRoute permission="can_view_invoices">
                 <Layout>
                   <InvoicesPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/manual-purchase-invoice"
+            element={
+              <ProtectedRoute permission="can_view_invoices">
+                <Layout>
+                  <ManualPurchaseInvoicePage />
                 </Layout>
               </ProtectedRoute>
             }

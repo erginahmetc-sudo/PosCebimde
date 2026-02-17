@@ -8,6 +8,7 @@ const menuItems = [
     { path: '/products', label: 'Ürünler', icon: 'inventory_2', permission: 'can_view_products' },
     { path: '/customers', label: 'Bakiyeler', icon: 'groups', permission: 'can_view_customers' },
     { path: '/sales', label: 'Satışlar', icon: 'receipt_long', permission: 'can_view_sales' },
+    { path: '/manual-purchase-invoice', label: 'Alış Faturası (Manuel)', icon: 'post_add', permission: 'can_view_invoices' },
     { path: '/invoices', label: 'Faturalar', icon: 'description', permission: 'can_view_invoices' },
 
     { path: '/settings', label: 'Ayarlar', icon: 'settings', permission: 'can_view_users' },
@@ -51,7 +52,7 @@ export default function Layout({ children }) {
                                 }`}
                         >
                             <span className="material-symbols-outlined">{item.icon}</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wider mt-0.5">{item.label}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider mt-0.5 text-center leading-tight">{item.label}</span>
                         </Link>
                     ))}
                     <button

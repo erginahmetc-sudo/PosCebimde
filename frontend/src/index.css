@@ -345,3 +345,15 @@ body {
   background-size: 80px 140px;
   background-position: 0 0, 0 0, 40px 70px, 40px 70px, 0 0, 40px 70px;
 }
+
+/* Customer selected blink animation */
+@keyframes pulseOnce {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  25% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  75% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.4); }
+}
+
+.animate-pulse-once {
+  animation: pulseOnce 1.5s ease-in-out;
+}

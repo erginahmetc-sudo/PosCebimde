@@ -48,9 +48,46 @@ export const authAPI = {
         };
     },
 
-    verify2FA: async (code) => {
-        return { status: 200 };
+    sendOtp: async (email) => {
+        const { error } = await supabase.auth.signInWithOtp({
+            email,
+            options: {
+                shouldCreateUser: false,
+            }
+        });
+        if (error) throw { response: { data: { message: error.message } } };
+        return { status: 200, message: 'Doğrulama kodu gönderildi.' };
     },
+
+    verifyOtp: async (email, token) => {
+        const { data, error } = await supabase.auth.verifyOtp({
+            email,
+            token,
+            type: 'email'
+        });
+
+        if (error) {
+            throw { response: { data: { message: 'Doğrulama kodu hatalı veya süresi dolmuş.' } } };
+        }
+
+        // Fetch user profile for role/permissions
+        const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
+
+        let finalProfile = profile || { role: 'user', permissions: {} };
+
+        return {
+            status: 200,
+            data: {
+                token: data.session.access_token,
+                user: { ...data.user, ...finalProfile }
+            }
+        };
+    },
+
 
     logout: async () => {
         const { error } = await supabase.auth.signOut();
