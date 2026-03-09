@@ -86,7 +86,7 @@ export default function CompanyInfoModal({ isOpen, onClose }) {
 
                 // If config was empty, set some defaults to avoid breaking
                 if (!config.type) config.type = 'custom_html_a5';
-                if (!config.logo_text) config.logo_text = '';
+                if (!config.logo_text) config.logo_text = companyName.trim().charAt(0).toUpperCase() || 'A';
                 if (config.showWatermark === undefined) config.showWatermark = true;
 
                 localStorage.setItem('receipt_design_config', JSON.stringify(config));

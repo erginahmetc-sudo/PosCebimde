@@ -11,11 +11,10 @@ export default function ReceiptDesignerModal({ isOpen, onClose }) {
         name: 'ERCAN YAPI MARKET',
         address: 'Fatih Mh. Mücahitler Cd. 151/C Seyhan/Adana',
         phone: '0553 878 58 85',
-        phone: '0553 878 58 85'
+        logo_text: 'E'
     });
 
     const [showWatermark, setShowWatermark] = useState(true);
-    const [showSuccessToast, setShowSuccessToast] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -50,7 +49,7 @@ export default function ReceiptDesignerModal({ isOpen, onClose }) {
                 address: addressRes.data || prev.address,
                 phone: phoneRes.data || prev.phone,
                 logo_url: logoRes.data || undefined,
-                logo_url: logoRes.data || undefined
+                logo_text: (nameRes.data || prev.name).charAt(0).toUpperCase()
             }));
         } catch (error) {
             console.error("Error fetching company settings for receipt default:", error);
@@ -66,9 +65,7 @@ export default function ReceiptDesignerModal({ isOpen, onClose }) {
         localStorage.setItem('receipt_design_config', JSON.stringify(config));
         // Also ensure we set the flag for printing logic to know to use this
         localStorage.setItem('receipt_template_type', 'custom_html_a5');
-        
-        setShowSuccessToast(true);
-        setTimeout(() => setShowSuccessToast(false), 3500);
+        alert('Tasarım ayarları kaydedildi!');
     };
 
     const getPreviewHTML = () => {
@@ -162,7 +159,7 @@ export default function ReceiptDesignerModal({ isOpen, onClose }) {
             <div class="w-[70%] flex flex-col items-center text-center">
                 ${companyInfo.logo_url
                 ? `<div class="mb-1 h-9 flex items-center justify-center overflow-hidden"><img src="${companyInfo.logo_url}" class="h-full object-contain" /></div>`
-                : ''
+                : `<div class="mb-1 bg-[var(--primary-color)] text-white p-1 rounded-lg font-extrabold text-base flex items-center justify-center w-9 h-9 shadow-sm">${companyInfo.logo_text}</div>`
             }
                 <h1 class="font-black text-base tracking-tight leading-none text-black uppercase mb-0">${companyInfo.name}</h1>
                 <p class="text-xs text-black font-bold uppercase tracking-normal leading-tight whitespace-nowrap mt-1">
@@ -240,23 +237,7 @@ export default function ReceiptDesignerModal({ isOpen, onClose }) {
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-6xl h-[90vh] flex flex-col shadow-2xl overflow-hidden relative">
-            
-                {/* Modern Success Toast */}
-                {showSuccessToast && (
-                    <div className="absolute top-8 left-1/2 transform -translate-x-1/2 z-[100] animate-[bounce_1s_ease-in-out]">
-                        <div className="bg-gradient-to-r from-emerald-500 to-green-600 text-white px-8 py-4 rounded-2xl flex items-center gap-4 shadow-[0_10px_40px_-10px_rgba(16,185,129,0.8)] border border-emerald-400/50">
-                            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined text-white text-3xl">check_circle</span>
-                            </div>
-                            <div>
-                                <h4 className="font-extrabold text-lg leading-tight tracking-wide">MÜKEMMEL!</h4>
-                                <p className="text-emerald-50 text-sm font-medium opacity-90">Tasarım ayarlarınız başarıyla kaydedildi.</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
+            <div className="bg-white rounded-2xl w-full max-w-6xl h-[90vh] flex flex-col shadow-2xl overflow-hidden">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-orange-500 to-red-600 px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -313,7 +294,17 @@ export default function ReceiptDesignerModal({ isOpen, onClose }) {
                                         placeholder="İletişim No"
                                     />
                                 </div>
-
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Logo Harfi/Sembol</label>
+                                    <input
+                                        type="text"
+                                        maxLength={2}
+                                        value={companyInfo.logo_text}
+                                        onChange={(e) => setCompanyInfo({ ...companyInfo, logo_text: e.target.value })}
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                                        placeholder="E"
+                                    />
+                                </div>
                             </div>
                         </div>
 

@@ -145,14 +145,20 @@ export default function MobileInvoicesPage() {
         try {
             // 1. Get credentials (ALWAYS DB)
             // Cihazlara kaydetme istenmediği için her seferinde DB'den çekiyoruz.
-            const { data: secretToken } = await settingsAPI.get('secret_token');
+            const [k1, k2, k3] = await Promise.all([
+                settingsAPI.get('birfatura_api_key'),
+                settingsAPI.get('birfatura_secret_key'),
+                settingsAPI.get('birfatura_integration_key')
+            ]);
 
-            if (!secretToken) {
+            if (!k1.data || !k2.data || !k3.data) {
                 throw new Error("API ayarları veritabanında bulunamadı. Lütfen Ayarlar > Entegrasyon Ayarları bölümünden bilgileri girin.");
             }
 
             const config = {
-                secret_token: secretToken
+                api_key: k1.data,
+                secret_key: k2.data,
+                integration_key: k3.data
             };
 
             // 2. Fetch Invoice XML
@@ -164,9 +170,10 @@ export default function MobileInvoicesPage() {
 
             const response = await axios.post('/api/birfatura-proxy', {
                 endpoint: 'OutEBelgeV2/DocumentDownloadByUUID',
-                payload: payload
-            }, {
-                headers: { 'x-secret-token': config.secret_token }
+                payload: payload,
+                apiKey: config.api_key,
+                secretKey: config.secret_key,
+                integrationKey: config.integration_key
             });
 
             if (!response.data.Success) throw new Error(response.data.Message || "Fatura detayı alınamadı");

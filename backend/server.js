@@ -1,16 +1,15 @@
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
-const axios = require('axios');
+const dotenv = require('dotenv');
+const fs = require('fs');
 const path = require('path');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+const axios = require('axios');
 
-require('dotenv').config({ path: path.join(__dirname, '../frontend/.env') });
+dotenv.config();
 
 const app = express();
-// Apply rate limiter to all /api routes
-app.use('/api/', apiLimiter);
+const PORT = process.env.PORT || 3001;
 
 
 // Supabase Config
@@ -51,88 +50,32 @@ try {
     console.error("Admin client init failed", e);
 }
 
-// Strict CORS Policy
-const allowedOrigins = [
-    'http://localhost:5173',
-    'https://www.poscebimde.com',
-    'https://poscebimde.com'
-];
-const corsOptions = {
-    origin: function (origin, callback) {
-        // allow requests with no origin (like mobile apps or curl requests)
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('CORS policy violation: This origin is not allowed.'));
-        }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'token', 'x-api-key', 'x-secret-key', 'x-integration-key', 'x-secret-token'],
-    credentials: true
-};
-
-app.use(cors(corsOptions));
-app.use(express.json({ limit: '5mb' })); // Limit JSON strictly against JSON parsing DOS attacks
+app.use(cors());
+app.use(express.json());
 
 // --- BIRFATURA API PROXY ---
-// Frontend's cors-free bridge. Securely fetches keys from backend using company Secret Token.
+// Frontend'in CORS sorunu olmadan BirFatura API'sine erişmesi için proxy
 app.post('/api/birfatura-proxy', async (req, res) => {
     try {
-        const { endpoint, payload } = req.body;
-        const secretToken = req.headers['x-secret-token'];
+        const { endpoint, payload, apiKey, secretKey, integrationKey } = req.body;
 
-        if (!endpoint || !secretToken) {
+        if (!endpoint || !apiKey || !secretKey || !integrationKey) {
             return res.status(400).json({
                 Success: false,
-                Message: 'Eksik parametre: endpoint ve x-secret-token header gerekli.'
+                Message: 'Eksik parametre: endpoint, apiKey, secretKey ve integrationKey gerekli.'
             });
         }
 
-        if (!supabase) {
-           return res.status(503).json({ Success: false, Message: 'Veritabanı bağlantısı yok.'});
-        }
-
-        // 1. Authenticate Request via secretToken to find company
-        const { data: setting, error: authErr } = await supabase
-            .from('app_settings')
-            .select('company_code')
-            .eq('key', 'secret_token')
-            .eq('value', secretToken)
-            .single();
-
-        if (authErr || !setting) {
-             return res.status(401).json({ Success: false, Message: 'Yetkisiz Erişim: Geçersiz Token' });
-        }
-        
-        const companyCode = setting.company_code;
-
-        // 2. Fetch the integration keys for this company from DB securely
-        const { data: keysData, error: keysErr } = await supabase
-             .from('app_settings')
-             .select('key, value')
-             .eq('company_code', companyCode)
-             .in('key', ['birfatura_api_key', 'birfatura_secret_key', 'birfatura_integration_key']);
-        
-        if (keysErr) {
-             return res.status(500).json({ Success: false, Message: 'Entegrasyon anahtarları veritabanından alınamadı.' });
-        }
-
-        const keysMap = {};
-        keysData.forEach(item => { keysMap[item.key] = item.value; });
-
-        if (!keysMap.birfatura_api_key || !keysMap.birfatura_secret_key || !keysMap.birfatura_integration_key) {
-             return res.status(400).json({ Success: false, Message: 'Şirket için BirFatura API anahtarları eksik.' });
-        }
-
         const url = `https://uygulama.edonustur.com/api/${endpoint}`;
+
         const headers = {
-            "X-Api-Key": keysMap.birfatura_api_key,
-            "X-Secret-Key": keysMap.birfatura_secret_key,
-            "X-Integration-Key": keysMap.birfatura_integration_key,
+            "X-Api-Key": apiKey,
+            "X-Secret-Key": secretKey,
+            "X-Integration-Key": integrationKey,
             "Content-Type": "application/json"
         };
 
-        console.log(`[BirFatura Proxy Secure] POST ${url}`);
+        console.log(`[BirFatura Proxy] POST ${url}`);
 
         const response = await axios.post(url, payload, {
             headers,
@@ -141,15 +84,17 @@ app.post('/api/birfatura-proxy', async (req, res) => {
 
         res.json(response.data);
     } catch (error) {
-        console.error('[BirFatura Proxy Secure] Error:', error.message);
+        console.error('[BirFatura Proxy] Error:', error.message);
 
         if (error.response) {
+            // BirFatura API'den gelen hata
             res.status(error.response.status).json({
                 Success: false,
                 Message: error.response.data?.Message || error.message,
                 StatusCode: error.response.status
             });
         } else {
+            // Ağ hatası vb.
             res.status(500).json({
                 Success: false,
                 Message: 'BirFatura API\'ye bağlanılamadı: ' + error.message

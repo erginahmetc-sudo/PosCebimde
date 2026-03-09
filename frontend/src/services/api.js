@@ -31,7 +31,7 @@ export const authAPI = {
         }
 
         // Fetch user profile for role/permissions AND Company Code
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
             .from('user_profiles')
             .select('*')
             .eq('id', data.user.id)
@@ -46,41 +46,6 @@ export const authAPI = {
                 user: { ...data.user, ...finalProfile }
             }
         };
-    },
-
-    // 2FA Option 2: Verify Password then Send Email OTP
-    verifyPasswordAndSendOtp: async (email, password) => {
-        if (!email.includes('@')) {
-            throw { response: { data: { message: 'Lütfen e-posta adresinizi giriniz.' } } };
-        }
-
-        // 1. Verify password by logging in temporarily
-        const { data: passData, error: passError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
-
-        if (passError) {
-            if (passError.message.includes('Email not confirmed')) {
-                throw { response: { data: { message: 'E-posta adresiniz henüz onaylanmamış.' } } };
-            }
-            throw { response: { data: { message: 'Giriş yapılamadı. Bilgilerinizi kontrol edin.' } } };
-        }
-
-        // 2. Sign out immediately so we don't hold the session until OTP is verified.
-        await supabase.auth.signOut();
-
-        // 3. Send OTP via email
-        const { error: otpError } = await supabase.auth.signInWithOtp({
-            email,
-            options: {
-                shouldCreateUser: false,
-            }
-        });
-
-        if (otpError) throw { response: { data: { message: otpError.message } } };
-        
-        return { status: 200, message: 'Lütfen e-postanıza gelen 8 haneli kodu giriniz.' };
     },
 
     sendOtp: async (email) => {

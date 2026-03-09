@@ -5,12 +5,10 @@ import { authAPI } from '../services/api';
 import StatusModal from '../components/modals/StatusModal';
 
 export default function LoginPage() {
-    // Step 1: Password, Step 2: OTP
-    const [step, setStep] = useState(1);
+    // Removed 'step' state as we are removing OTP
     const [formData, setFormData] = useState({
         email: '',
-        password: '',
-        otp: ''
+        password: ''
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -24,28 +22,24 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            if (step === 1) {
-                // Step 1: Verify Password and Send OTP
-                const res = await authAPI.verifyPasswordAndSendOtp(formData.email, formData.password);
-                if (res.status === 200) {
-                    setStep(2);
-                }
-            } else if (step === 2) {
-                // Step 2: Verify OTP
-                const verifyResponse = await authAPI.verifyOtp(formData.email, formData.otp);
-                
-                if (verifyResponse.status === 200) {
-                    const userData = verifyResponse.data.user;
-                    await login(userData);
-                    navigate('/');
-                }
+            // Direct login without OTP
+            const loginResponse = await authAPI.login(formData.email, formData.password);
+
+            if (loginResponse.status === 200) {
+                // Determine user role and permissions from response or defaults
+                const userData = loginResponse.data.user;
+
+                // Login successful - Await to catch permission errors from AuthContext
+                await login(userData);
+                navigate('/');
             }
         } catch (err) {
             const message = err.response?.data?.message ||
                 err.response?.data?.error ||
                 err.message ||
-                'İşlem başarısız. Bilgilerinizi kontrol edin.';
+                'Giriş başarısız. Bilgilerinizi kontrol edin.';
 
+            // Fallback to standard error display
             setError(message);
         } finally {
             setLoading(false);
@@ -135,12 +129,10 @@ export default function LoginPage() {
 
                         <div className="mb-8 text-center lg:text-left">
                             <h1 className="text-3xl font-bold text-slate-800 mb-2 tracking-tight">
-                                {step === 1 ? 'Giriş Yap' : 'Doğrulama Kodu'}
+                                Giriş Yap
                             </h1>
                             <p className="text-slate-500 font-normal">
-                                {step === 1 
-                                    ? 'Tekrar hoş geldiniz! Hesabınıza erişin.' 
-                                    : 'Lütfen e-postanıza gönderilen 8 haneli güvenlik kodunu girin.'}
+                                Tekrar hoş geldiniz! Hesabınıza erişin.
                             </p>
                         </div>
 
@@ -153,65 +145,41 @@ export default function LoginPage() {
 
                         <form onSubmit={handleSubmit} className="space-y-5">
 
-                            {step === 1 && (
-                                <>
-                                    <div className="space-y-1.5 group">
-                                        <label className="block text-sm font-semibold text-slate-600 ml-1">E-posta</label>
-                                        <div className="relative">
-                                            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                                <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">mail</span>
-                                            </span>
-                                            <input
-                                                className="glass-input block w-full pl-10 pr-4 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
-                                                placeholder="isim@sirket.com"
-                                                type="email"
-                                                value={formData.email}
-                                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-1.5 group">
-                                        <div className="flex justify-between items-center ml-1">
-                                            <label className="block text-sm font-semibold text-slate-600">Şifre</label>
-                                        </div>
-                                        <div className="relative">
-                                            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                                <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">lock</span>
-                                            </span>
-                                            <input
-                                                className="glass-input block w-full pl-10 pr-10 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
-                                                placeholder="••••••••"
-                                                type="password"
-                                                value={formData.password}
-                                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            {step === 2 && (
-                                <div className="space-y-1.5 group animate-fadeIn">
-                                    <label className="block text-sm font-semibold text-slate-600 ml-1">8 Haneli Doğrulama Kodu</label>
-                                    <div className="relative">
-                                        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                            <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">pin</span>
-                                        </span>
-                                        <input
-                                            className="glass-input block w-full pl-10 pr-4 py-3 bg-white/60 border border-border-subtle rounded-xl text-lg font-mono tracking-widest text-center transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
-                                            placeholder="--------"
-                                            type="text"
-                                            maxLength="8"
-                                            value={formData.otp}
-                                            onChange={(e) => setFormData({ ...formData, otp: e.target.value.replace(/[^0-9]/g, '') })}
-                                            required
-                                        />
-                                    </div>
+                            <div className="space-y-1.5 group">
+                                <label className="block text-sm font-semibold text-slate-600 ml-1">E-posta</label>
+                                <div className="relative">
+                                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                        <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">mail</span>
+                                    </span>
+                                    <input
+                                        className="glass-input block w-full pl-10 pr-4 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
+                                        placeholder="isim@sirket.com"
+                                        type="email"
+                                        value={formData.email}
+                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                        required
+                                    />
                                 </div>
-                            )}
+                            </div>
+
+                            <div className="space-y-1.5 group">
+                                <div className="flex justify-between items-center ml-1">
+                                    <label className="block text-sm font-semibold text-slate-600">Şifre</label>
+                                </div>
+                                <div className="relative">
+                                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                        <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">lock</span>
+                                    </span>
+                                    <input
+                                        className="glass-input block w-full pl-10 pr-10 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
+                                        placeholder="••••••••"
+                                        type="password"
+                                        value={formData.password}
+                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
 
 
                             <button
@@ -222,34 +190,18 @@ export default function LoginPage() {
                                 {loading ? (
                                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                 ) : (
-                                    step === 1 ? 'İleri' : 'Onayla ve Giriş Yap'
+                                    'Giriş Yap'
                                 )}
                             </button>
 
                         </form>
 
-                        {step === 1 && (
-                            <div className="mt-8 text-center">
-                                <p className="text-sm text-slate-500 font-medium">
-                                    Kasa POS'ta yeni misiniz?
-                                    <Link className="text-primary font-bold hover:text-primary-hover hover:underline decoration-2 underline-offset-4 transition-all ml-1" to="/register">Hesap Oluşturun</Link>
-                                </p>
-                            </div>
-                        )}
-                        {step === 2 && (
-                            <div className="mt-8 text-center">
-                                <p className="text-sm text-slate-500 font-medium">
-                                    Yanlış e-posta mı girdiniz?
-                                    <button 
-                                        type="button" 
-                                        onClick={() => { setStep(1); setFormData({...formData, otp: ''}) }} 
-                                        className="text-primary font-bold hover:text-primary-hover hover:underline decoration-2 underline-offset-4 transition-all ml-1"
-                                    >
-                                        Geri Dön
-                                    </button>
-                                </p>
-                            </div>
-                        )}
+                        <div className="mt-8 text-center">
+                            <p className="text-sm text-slate-500 font-medium">
+                                Kasa POS'ta yeni misiniz?
+                                <Link className="text-primary font-bold hover:text-primary-hover hover:underline decoration-2 underline-offset-4 transition-all ml-1" to="/register">Hesap Oluşturun</Link>
+                            </p>
+                        </div>
 
                         {/* Footer Links (Mobile) */}
                         <div className="mt-auto lg:hidden pt-8 text-center">
