@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",
     "axios": "^1.13.2",
+    "dompurify": "^3.3.2",
     "file-saver": "^2.0.5",
     "html5-qrcode": "^2.3.8",
     "jsbarcode": "^3.12.3",

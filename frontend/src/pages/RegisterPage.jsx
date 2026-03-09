@@ -27,8 +27,11 @@ export default function RegisterPage() {
         }
 
         try {
-            // Generate 7-digit Company Code
-            const companyCode = Math.floor(1000000 + Math.random() * 9000000).toString();
+            // Generate 7-digit Company Code securely
+            const array = new Uint32Array(1);
+            window.crypto.getRandomValues(array);
+            // Produce a 7 digit number (from 1000000 to 9999999)
+            const companyCode = (1000000 + (array[0] % 9000000)).toString();
 
             // API çağrısı - Mevcut API yapısına uygun şekilde veri gönderiyoruz
             // Not: Backend 'companyName' ve 'phone' alanlarını destekliyorsa gönderilmeli
@@ -197,6 +200,21 @@ export default function RegisterPage() {
                                         <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary transition-colors outline-none" type="button">
                                             <span className="material-symbols-outlined">visibility_off</span>
                                         </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-text-main text-sm font-bold ml-1">Şifre Tekrarı</label>
+                                    <div className="relative group">
+                                        <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors text-[22px]">lock</span>
+                                        <input
+                                            className="form-input flex w-full rounded-2xl bg-gray-50 border-gray-100 focus:bg-white focus:border-primary/40 focus:ring-4 focus:ring-primary/10 transition-all duration-200 h-14 pl-12 pr-4 placeholder:text-gray-400 text-base text-text-main shadow-input outline-none"
+                                            placeholder="••••••••"
+                                            type="password"
+                                            value={formData.confirmPassword}
+                                            onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                                            required
+                                        />
                                     </div>
                                 </div>
 
