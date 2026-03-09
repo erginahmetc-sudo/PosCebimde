@@ -7,9 +7,8 @@ export default function RegisterPage() {
         username: '',
         companyName: '', // Kullanıcıdan işletme adı da istiyoruz artık
         email: '',
-        phone: '', // Telefon alanı eklendi
-        password: '',
-        confirmPassword: ''
+        phone: '', 
+        password: ''
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -19,12 +18,6 @@ export default function RegisterPage() {
         e.preventDefault();
         setError('');
         setLoading(true);
-
-        if (formData.password !== formData.confirmPassword) {
-            setError('Şifreler eşleşmiyor.');
-            setLoading(false);
-            return;
-        }
 
         try {
             // Generate 7-digit Company Code

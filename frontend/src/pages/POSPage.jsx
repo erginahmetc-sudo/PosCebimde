@@ -1278,23 +1278,28 @@ overflow: hidden;
             // BirFatura Integration
             const sendToBirFatura = localStorage.getItem('integration_send_sales_to_birfatura') === 'true';
             if (sendToBirFatura) {
+                // The new Push-Pull logic only needs the sale_code
                 const salePayload = {
-                    sale_code: saleCode,
-                    customer: selectedCustomer || null,
-                    customer_name: !selectedCustomer ? cleanCustomerName : undefined, // Temizlenmiş isim
-                    items: cart.map(item => ({
-                        stock_code: item.stock_code,
-                        name: item.name,
-                        quantity: item.quantity,
-                        price: item.price
-                    })),
-                    total: calculateTotal()
+                    sale_code: saleCode
                 };
 
-                birFaturaAPI.createOrder(salePayload).then(result => {
-                    if (!result.success) {
+                birFaturaAPI.createOrder(salePayload).then(async (result) => {
+                    if (result.success && result.data?.Result?.UUID) {
+                        // Successfully triggered, and BirFatura gave us an Invoice UUID
+                        const invoiceUuid = result.data.Result.UUID;
+                        console.log(`[POS] Fatura oluşturuldu. UUID: ${invoiceUuid}`);
+                        
+                        try {
+                            // Update the sale in Supabase to save UUID and mark as invoiced
+                            await salesAPI.update(saleCode, {
+                                faturasi_kesilecek_mi: false,
+                                birfatura_uuid: invoiceUuid
+                            });
+                        } catch (err) {
+                            console.error("[POS] UUID veritabanına kaydedilemedi:", err);
+                        }
+                    } else if (!result.success) {
                         console.error("BirFatura Error:", result.message);
-                        // Optional: alert users or just log. Choosing alert for visibility.
                         alert("BirFatura Entegrasyon Uyarısı: " + result.message);
                     }
                 });

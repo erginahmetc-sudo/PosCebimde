@@ -7,6 +7,7 @@ import SecretTokenModal from '../components/modals/SecretTokenModal';
 import CompanyInfoModal from '../components/modals/CompanyInfoModal';
 import DebtLimitModal from '../components/modals/DebtLimitModal';
 import { settingsAPI, productsAPI } from '../services/api';
+import StatusModal from '../components/modals/StatusModal';
 
 export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
@@ -32,6 +33,7 @@ export default function SettingsPage() {
     const [showSecretTokenModal, setShowSecretTokenModal] = useState(false);
     const [showCompanyInfoModal, setShowCompanyInfoModal] = useState(false);
     const [showDebtLimitModal, setShowDebtLimitModal] = useState(false);
+    const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'success' });
 
     useEffect(() => {
         loadSettings();
@@ -74,6 +76,16 @@ export default function SettingsPage() {
                 }
 
                 if (data['secret_token']) setSecretToken(data['secret_token']);
+
+                // Restore BirFatura Config to localStorage
+                if (data['birfatura_api_key'] || data['birfatura_secret_key'] || data['birfatura_integration_key']) {
+                    const birfaturaConfig = {
+                        api_key: data['birfatura_api_key'] || '',
+                        secret_key: data['birfatura_secret_key'] || '',
+                        integration_key: data['birfatura_integration_key'] || ''
+                    };
+                    localStorage.setItem('birfatura_config', JSON.stringify(birfaturaConfig));
+                }
             }
         } catch (error) {
             console.error("Settings load error:", error);
@@ -89,9 +101,21 @@ export default function SettingsPage() {
             if (key === 'receipt_auto_print') localStorage.setItem(key, value);
             if (key === 'receipt_paper_size') localStorage.setItem(key, value);
             if (key === 'invoices_show_total') localStorage.setItem(key, value);
+            
+            setStatusModal({
+                isOpen: true,
+                title: 'Başarılı',
+                message: 'Ayarlar başarıyla kaydedildi.',
+                type: 'success'
+            });
         } catch (err) {
             console.error(`Failed to save setting ${key}:`, err);
-            alert("Ayar kaydedilemedi.");
+            setStatusModal({
+                isOpen: true,
+                title: 'Hata',
+                message: 'Ayar kaydedilemedi.',
+                type: 'error'
+            });
         }
     };
 
@@ -567,6 +591,14 @@ export default function SettingsPage() {
             <CompanyInfoModal
                 isOpen={showCompanyInfoModal}
                 onClose={() => setShowCompanyInfoModal(false)}
+            />
+
+            <StatusModal
+                isOpen={statusModal.isOpen}
+                onClose={() => setStatusModal(prev => ({...prev, isOpen: false}))}
+                title={statusModal.title}
+                message={statusModal.message}
+                type={statusModal.type}
             />
         </div>
     );

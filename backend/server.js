@@ -202,9 +202,8 @@ app.post('/api/products/force-delete', async (req, res) => {
 });
 
 // --- ENDPOINT: BirFatura Polls This for Orders ---
-// Flask'ta çalışan /api/orders/ endpoint'i ile aynı mantık
+// Flask'ta çalışan /api/orders/ endpoint'i ile BİREBİR aynı mantık
 app.post('/api/orders/', async (req, res) => {
-    // 1. Auth Check (API Şifresi) - BirFatura 'token' header'ı gönderir
     const receivedToken = req.headers['token'];
     console.log("BirFatura İsteği Geldi:", req.body);
     console.log("Alınan Token:", receivedToken);
@@ -218,52 +217,53 @@ app.post('/api/orders/', async (req, res) => {
         return res.status(503).json({ "Orders": [], "error": "Veritabanı bağlantısı yok" });
     }
 
-    // 2. Validate Token & Get Company Code
-    // Token değerini doğrudan karşılaştır (JSON.stringify olmadan da dene)
-    let setting = null;
+    // 2. Validate Token
+    let isValidToken = false;
+    let companyCode = null;
 
-    // Önce doğrudan string olarak dene
-    const { data: setting1, error: error1 } = await supabase
+    // A) Veritabanından secret_token kontrolü
+    const { data: setting1 } = await supabase
         .from('app_settings')
         .select('company_code, value')
         .eq('key', 'secret_token')
         .single();
 
-    if (setting1) {
-        // value JSONB olduğu için içinden değeri çıkar
+    if (setting1 && setting1.value) {
         let storedToken = setting1.value;
-        // Eğer tırnak içinde geldiyse temizle
-        if (typeof storedToken === 'string') {
-            storedToken = storedToken.replace(/^"|"$/g, '');
-        }
-
-        console.log("DB'deki Token:", storedToken);
-        console.log("Gelen Token:", receivedToken);
-
+        if (typeof storedToken === 'string') storedToken = storedToken.replace(/^"|"$/g, '');
         if (storedToken === receivedToken) {
-            setting = setting1;
+            isValidToken = true;
+            companyCode = setting1.company_code;
         }
     }
 
-    if (!setting || !setting.company_code) {
-        console.warn("Invalid token received or no company found:", receivedToken);
+    // B) app.py Fallback: Eski python uygulamasındaki varsayılan token (Eğer DB'de eşleşmediyse)
+    if (!isValidToken && receivedToken === 'kasapos-2026-secret-api-token') {
+        isValidToken = true;
+        console.log("Fallback token accepted (kasapos-2026-secret-api-token).");
+    }
+
+    if (!isValidToken) {
+        console.warn("Invalid token received:", receivedToken);
         return res.status(401).json({ "Orders": [], "error": "Yetkisiz Erişim / Geçersiz Token" });
     }
 
-    const companyCode = setting.company_code;
-    console.log(`BirFatura request authorized for Company: ${companyCode}`);
-
-    // 3. Fetch Sales for this Company
-    const filterData = req.body;
-    const startDateTimeStr = filterData.startDateTime; // DD.MM.YYYY HH:mm:ss
-    const endDateTimeStr = filterData.endDateTime;
-    const orderCodeFilter = filterData.OrderCode;
-
+    // 3. Fetch Sales
+    // SADECE faturası kesilecek olanları ve silinmemiş olanları al
     let query = supabase
         .from('sales')
         .select('*')
-        .eq('company_code', companyCode)
-        .eq('is_deleted', false);
+        .eq('is_deleted', false)
+        .eq('faturasi_kesilecek_mi', true);
+
+    if (companyCode) {
+        query = query.eq('company_code', companyCode);
+    }
+
+    const filterData = req.body;
+    const startDateTimeStr = filterData.startDateTime;
+    const endDateTimeStr = filterData.endDateTime;
+    const orderCodeFilter = filterData.OrderCode;
 
     if (orderCodeFilter) {
         query = query.eq('sale_code', orderCodeFilter);
@@ -276,33 +276,30 @@ app.post('/api/orders/', async (req, res) => {
         return res.status(500).json({ "Orders": [], "error": "Veritabanı Hatası" });
     }
 
-    console.log(`Toplam ${sales?.length || 0} satış bulundu.`);
+    console.log(`Toplam ${sales?.length || 0} faturası kesilecek satış bulundu.`);
 
     // 4. Process and Filter (Date logic etc.)
     const ordersToSend = [];
 
-    let startDate = null, endDate = null;
-    try {
-        if (startDateTimeStr && endDateTimeStr) {
-            startDate = parseDate(startDateTimeStr);
-            endDate = parseDate(endDateTimeStr);
+    let filterStartDate = null, filterEndDate = null;
+    if (startDateTimeStr && endDateTimeStr) {
+        try {
+            filterStartDate = parseDate(startDateTimeStr);
+            filterEndDate = parseDate(endDateTimeStr);
+        } catch (e) {
+            console.error("Tarih parse hatası:", e);
         }
-    } catch (e) {
-        console.error("Tarih parse hatası:", e);
-        // Tarih hatası olsa bile devam et, tarih filtresi uygulama
     }
 
     for (const sale of (sales || [])) {
-        // Date Filter
-        let saleDate;
-        try {
-            saleDate = new Date(sale.date || sale.created_at);
-        } catch (e) {
-            continue;
-        }
-
-        if (startDate && endDate) {
-            if (saleDate < startDate || saleDate > endDate) continue;
+        // Tarih filtresi (Sadece OrderCode yoksa tarih filtresi uygula - app.py mantığı)
+        if (!orderCodeFilter && filterStartDate && filterEndDate) {
+            try {
+                const saleDate = new Date(sale.date || sale.created_at);
+                if (saleDate < filterStartDate || saleDate > filterEndDate) continue;
+            } catch (e) {
+                continue;
+            }
         }
 
         // --- Customer & Tax Logic (Flask'tan kopyalandı) ---
@@ -340,7 +337,6 @@ app.post('/api/orders/', async (req, res) => {
 
         if (Array.isArray(items)) {
             items.forEach(item => {
-                // final_price varsa kullan, yoksa price (Flask'taki gibi)
                 const unitPriceInclTax = parseFloat(item.final_price || item.price || 0);
                 const quantity = parseFloat(item.quantity || 1);
                 const unitPriceExclTax = unitPriceInclTax / 1.20;
@@ -363,13 +359,11 @@ app.post('/api/orders/', async (req, res) => {
 
         const calculatedTotalExclTax = calculatedTotal / 1.20;
 
-        // Flask'taki formatla aynı: DD.MM.YYYY HH:MM:SS
-        const formattedDate = formatDateForBirFatura(saleDate);
+        const saleDateObj = new Date(sale.date || sale.created_at);
+        const formattedDate = formatDateForBirFatura(saleDateObj);
 
-        // OrderId: Flask'taki gibi sale_code'dan sayısal değer çıkar
         let orderId = 0;
         try {
-            // sale_code formatı: SERVER-20260118001234567890 veya S-1234567890
             const codeWithoutPrefix = sale.sale_code.split('-')[1] || sale.sale_code;
             orderId = parseInt(codeWithoutPrefix.substring(0, 18)) || sale.id || 0;
         } catch (e) {

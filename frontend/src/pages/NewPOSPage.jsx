@@ -636,12 +636,23 @@ export default function NewPOSPage() {
 
             if (localStorage.getItem('integration_send_sales_to_birfatura') === 'true') {
                 birFaturaAPI.createOrder({
-                    sale_code: saleCode,
-                    customer: selectedCustomer || null,
-                    customer_name: !selectedCustomer ? cleanCustomerName : undefined,
-                    items: cart.map(item => ({ stock_code: item.stock_code, name: item.name, quantity: item.quantity, price: item.price })),
-                    total: calculateTotal()
-                }).then(res => { if (!res.success) alert("BirFatura Hatası: " + res.message); });
+                    sale_code: saleCode
+                }).then(async (result) => {
+                    if (result.success && result.data?.Result?.UUID) {
+                        try {
+                            const invoiceUuid = result.data.Result.UUID;
+                            console.log(`[NewPOS] Fatura oluşturuldu. UUID: ${invoiceUuid}`);
+                            await salesAPI.update(saleCode, {
+                                faturasi_kesilecek_mi: false,
+                                birfatura_uuid: invoiceUuid
+                            });
+                        } catch (err) {
+                            console.error("[NewPOS] UUID veritabanına kaydedilemedi:", err);
+                        }
+                    } else if (!result.success) {
+                        alert("BirFatura Hatası: " + result.message);
+                    }
+                });
             }
 
             if (localStorage.getItem('receipt_auto_print') === 'true') {

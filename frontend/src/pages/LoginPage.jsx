@@ -5,10 +5,11 @@ import { authAPI } from '../services/api';
 import StatusModal from '../components/modals/StatusModal';
 
 export default function LoginPage() {
-    // Removed 'step' state as we are removing OTP
+    const [step, setStep] = useState(1); // 1: Email/Password, 2: OTP
     const [formData, setFormData] = useState({
         email: '',
-        password: ''
+        password: '',
+        otp: ''
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -16,20 +17,38 @@ export default function LoginPage() {
     const navigate = useNavigate();
     const { login } = useAuth();
 
-    const handleSubmit = async (e) => {
+    const handleLoginSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
 
         try {
-            // Direct login without OTP
-            const loginResponse = await authAPI.login(formData.email, formData.password);
+            // First step: Login to get token/session
+            await authAPI.login(formData.email, formData.password);
+            
+            // Second step: Send OTP for 2FA verification
+            await authAPI.sendOtp(formData.email);
+            setStep(2);
+        } catch (err) {
+            const message = err.response?.data?.message ||
+                err.response?.data?.error ||
+                err.message ||
+                'Giriş başarısız. Bilgilerinizi kontrol edin.';
+            setError(message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-            if (loginResponse.status === 200) {
-                // Determine user role and permissions from response or defaults
-                const userData = loginResponse.data.user;
+    const handleOtpSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
 
-                // Login successful - Await to catch permission errors from AuthContext
+        try {
+            const verifyResponse = await authAPI.verifyOtp(formData.email, formData.otp);
+            if (verifyResponse.status === 200) {
+                const userData = verifyResponse.data.user;
                 await login(userData);
                 navigate('/');
             }
@@ -37,9 +56,7 @@ export default function LoginPage() {
             const message = err.response?.data?.message ||
                 err.response?.data?.error ||
                 err.message ||
-                'Giriş başarısız. Bilgilerinizi kontrol edin.';
-
-            // Fallback to standard error display
+                'Doğrulama kodu hatalı.';
             setError(message);
         } finally {
             setLoading(false);
@@ -143,58 +160,104 @@ export default function LoginPage() {
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit} className="space-y-5">
+                        {step === 1 ? (
+                            <form onSubmit={handleLoginSubmit} className="space-y-5">
 
-                            <div className="space-y-1.5 group">
-                                <label className="block text-sm font-semibold text-slate-600 ml-1">E-posta</label>
-                                <div className="relative">
-                                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                        <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">mail</span>
-                                    </span>
-                                    <input
-                                        className="glass-input block w-full pl-10 pr-4 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
-                                        placeholder="isim@sirket.com"
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        required
-                                    />
+                                <div className="space-y-1.5 group">
+                                    <label className="block text-sm font-semibold text-slate-600 ml-1">E-posta</label>
+                                    <div className="relative">
+                                        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                            <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">mail</span>
+                                        </span>
+                                        <input
+                                            className="glass-input block w-full pl-10 pr-4 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
+                                            placeholder="isim@sirket.com"
+                                            type="email"
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            required
+                                        />
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div className="space-y-1.5 group">
-                                <div className="flex justify-between items-center ml-1">
-                                    <label className="block text-sm font-semibold text-slate-600">Şifre</label>
+                                <div className="space-y-1.5 group">
+                                    <div className="flex justify-between items-center ml-1">
+                                        <label className="block text-sm font-semibold text-slate-600">Şifre</label>
+                                    </div>
+                                    <div className="relative">
+                                        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                            <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">lock</span>
+                                        </span>
+                                        <input
+                                            className="glass-input block w-full pl-10 pr-10 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
+                                            placeholder="••••••••"
+                                            type="password"
+                                            value={formData.password}
+                                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                            required
+                                        />
+                                    </div>
                                 </div>
-                                <div className="relative">
-                                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                        <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">lock</span>
-                                    </span>
-                                    <input
-                                        className="glass-input block w-full pl-10 pr-10 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
-                                        placeholder="••••••••"
-                                        type="password"
-                                        value={formData.password}
-                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                        required
-                                    />
+
+                                <button
+                                    className="w-full flex items-center justify-center py-3.5 px-6 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold text-base shadow-lg shadow-teal-500/20 transition-all duration-200 hover:shadow-teal-500/30 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
+                                    type="submit"
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        'Giriş Yap'
+                                    )}
+                                </button>
+                            </form>
+                        ) : (
+                            <form onSubmit={handleOtpSubmit} className="space-y-5">
+                                <div className="space-y-1.5 group">
+                                    <label className="block text-sm font-semibold text-slate-600 ml-1">Doğrulama Kodu</label>
+                                    <p className="text-xs text-slate-500 mb-2 ml-1">E-posta adresinize gönderilen 8 haneli kodu girin.</p>
+                                    <div className="relative">
+                                        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                            <span className="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">dialpad</span>
+                                        </span>
+                                        <input
+                                            className="glass-input block w-full pl-10 pr-4 py-3 bg-white/60 border border-border-subtle rounded-xl text-sm tracking-widest text-center transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none text-slate-700 placeholder-slate-400 hover:border-slate-300 hover:bg-white/80"
+                                            placeholder="12345678"
+                                            type="text"
+                                            maxLength={8}
+                                            value={formData.otp}
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                if(val.length <= 8) setFormData({ ...formData, otp: val });
+                                            }}
+                                            required
+                                        />
+                                    </div>
                                 </div>
-                            </div>
+
+                                <button
+                                    className="w-full flex items-center justify-center py-3.5 px-6 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold text-base shadow-lg shadow-teal-500/20 transition-all duration-200 hover:shadow-teal-500/30 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
+                                    type="submit"
+                                    disabled={loading || formData.otp.length !== 8}
+                                >
+                                    {loading ? (
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        'Doğrula ve Giriş Yap'
+                                    )}
+                                </button>
+                                
+                                <button
+                                    type="button"
+                                    onClick={() => setStep(1)}
+                                    className="w-full mt-3 flex items-center justify-center py-2 px-6 rounded-xl bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 font-medium text-sm transition-all duration-200"
+                                >
+                                    Geri Dön
+                                </button>
+                            </form>
+                        )}
 
 
-                            <button
-                                className="w-full flex items-center justify-center py-3.5 px-6 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold text-base shadow-lg shadow-teal-500/20 transition-all duration-200 hover:shadow-teal-500/30 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
-                                type="submit"
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                    'Giriş Yap'
-                                )}
-                            </button>
-
-                        </form>
 
                         <div className="mt-8 text-center">
                             <p className="text-sm text-slate-500 font-medium">

@@ -40,7 +40,13 @@ export default function IntegrationSettingsModal({ isOpen, onClose }) {
             await settingsAPI.set('birfatura_secret_key', secretKey.trim());
             await settingsAPI.set('birfatura_integration_key', integrationKey.trim());
 
-
+            // Save to localStorage for birFaturaService.js
+            const birfaturaConfig = {
+                api_key: apiKey.trim(),
+                secret_key: secretKey.trim(),
+                integration_key: integrationKey.trim()
+            };
+            localStorage.setItem('birfatura_config', JSON.stringify(birfaturaConfig));
 
             alert("Ayarlar başarıyla kaydedildi.");
             onClose();

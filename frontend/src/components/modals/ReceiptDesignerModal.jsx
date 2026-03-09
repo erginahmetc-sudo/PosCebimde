@@ -5,6 +5,7 @@ const PAPER_SIZES = {
 };
 
 import { settingsAPI } from '../../services/api';
+import StatusModal from './StatusModal';
 
 export default function ReceiptDesignerModal({ isOpen, onClose }) {
     const [companyInfo, setCompanyInfo] = useState({
@@ -15,6 +16,7 @@ export default function ReceiptDesignerModal({ isOpen, onClose }) {
     });
 
     const [showWatermark, setShowWatermark] = useState(true);
+    const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'success' });
 
     useEffect(() => {
         if (isOpen) {
@@ -65,7 +67,12 @@ export default function ReceiptDesignerModal({ isOpen, onClose }) {
         localStorage.setItem('receipt_design_config', JSON.stringify(config));
         // Also ensure we set the flag for printing logic to know to use this
         localStorage.setItem('receipt_template_type', 'custom_html_a5');
-        alert('Tasarım ayarları kaydedildi!');
+        setStatusModal({
+            isOpen: true,
+            title: 'Başarılı',
+            message: 'Tasarım ayarları kaydedildi!',
+            type: 'success'
+        });
     };
 
     const getPreviewHTML = () => {
@@ -351,6 +358,14 @@ export default function ReceiptDesignerModal({ isOpen, onClose }) {
                     </div>
                 </div>
             </div>
+            
+            <StatusModal
+                isOpen={statusModal.isOpen}
+                onClose={() => setStatusModal(prev => ({...prev, isOpen: false}))}
+                title={statusModal.title}
+                message={statusModal.message}
+                type={statusModal.type}
+            />
         </div>
     );
 }
