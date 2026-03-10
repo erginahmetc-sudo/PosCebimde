@@ -428,6 +428,8 @@ app.post('/api/orders/', async (req, res) => {
             "ShipCompany": "Kargo",
             "PaymentTypeId": 1,
             "PaymentType": "Kredi Kartı",
+            "Status": 1, // Onaylandı statüsü
+            "OrderStatusId": 1, // Onaylandı statüsü
             "Currency": "TRY",
             "CurrencyRate": 1,
             "TotalPaidTaxIncluding": Number(calculatedTotal.toFixed(2)),
