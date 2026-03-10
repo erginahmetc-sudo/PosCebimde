@@ -643,7 +643,6 @@ export default function NewPOSPage() {
                             const invoiceUuid = result.data.Result.UUID;
                             console.log(`[NewPOS] Fatura oluşturuldu. UUID: ${invoiceUuid}`);
                             await salesAPI.update(saleCode, {
-                                faturasi_kesilecek_mi: false,
                                 birfatura_uuid: invoiceUuid
                             });
                         } catch (err) {

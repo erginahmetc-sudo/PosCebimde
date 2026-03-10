@@ -1292,7 +1292,6 @@ overflow: hidden;
                         try {
                             // Update the sale in Supabase to save UUID and mark as invoiced
                             await salesAPI.update(saleCode, {
-                                faturasi_kesilecek_mi: false,
                                 birfatura_uuid: invoiceUuid
                             });
                         } catch (err) {
@@ -2498,6 +2497,3 @@ overflow: hidden;
         </div >
     );
 }
-
-
-    }
