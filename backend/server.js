@@ -254,8 +254,7 @@ app.post('/api/orders/', async (req, res) => {
     let query = supabase
         .from('sales')
         .select('*')
-        .eq('is_deleted', false)
-        .eq('faturasi_kesilecek_mi', true);
+        .eq('is_deleted', false);
 
     if (companyCode) {
         query = query.eq('company_code', companyCode);
