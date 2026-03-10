@@ -23,20 +23,9 @@ export const birFaturaAPI = {
             return { success: false, message: "API, Secret veya Integration Key eksik. Lütfen Ayarlar sayfasını kontrol edin." };
         }
 
-        // TC / VKN ayrıştırma (11 hane = TCKN → SsnTcNo, diğer = VKN → TaxNo)
+        // TC / VKN - API sadece taxNo alanı bekliyor (camelCase)
         const cleanTaxNumber = String(retailForm.tax_number || "").trim();
-        let ssnTcNo = "";
-        let taxNo = "";
-        if (cleanTaxNumber.length === 11) {
-            ssnTcNo = cleanTaxNumber;
-        } else if (cleanTaxNumber.length > 0) {
-            taxNo = cleanTaxNumber;
-        }
-        // Varsayılan: boşsa 11111111111
-        if (!ssnTcNo && !taxNo) {
-            ssnTcNo = "11111111111";
-        }
-        const shippingTaxNumber = taxNo ? taxNo : ssnTcNo;
+        const taxNo = cleanTaxNumber.length > 0 ? cleanTaxNumber : "11111111111";
 
         // Toplam hesapla
         const total = cart.reduce((sum, item) => {
@@ -48,7 +37,7 @@ export const birFaturaAPI = {
 
         const today = new Date().toISOString().split('T')[0];
 
-        // Ürün satırları
+        // Ürün satırları (camelCase - API şemasına uygun)
         const orderDetails = cart.map(item => {
             const priceIncl = parseFloat(item.price || 0);
             const priceExcl = priceIncl / 1.20;
@@ -57,20 +46,20 @@ export const birFaturaAPI = {
             const discountIncl = priceIncl * qty * discountRate / 100;
             const discountExcl = discountIncl / 1.20;
             return {
-                ProductCode: item.stock_code || "",
-                Barcode: item.barcode || item.stock_code || "",
-                ProductBrand: "",
-                ProductName: item.name || "",
-                ProductNote: "",
-                ProductQuantityType: "Adet",
-                ProductQuantity: qty,
-                VatRate: 20,
-                ProductUnitPriceTaxExcluding: Number(priceExcl.toFixed(4)),
-                ProductUnitPriceTaxIncluding: Number(priceIncl.toFixed(4)),
-                DiscountIsPercentUnit: discountRate > 0 ? 1 : 0,
-                DiscountRateUnit: discountRate,
-                DiscountUnitTaxExcluding: Number(discountExcl.toFixed(2)),
-                DiscountUnitTaxIncluding: Number(discountIncl.toFixed(2)),
+                productCode: item.stock_code || "",
+                barcode: item.barcode || item.stock_code || "",
+                productBrand: "",
+                productName: item.name || "",
+                productNote: "",
+                productQuantityType: "Adet",
+                productQuantity: qty,
+                vatRate: 20,
+                productUnitPriceTaxExcluding: Number(priceExcl.toFixed(4)),
+                productUnitPriceTaxIncluding: Number(priceIncl.toFixed(4)),
+                discountIsPercentUnit: discountRate > 0 ? 1 : 0,
+                discountRateUnit: discountRate,
+                discountUnitTaxExcluding: Number(discountExcl.toFixed(2)),
+                discountUnitTaxIncluding: Number(discountIncl.toFixed(2)),
             };
         });
 
@@ -82,60 +71,58 @@ export const birFaturaAPI = {
             }));
 
         const invoicePayload = {
-            Invoice: {
-                OrderCode: saleCode || ('SLS-' + Date.now()),
-                OrderDate: today,
-                InvoiceDate: today,
-                InvoiceExplanation: "POS Satış",
-                EInvoiceId: "",
-                IsDocumentNoAuto: true,
-                ETTN: ettn,
-                ReceiverTag: null,
-                BillingName: retailForm.name || "Perakende Müşteri",
-                BillingAddress: retailForm.address || "",
-                BillingTown: retailForm.district || "",
-                BillingCity: retailForm.city || "",
-                BillingMobilePhone: retailForm.phone || "",
-                BillingPhone: retailForm.phone || "",
-                BillingPhone2: null,
-                TaxOffice: retailForm.tax_office || "",
-                TaxNo: taxNo,
-                SsnTcNo: ssnTcNo,
-                Email: retailForm.email || "",
-                ShipCompany: "",
-                CargoCampaignCode: "",
-                ShippingName: retailForm.name || "",
-                ShippingAddress: retailForm.address || "",
-                ShippingTown: retailForm.district || "",
-                ShippingCity: retailForm.city || "",
-                ShippingCountry: "Türkiye",
-                ShippingZipCode: "",
-                ShippingPhone: retailForm.phone || "",
-                ShippingTaxNumber: shippingTaxNumber,
-                DeliveryFeeType: 3,
-                PaymentType: paymentMethod || "Nakit",
-                Currency: "TRY",
-                CurrencyRate: 1.0,
-                TotalPaidTaxExcluding: Number(totalExclTax.toFixed(2)),
-                TotalPaidTaxIncluding: Number(total.toFixed(2)),
-                ProductsTotalTaxExcluding: Number(totalExclTax.toFixed(2)),
-                ProductsTotalTaxIncluding: Number(total.toFixed(2)),
-                ShippingChargeTotalTaxExcluding: 0.00,
-                ShippingChargeTotalTaxIncluding: 0.00,
-                InstallmentChargeTotalTaxExcluding: 0.00,
-                InstallmentChargeTotalTaxIncluding: 0.00,
-                BankTransferDiscountTotalTaxExcluding: 0.00,
-                BankTransferDiscountTotalTaxIncluding: 0.00,
-                PayingAtTheDoorChargeTotalTaxExcluding: 0.00,
-                PayingAtTheDoorChargeTotalTaxIncluding: 0.00,
-                DiscountTotalTaxExcluding: 0.00,
-                DiscountTotalTaxIncluding: 0.00,
-                OrderDetails: orderDetails
+            invoice: {
+                orderCode: saleCode || ('SLS-' + Date.now()),
+                orderDate: today,
+                invoiceDate: today,
+                invoiceExplanation: "POS Satış",
+                eInvoiceId: "",
+                isDocumentNoAuto: true,
+                ettn: ettn,
+                receiverTag: null,
+                billingName: retailForm.name || "Perakende Müşteri",
+                billingAddress: retailForm.address || "",
+                billingTown: retailForm.district || "",
+                billingCity: retailForm.city || "",
+                billingMobilePhone: retailForm.phone || "",
+                billingPhone: retailForm.phone || "",
+                billingPhone2: null,
+                taxOffice: retailForm.tax_office || "",
+                taxNo: taxNo,
+                email: retailForm.email || "",
+                shipCompany: "",
+                cargoCampaignCode: "",
+                shippingName: retailForm.name || "",
+                shippingAddress: retailForm.address || "",
+                shippingTown: retailForm.district || "",
+                shippingCity: retailForm.city || "",
+                shippingCountry: "Türkiye",
+                shippingZipCode: "",
+                shippingPhone: retailForm.phone || "",
+                deliveryFeeType: 3,
+                paymentType: paymentMethod || "Nakit",
+                currency: "TRY",
+                currencyRate: 1.0,
+                totalPaidTaxExcluding: Number(totalExclTax.toFixed(2)),
+                totalPaidTaxIncluding: Number(total.toFixed(2)),
+                productsTotalTaxExcluding: Number(totalExclTax.toFixed(2)),
+                productsTotalTaxIncluding: Number(total.toFixed(2)),
+                shippingChargeTotalTaxExcluding: 0.00,
+                shippingChargeTotalTaxIncluding: 0.00,
+                installmentChargeTotalTaxExcluding: 0.00,
+                installmentChargeTotalTaxIncluding: 0.00,
+                bankTransferDiscountTotalTaxExcluding: 0.00,
+                bankTransferDiscountTotalTaxIncluding: 0.00,
+                payingAtTheDoorChargeTotalTaxExcluding: 0.00,
+                payingAtTheDoorChargeTotalTaxIncluding: 0.00,
+                discountTotalTaxExcluding: 0.00,
+                discountTotalTaxIncluding: 0.00,
+                orderDetails: orderDetails
             }
         };
 
         try {
-            console.log(`[BirFaturaService] Direkt fatura gönderiliyor: ${invoicePayload.Invoice.OrderCode}`);
+            console.log(`[BirFaturaService] Direkt fatura gönderiliyor: ${invoicePayload.invoice.orderCode}`);
             const response = await axios.post(`${LOCAL_BACKEND_URL}/api/birfatura-proxy`, {
                 endpoint: "OutEBelgeV2/SendBasicInvoiceFromModel",
                 apiKey: config.api_key,
