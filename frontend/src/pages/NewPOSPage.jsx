@@ -2353,6 +2353,125 @@ export default function NewPOSPage() {
                 }}
             />
 
+            {/* Retail Customer Modal - 2026 Modern Design */}
+            {
+                showRetailCustomerModal && (
+                    <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[60] p-4">
+                        <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+                            {/* Minimalist Header */}
+                            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-10 py-8">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30">
+                                        <span className="text-3xl">👤</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-3xl font-bold text-white tracking-tight">Perakende Müşteri</h3>
+                                        <p className="text-slate-400 text-base mt-1">Hızlı satış için bilgileri doldurun</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Form Content */}
+                            <form onSubmit={handleRetailCustomerSubmit} className="p-10 space-y-6 bg-gradient-to-b from-slate-50 to-white">
+                                {/* İsim Soyisim - En Önemli Alan */}
+                                <div className="space-y-2">
+                                    <label className="block text-base font-semibold text-slate-700">
+                                        İsim Soyisim <span className="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="name"
+                                        value={retailCustomerForm.name}
+                                        onChange={handleRetailCustomerChange}
+                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                        placeholder="Müşteri adını giriniz..."
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
+
+                                {/* TC / Vergi No */}
+                                <div className="space-y-2">
+                                    <label className="block text-base font-semibold text-slate-700">
+                                        TC Kimlik / Vergi Numarası
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="tax_number"
+                                        value={retailCustomerForm.tax_number}
+                                        onChange={handleRetailCustomerChange}
+                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400 font-mono tracking-wider"
+                                        placeholder="11111111111"
+                                    />
+                                </div>
+
+                                {/* Adres */}
+                                <div className="space-y-2">
+                                    <label className="block text-base font-semibold text-slate-700">
+                                        Adres
+                                    </label>
+                                    <textarea
+                                        name="address"
+                                        value={retailCustomerForm.address}
+                                        onChange={handleRetailCustomerChange}
+                                        rows="3"
+                                        className="w-full px-6 py-5 text-lg rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all resize-none placeholder:text-slate-400"
+                                        placeholder="Adres bilgisi..."
+                                    ></textarea>
+                                </div>
+
+                                {/* Telefon */}
+                                <div className="space-y-2">
+                                    <label className="block text-base font-semibold text-slate-700">
+                                        Telefon
+                                    </label>
+                                    <input
+                                        type="tel"
+                                        name="phone"
+                                        value={retailCustomerForm.phone}
+                                        onChange={handleRetailCustomerChange}
+                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                        placeholder="0532 xxx xx xx"
+                                    />
+                                </div>
+
+                                {/* Vergi Dairesi */}
+                                <div className="space-y-2">
+                                    <label className="block text-base font-semibold text-slate-700">
+                                        Vergi Dairesi
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="tax_office"
+                                        value={retailCustomerForm.tax_office}
+                                        onChange={handleRetailCustomerChange}
+                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                        placeholder="Vergi dairesi adı..."
+                                    />
+                                </div>
+
+                                {/* Buttons */}
+                                <div className="flex gap-4 pt-6">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowRetailCustomerModal(false)}
+                                        className="flex-1 py-5 text-lg font-bold text-slate-600 bg-slate-100 rounded-2xl hover:bg-slate-200 transition-all active:scale-[0.98]"
+                                    >
+                                        İptal
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-[2] py-5 text-xl font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl hover:from-amber-600 hover:to-orange-600 shadow-xl shadow-orange-500/30 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                                    >
+                                        ✓ Tamamla
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )
+            }
+
             <StatusModal
                 isOpen={statusModal.isOpen}
                 onClose={() => setStatusModal({ ...statusModal, isOpen: false })}
