@@ -365,7 +365,8 @@ app.post('/api/orders/', async (req, res) => {
 
         const shippingTaxNumber = taxNo ? taxNo : ssnTcNo;
 
-        let address = "Fatih Mh.";
+        let address = sale.address || "Fatih Mh.";
+        let phone = sale.phone || "";
         let city = "Adana";
         let district = "Seyhan";
 
@@ -423,7 +424,7 @@ app.post('/api/orders/', async (req, res) => {
             "BillingAddress": address,
             "BillingTown": district,
             "BillingCity": city,
-            "BillingMobilePhone": "", // Required by BirFatura
+            "BillingMobilePhone": phone, // Dynamic Phone via frontend
             "BillingTaxOffice": "",
             "TaxNo": taxNo,
             "SSNTCNo": ssnTcNo,

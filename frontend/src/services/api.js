@@ -868,6 +868,9 @@ export const salesAPI = {
             date: new Date().toISOString(),
             customer_id: sale.customer_id || (sale.customer && sale.customer.id) || null, // Handle customer object or ID
             customer_name: sale.customer_name || (sale.customer && sale.customer.name) || (typeof sale.customer === 'string' ? sale.customer : '') || 'Misafir', // NEW: Store name explicitly
+            tax_number: sale.tax_number || '',
+            address: sale.address || '',
+            phone: sale.phone || '',
             company_code: companyCode
         };
 

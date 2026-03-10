@@ -1262,6 +1262,9 @@ overflow: hidden;
                 sale_code: saleCode,
                 customer: selectedCustomer || null,
                 customer_name: !selectedCustomer ? cleanCustomerName : undefined,
+                tax_number: retailCustomerForm.tax_number,
+                address: retailCustomerForm.address,
+                phone: retailCustomerForm.phone,
                 payment_method: paymentMethod,
                 items: cart.map(item => ({
                     id: item.id,
@@ -1288,7 +1291,7 @@ overflow: hidden;
                         // Successfully triggered, and BirFatura gave us an Invoice UUID
                         const invoiceUuid = result.data.Result.UUID;
                         console.log(`[POS] Fatura oluşturuldu. UUID: ${invoiceUuid}`);
-                        
+
                         try {
                             // Update the sale in Supabase to save UUID and mark as invoiced
                             await salesAPI.update(saleCode, {

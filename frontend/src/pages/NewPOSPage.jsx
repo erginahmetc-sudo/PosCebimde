@@ -625,6 +625,9 @@ export default function NewPOSPage() {
                 sale_code: saleCode,
                 customer: selectedCustomer || null,
                 customer_name: !selectedCustomer ? cleanCustomerName : undefined,
+                tax_number: retailCustomerForm.tax_number,
+                address: retailCustomerForm.address,
+                phone: retailCustomerForm.phone,
                 payment_method: paymentMethod,
                 items: cart.map(item => ({
                     id: item.id, stock_code: item.stock_code, barcode: item.barcode, name: item.name,
