@@ -4,6 +4,140 @@ import axios from 'axios';
 const API_BASE_URL = "https://uygulama.edonustur.com/api";
 
 export const birFaturaAPI = {
+
+    /**
+     * Direkt fatura kes: SendBasicInvoiceFromModel endpoint'ini kullanır.
+     * @param {Object} params - { retailForm, cart, paymentMethod, saleCode }
+     */
+    sendBasicInvoice: async ({ retailForm, cart, paymentMethod, saleCode }) => {
+        const configStr = localStorage.getItem('birfatura_config');
+        if (!configStr) {
+            return { success: false, message: "Ayarlar bulunamadı. Lütfen Ayarlar sayfasından BirFatura API anahtarlarını kaydedin." };
+        }
+        let config;
+        try { config = JSON.parse(configStr); }
+        catch (e) { return { success: false, message: "Ayar dosyası bozuk. Lütfen ayarları tekrar kaydedin." }; }
+
+        if (!config.api_key || !config.secret_key) {
+            return { success: false, message: "API veya Secret Key eksik. Lütfen Ayarlar sayfasını kontrol edin." };
+        }
+
+        // TC / VKN ayrıştırma
+        const cleanTaxNumber = String(retailForm.tax_number || "").trim();
+        const taxNo = (cleanTaxNumber.length > 0 && cleanTaxNumber.length !== 11) ? cleanTaxNumber : "";
+        const ssnTcNo = cleanTaxNumber.length === 11 ? cleanTaxNumber : "";
+
+        // Toplam hesapla
+        const total = cart.reduce((sum, item) => {
+            const price = item.price * item.quantity;
+            const discount = price * (item.discount_rate || 0) / 100;
+            return sum + (price - discount);
+        }, 0);
+        const totalExclTax = total / 1.20;
+
+        const today = new Date().toISOString().split('T')[0];
+
+        // Ürün satırları
+        const orderDetails = cart.map(item => {
+            const priceIncl = parseFloat(item.price || 0);
+            const priceExcl = priceIncl / 1.20;
+            const qty = parseFloat(item.quantity || 1);
+            const discountRate = item.discount_rate || 0;
+            const discountIncl = priceIncl * qty * discountRate / 100;
+            const discountExcl = discountIncl / 1.20;
+            return {
+                ProductCode: item.stock_code || "",
+                Barcode: item.barcode || item.stock_code || "",
+                ProductBrand: "",
+                ProductName: item.name || "",
+                ProductNote: "",
+                ProductQuantityType: "Adet",
+                ProductQuantity: qty,
+                VatRate: 20,
+                ProductUnitPriceTaxExcluding: Number(priceExcl.toFixed(4)),
+                ProductUnitPriceTaxIncluding: Number(priceIncl.toFixed(4)),
+                DiscountIsPercentUnit: discountRate > 0 ? 1 : 0,
+                DiscountRateUnit: discountRate,
+                DiscountUnitTaxExcluding: Number(discountExcl.toFixed(2)),
+                DiscountUnitTaxIncluding: Number(discountIncl.toFixed(2)),
+            };
+        });
+
+        // UUID (ETTN) üret
+        const ettn = (crypto.randomUUID ? crypto.randomUUID() :
+            'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            }));
+
+        const payload = {
+            Invoice: {
+                OrderCode: saleCode || ('SLS-' + Date.now()),
+                OrderDate: today,
+                InvoiceDate: today,
+                InvoiceExplanation: "POS Satış",
+                EInvoiceId: "",
+                IsDocumentNoAuto: true,
+                ETTN: ettn,
+                ReceiverTag: null,
+                BillingName: retailForm.name || "Perakende Müşteri",
+                BillingAddress: retailForm.address || "",
+                BillingTown: retailForm.district || "",
+                BillingCity: retailForm.city || "",
+                BillingMobilePhone: retailForm.phone || "",
+                BillingPhone: retailForm.phone || "",
+                BillingPhone2: null,
+                TaxOffice: retailForm.tax_office || "",
+                TaxNo: taxNo,
+                Email: retailForm.email || "",
+                ShipCompany: "",
+                CargoCampaignCode: "",
+                ShippingName: retailForm.name || "",
+                ShippingAddress: retailForm.address || "",
+                ShippingTown: retailForm.district || "",
+                ShippingCity: retailForm.city || "",
+                ShippingCountry: "Türkiye",
+                ShippingZipCode: "",
+                ShippingPhone: retailForm.phone || "",
+                DeliveryFeeType: 3,
+                PaymentType: paymentMethod || "Nakit",
+                Currency: "TRY",
+                CurrencyRate: 1.0,
+                TotalPaidTaxExcluding: Number(totalExclTax.toFixed(2)),
+                TotalPaidTaxIncluding: Number(total.toFixed(2)),
+                ProductsTotalTaxExcluding: Number(totalExclTax.toFixed(2)),
+                ProductsTotalTaxIncluding: Number(total.toFixed(2)),
+                ShippingChargeTotalTaxExcluding: 0.00,
+                ShippingChargeTotalTaxIncluding: 0.00,
+                InstallmentChargeTotalTaxExcluding: 0.00,
+                InstallmentChargeTotalTaxIncluding: 0.00,
+                BankTransferDiscountTotalTaxExcluding: 0.00,
+                BankTransferDiscountTotalTaxIncluding: 0.00,
+                PayingAtTheDoorChargeTotalTaxExcluding: 0.00,
+                PayingAtTheDoorChargeTotalTaxIncluding: 0.00,
+                DiscountTotalTaxExcluding: 0.00,
+                DiscountTotalTaxIncluding: 0.00,
+                OrderDetails: orderDetails
+            }
+        };
+
+        try {
+            const response = await axios.post(`${API_BASE_URL}/OutEBelgeV2/SendBasicInvoiceFromModel`, payload, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Api-Key': config.api_key,
+                    'X-Secret-Key': config.secret_key,
+                    'X-Integration-Key': config.integration_key
+                }
+            });
+            return { success: true, data: response.data };
+        } catch (error) {
+            console.error("BirFatura SendBasicInvoice Error:", error);
+            const errorMsg = error.response?.data?.message || error.response?.data?.Message || error.message || "Bilinmeyen Hata";
+            return { success: false, message: `BirFatura Hatası: ${errorMsg}` };
+        }
+    },
+
     /**
      * Create/Send an order to BirFatura
      * Uses the data structure extracted from the user's Python code (get_orders function).

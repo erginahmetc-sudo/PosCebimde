@@ -184,7 +184,9 @@ export default function NewPOSPage() {
         phone: '',
         email: '',
         tax_office: '',
-        tax_number: '11111111111'
+        tax_number: '11111111111',
+        city: '',
+        district: ''
     };
     const [retailCustomerForm, setRetailCustomerForm] = useState(defaultRetailForm);
 
@@ -582,6 +584,41 @@ export default function NewPOSPage() {
         setCustomer(`${retailCustomerForm.name.trim()} (Perakende)`);
         setShowRetailCustomerModal(false);
         setShowCustomerModal(false);
+    };
+
+    const [invoiceLoading, setInvoiceLoading] = useState(false);
+
+    const handleDirectInvoice = async () => {
+        if (!retailCustomerForm.name.trim()) {
+            setStatusModal({ isOpen: true, title: 'Hata', message: 'İsim Soyisim zorunludur!', type: 'error', details: null });
+            return;
+        }
+        if (cart.length === 0) {
+            setStatusModal({ isOpen: true, title: 'Hata', message: 'Sepet boş! Önce ürün ekleyin.', type: 'error', details: null });
+            return;
+        }
+        const configStr = localStorage.getItem('birfatura_config');
+        if (!configStr) {
+            setStatusModal({ isOpen: true, title: 'Entegrasyon Ayarı Yok', message: 'Ayarlar sayfasından BirFatura API anahtarlarını kaydedin.', type: 'error', details: null });
+            return;
+        }
+        setInvoiceLoading(true);
+        const saleCode = 'SLS-' + Date.now();
+        const result = await birFaturaAPI.sendBasicInvoice({
+            retailForm: retailCustomerForm,
+            cart,
+            paymentMethod: 'Nakit',
+            saleCode
+        });
+        setInvoiceLoading(false);
+        if (result.success) {
+            setCustomer(`${retailCustomerForm.name.trim()} (Perakende)`);
+            setShowRetailCustomerModal(false);
+            setShowCustomerModal(false);
+            setStatusModal({ isOpen: true, title: 'Fatura Gönderildi ✓', message: 'E-Fatura/E-Arşiv fatura başarıyla gönderildi.', type: 'success', details: null });
+        } else {
+            setStatusModal({ isOpen: true, title: 'Fatura Hatası', message: result.message, type: 'error', details: null });
+        }
     };
 
     const handleRetailCustomerChange = (e) => {
@@ -1841,31 +1878,6 @@ export default function NewPOSPage() {
                 </div>
             )}
 
-            {/* Retail Customer Modal */}
-            {showRetailCustomerModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[60] p-4">
-                    <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden">
-                        <div className="bg-slate-900 px-10 py-8 text-white">
-                            <h3 className="text-3xl font-bold">Perakende Müşteri</h3>
-                            <p className="text-slate-400">Hızlı satış için bilgileri doldurun</p>
-                        </div>
-                        <form onSubmit={handleRetailCustomerSubmit} className="p-10 space-y-6">
-                            <div className="space-y-2">
-                                <label className="block font-semibold text-slate-700">İsim Soyisim *</label>
-                                <input name="name" value={retailCustomerForm.name} onChange={handleRetailCustomerChange} className="w-full px-6 py-4 rounded-2xl border-2 border-slate-200 focus:border-blue-500 outline-none" required />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="block font-semibold text-slate-700">Telefon</label>
-                                <input name="phone" value={retailCustomerForm.phone} onChange={handleRetailCustomerChange} className="w-full px-6 py-4 rounded-2xl border-2 border-slate-200 focus:border-blue-500 outline-none" />
-                            </div>
-                            <div className="flex gap-4 pt-6">
-                                <button type="button" onClick={() => setShowRetailCustomerModal(false)} className="flex-1 py-4 bg-slate-100 font-bold text-slate-600 rounded-2xl hover:bg-slate-200">İptal</button>
-                                <button type="submit" className="flex-[2] py-4 bg-blue-600 font-bold text-white rounded-2xl hover:bg-blue-700">✓ Tamamla</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
 
             {/* Quantity Modal */}
             {showQuantityModal && (
@@ -2435,29 +2447,78 @@ export default function NewPOSPage() {
                                     />
                                 </div>
 
-                                {/* Vergi Dairesi */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">
-                                        Vergi Dairesi
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="tax_office"
-                                        value={retailCustomerForm.tax_office}
-                                        onChange={handleRetailCustomerChange}
-                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
-                                        placeholder="Vergi dairesi adı..."
-                                    />
+                                {/* Vergi Dairesi + E-posta */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="block text-base font-semibold text-slate-700">Vergi Dairesi</label>
+                                        <input
+                                            type="text"
+                                            name="tax_office"
+                                            value={retailCustomerForm.tax_office}
+                                            onChange={handleRetailCustomerChange}
+                                            className="w-full px-5 py-4 text-base rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            placeholder="Vergi dairesi adı..."
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="block text-base font-semibold text-slate-700">E-posta</label>
+                                        <input
+                                            type="email"
+                                            name="email"
+                                            value={retailCustomerForm.email}
+                                            onChange={handleRetailCustomerChange}
+                                            className="w-full px-5 py-4 text-base rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            placeholder="ornek@email.com"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* İl / İlçe */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="block text-base font-semibold text-slate-700">İl</label>
+                                        <input
+                                            type="text"
+                                            name="city"
+                                            value={retailCustomerForm.city}
+                                            onChange={handleRetailCustomerChange}
+                                            className="w-full px-5 py-4 text-base rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            placeholder="Adana"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="block text-base font-semibold text-slate-700">İlçe</label>
+                                        <input
+                                            type="text"
+                                            name="district"
+                                            value={retailCustomerForm.district}
+                                            onChange={handleRetailCustomerChange}
+                                            className="w-full px-5 py-4 text-base rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            placeholder="Seyhan"
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Buttons */}
-                                <div className="flex gap-4 pt-6">
+                                <div className="flex gap-3 pt-4">
                                     <button
                                         type="button"
                                         onClick={() => setShowRetailCustomerModal(false)}
                                         className="flex-1 py-5 text-lg font-bold text-slate-600 bg-slate-100 rounded-2xl hover:bg-slate-200 transition-all active:scale-[0.98]"
                                     >
                                         İptal
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleDirectInvoice}
+                                        disabled={invoiceLoading}
+                                        className="flex-[2] py-5 text-lg font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/30 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        {invoiceLoading ? (
+                                            <><span className="material-symbols-outlined animate-spin text-xl">progress_activity</span> Gönderiliyor...</>
+                                        ) : (
+                                            <><span className="material-symbols-outlined text-xl">receipt_long</span> Direkt Fatura Kes</>
+                                        )}
                                     </button>
                                     <button
                                         type="submit"
