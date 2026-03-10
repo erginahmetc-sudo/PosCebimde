@@ -252,24 +252,32 @@ app.post('/api/orders/', async (req, res) => {
     let isValidToken = false;
     let companyCode = null;
 
-    // A) Veritabanından secret_token kontrolü
-    const { data: setting1, error: tokenError } = await supabase
+    // A) Veritabanından secret_token kontrolü (Çoklu kiracı desteği)
+    const { data: settings, error: tokenError } = await supabase
         .from('app_settings')
         .select('company_code, value')
-        .eq('key', 'secret_token')
-        .eq('value', receivedToken)
-        .maybeSingle();
+        .eq('key', 'secret_token');
 
     if (tokenError) {
         console.error("Token sorgulama hatası:", tokenError);
     }
 
-    if (setting1 && setting1.value) {
-        let storedToken = setting1.value;
-        if (typeof storedToken === 'string') storedToken = storedToken.replace(/^"|"$/g, '');
-        if (storedToken === receivedToken) {
-            isValidToken = true;
-            companyCode = setting1.company_code;
+    if (settings && settings.length > 0) {
+        // Gelen token'ı veritabanındaki token'lar ile karşılaştır
+        for (const setting of settings) {
+            if (setting.value) {
+                let storedToken = setting.value;
+                // Veritabanında string değerler çift tırnaklı (örn: "token") kayıtlı olabiliyor
+                if (typeof storedToken === 'string') {
+                    storedToken = storedToken.replace(/^"|"$/g, '');
+                }
+
+                if (storedToken === receivedToken) {
+                    isValidToken = true;
+                    companyCode = setting.company_code;
+                    break; // Eşleşen token bulundu, döngüden çık
+                }
+            }
         }
     }
 
