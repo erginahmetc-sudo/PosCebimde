@@ -77,21 +77,27 @@ app.post('/api/birfatura-proxy', async (req, res) => {
         };
 
         console.log(`[BirFatura Proxy] POST ${url}`);
+        console.log(`[BirFatura Proxy] Payload:`, JSON.stringify(payload, null, 2));
 
         const response = await axios.post(url, payload, {
             headers,
             timeout: 30000
         });
 
+        console.log(`[BirFatura Proxy] Response:`, JSON.stringify(response.data, null, 2));
         res.json(response.data);
     } catch (error) {
         console.error('[BirFatura Proxy] Error:', error.message);
+        if (error.response) {
+            console.error('[BirFatura Proxy] Error Response Data:', JSON.stringify(error.response.data, null, 2));
+            console.error('[BirFatura Proxy] Error Status:', error.response.status);
+        }
 
         if (error.response) {
-            // BirFatura API'den gelen hata
-            res.status(error.response.status).json({
+            // BirFatura API'den gelen hata - tüm response'u gönder
+            res.status(error.response.status).json(error.response.data || {
                 Success: false,
-                Message: error.response.data?.Message || error.message,
+                Message: error.message,
                 StatusCode: error.response.status
             });
         } else {
