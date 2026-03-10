@@ -71,10 +71,10 @@ export const birFaturaAPI = {
 
         const invoicePayload = {
             Invoice: {
-                OrderCode: saleCode || ('SLS-' + Date.now()),
+                OrderCode: "",
                 OrderDate: today,
                 InvoiceDate: today,
-                InvoiceExplanation: "POS Satış",
+                InvoiceExplanation: "",
                 EInvoiceId: "",
                 IsDocumentNoAuto: true,
                 ETTN: ettn,
@@ -99,7 +99,7 @@ export const birFaturaAPI = {
                 ShippingZipCode: "",
                 ShippingPhone: retailForm.phone || "",
                 DeliveryFeeType: 3,
-                PaymentType: paymentMethod || "Nakit",
+                PaymentType: "",
                 Currency: "TRY",
                 CurrencyRate: 1.0,
                 TotalPaidTaxExcluding: Number(totalExclTax.toFixed(2)),
