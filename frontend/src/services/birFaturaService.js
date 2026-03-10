@@ -23,18 +23,9 @@ export const birFaturaAPI = {
             return { success: false, message: "API, Secret veya Integration Key eksik. Lütfen Ayarlar sayfasını kontrol edin." };
         }
 
-        // TC / VKN ayrıştırma (11 hane = TCKN → SSNTCNo, diğer = VKN → TaxNo)
+        // TC / VKN - SendBasicInvoiceFromModel sadece TaxNo alanını tanıyor
         const cleanTaxNumber = String(retailForm.tax_number || "").trim();
-        let ssnTcNo = "";
-        let taxNo = "";
-        if (cleanTaxNumber.length === 11) {
-            ssnTcNo = cleanTaxNumber;
-        } else if (cleanTaxNumber.length > 0) {
-            taxNo = cleanTaxNumber;
-        }
-        if (!ssnTcNo && !taxNo) {
-            ssnTcNo = "11111111111";
-        }
+        const taxNo = cleanTaxNumber.length > 0 ? cleanTaxNumber : "11111111111";
 
         // Toplam hesapla
         const total = cart.reduce((sum, item) => {
@@ -95,7 +86,6 @@ export const birFaturaAPI = {
                 BillingPhone: retailForm.phone || "",
                 TaxOffice: retailForm.tax_office || "",
                 TaxNo: taxNo,
-                SSNTCNo: ssnTcNo,
                 Email: retailForm.email || "",
                 ShippingName: retailForm.name || "Perakende Müşteri",
                 ShippingAddress: retailForm.address || ".",
