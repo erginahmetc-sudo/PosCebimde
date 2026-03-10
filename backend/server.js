@@ -365,7 +365,7 @@ app.post('/api/orders/', async (req, res) => {
 
         const shippingTaxNumber = taxNo ? taxNo : ssnTcNo;
 
-        let address = "Belirtilmemiş";
+        let address = "Fatih Mh.";
         let city = "Adana";
         let district = "Seyhan";
 
@@ -423,7 +423,7 @@ app.post('/api/orders/', async (req, res) => {
             "BillingAddress": address,
             "BillingTown": district,
             "BillingCity": city,
-            "BillingMobilePhone": "5555555555", // Required by BirFatura
+            "BillingMobilePhone": "", // Required by BirFatura
             "BillingTaxOffice": "",
             "TaxNo": taxNo,
             "SSNTCNo": ssnTcNo,
