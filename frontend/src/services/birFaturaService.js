@@ -23,9 +23,20 @@ export const birFaturaAPI = {
             return { success: false, message: "API, Secret veya Integration Key eksik. Lütfen Ayarlar sayfasını kontrol edin." };
         }
 
-        // TC / VKN ayrıştırma
+        // TC / VKN ayrıştırma (11 hane = TCKN → SsnTcNo, diğer = VKN → TaxNo)
         const cleanTaxNumber = String(retailForm.tax_number || "").trim();
-        const taxNo = (cleanTaxNumber.length > 0 && cleanTaxNumber.length !== 11) ? cleanTaxNumber : "";
+        let ssnTcNo = "";
+        let taxNo = "";
+        if (cleanTaxNumber.length === 11) {
+            ssnTcNo = cleanTaxNumber;
+        } else if (cleanTaxNumber.length > 0) {
+            taxNo = cleanTaxNumber;
+        }
+        // Varsayılan: boşsa 11111111111
+        if (!ssnTcNo && !taxNo) {
+            ssnTcNo = "11111111111";
+        }
+        const shippingTaxNumber = taxNo ? taxNo : ssnTcNo;
 
         // Toplam hesapla
         const total = cart.reduce((sum, item) => {
@@ -89,6 +100,7 @@ export const birFaturaAPI = {
                 BillingPhone2: null,
                 TaxOffice: retailForm.tax_office || "",
                 TaxNo: taxNo,
+                SsnTcNo: ssnTcNo,
                 Email: retailForm.email || "",
                 ShipCompany: "",
                 CargoCampaignCode: "",
@@ -99,6 +111,7 @@ export const birFaturaAPI = {
                 ShippingCountry: "Türkiye",
                 ShippingZipCode: "",
                 ShippingPhone: retailForm.phone || "",
+                ShippingTaxNumber: shippingTaxNumber,
                 DeliveryFeeType: 3,
                 PaymentType: paymentMethod || "Nakit",
                 Currency: "TRY",
