@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat /c/Users/incPa/Desktop/poscebimde1/kasapos/backend/migrations/*.sql)"
+    ]
+  }
+}

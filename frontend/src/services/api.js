@@ -987,6 +987,7 @@ export const salesAPI = {
         if (data.payment_method !== undefined) updateData.payment_method = data.payment_method;
         if (data.customer_id !== undefined) updateData.customer_id = data.customer_id;
         if (data.customer_name !== undefined) updateData.customer_name = data.customer_name;
+        if (data.birfatura_uuid !== undefined) updateData.birfatura_uuid = data.birfatura_uuid;
 
         // 2. Update Sales Table
         const { error } = await supabase
