@@ -185,8 +185,8 @@ export default function NewPOSPage() {
         email: '',
         tax_office: '',
         tax_number: '11111111111',
-        city: '',
-        district: ''
+        city: 'Adana',
+        district: 'Seyhan'
     };
     const [retailCustomerForm, setRetailCustomerForm] = useState(defaultRetailForm);
 
@@ -587,6 +587,9 @@ export default function NewPOSPage() {
     };
 
     const [invoiceLoading, setInvoiceLoading] = useState(false);
+    const [showInvoicePaymentModal, setShowInvoicePaymentModal] = useState(false);
+    const [invoiceSaleCode, setInvoiceSaleCode] = useState('');
+    const [invoicePdfUrl, setInvoicePdfUrl] = useState(null);
 
     const handleDirectInvoice = async () => {
         if (!retailCustomerForm.name.trim()) {
@@ -617,19 +620,50 @@ export default function NewPOSPage() {
             setShowCustomerModal(false);
             const pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
             console.log('[NewPOS] Fatura response:', JSON.stringify(result.data, null, 2));
-            setStatusModal({
-                isOpen: true,
-                title: 'Fatura Gönderildi ✓',
-                message: 'E-Fatura/E-Arşiv fatura başarıyla gönderildi.',
-                type: 'success',
-                details: null,
-                actionButton: pdfUrl ? {
-                    label: '📄 Kesilen Faturayı Görüntüle',
-                    onClick: () => window.open(pdfUrl, '_blank')
-                } : null
-            });
+            setInvoiceSaleCode(saleCode);
+            setInvoicePdfUrl(pdfUrl);
+            setShowInvoicePaymentModal(true);
         } else {
             setStatusModal({ isOpen: true, title: 'Fatura Hatası', message: result.message, type: 'error', details: null });
+        }
+    };
+
+    const handleInvoicePaymentComplete = async (paymentMethod) => {
+        setShowInvoicePaymentModal(false);
+        try {
+            const selectedCust = customers.find(c => c.name === customer);
+            const cleanCustomerName = (customer || 'Toptan Satış').replace(/ \(Perakende\)$/i, '').trim();
+            await salesAPI.complete({
+                sale_code: invoiceSaleCode,
+                customer: selectedCust || null,
+                customer_name: !selectedCust ? cleanCustomerName : undefined,
+                tax_number: retailCustomerForm.tax_number,
+                address: retailCustomerForm.address,
+                phone: retailCustomerForm.phone,
+                payment_method: paymentMethod,
+                items: cart.map(item => ({
+                    id: item.id, stock_code: item.stock_code, barcode: item.barcode, name: item.name,
+                    quantity: item.quantity, price: item.price, discount_rate: item.discount_rate || 0,
+                    amount: item.quantity
+                })),
+                total: calculateTotal()
+            });
+
+            if (localStorage.getItem('receipt_auto_print') === 'true') {
+                printReceipt({
+                    customer: customer, paymentMethod: paymentMethod, items: cart,
+                    total: calculateTotal(), customerData: selectedCust
+                });
+            }
+
+            setSuccessMessage('Satış İşlemi Başarılı');
+            setTimeout(() => setSuccessMessage(''), 2000);
+            setCart([]);
+            setCustomer('Toptan Satış');
+            setRetailCustomerForm(defaultRetailForm);
+            loadProducts();
+        } catch (error) {
+            setStatusModal({ isOpen: true, title: 'Satış Hatası', message: error.response?.data?.message || error.message, type: 'error', details: null });
         }
     };
 
@@ -2554,6 +2588,52 @@ export default function NewPOSPage() {
                 details={statusModal.details}
                 actionButton={statusModal.actionButton}
             />
+
+            {/* Fatura Sonrası Ödeme Yöntemi Seçimi */}
+            {showInvoicePaymentModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-[2px] animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 flex flex-col items-center text-center bg-emerald-50">
+                            <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-sm mb-4 text-emerald-700">
+                                <span className="material-symbols-outlined text-4xl">check_circle</span>
+                            </div>
+                            <h3 className="text-xl font-black text-emerald-700 mb-2">Fatura Gönderildi ✓</h3>
+                            <p className="text-slate-600 font-medium">Satışı tamamlamak için ödeme yöntemini seçin</p>
+                        </div>
+                        <div className="p-5 space-y-3">
+                            {invoicePdfUrl && (
+                                <button
+                                    onClick={() => window.open(invoicePdfUrl, '_blank')}
+                                    className="w-full py-3 rounded-xl font-bold border-2 border-slate-200 text-slate-700 hover:bg-slate-50 transition-all active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                    <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
+                                    Kesilen Faturayı Görüntüle
+                                </button>
+                            )}
+                            <div className="grid grid-cols-3 gap-3 pt-2">
+                                <button
+                                    onClick={() => handleInvoicePaymentComplete('Nakit')}
+                                    className="py-4 rounded-xl font-extrabold text-emerald-700 bg-emerald-50 border-2 border-emerald-200 hover:border-emerald-500 hover:bg-emerald-100 hover:shadow-md transition-all active:scale-95"
+                                >
+                                    NAKİT
+                                </button>
+                                <button
+                                    onClick={() => handleInvoicePaymentComplete('POS')}
+                                    className="py-4 rounded-xl font-extrabold text-blue-700 bg-blue-50 border-2 border-blue-200 hover:border-blue-500 hover:bg-blue-100 hover:shadow-md transition-all active:scale-95"
+                                >
+                                    KREDİ KARTI
+                                </button>
+                                <button
+                                    onClick={() => handleInvoicePaymentComplete('Açık Hesap')}
+                                    className="py-4 rounded-xl font-extrabold text-orange-700 bg-orange-50 border-2 border-orange-200 hover:border-orange-500 hover:bg-orange-100 hover:shadow-md transition-all active:scale-95"
+                                >
+                                    VERESİYE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Debt Limit Alert Modal */}
             <DebtLimitAlert

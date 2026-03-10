@@ -71,7 +71,6 @@ export const birFaturaAPI = {
 
         const invoicePayload = {
             Invoice: {
-                OrderCode: saleCode || ('SLS-' + Date.now()),
                 OrderDate: today,
                 InvoiceDate: today,
                 InvoiceExplanation: "POS Satış",
@@ -93,6 +92,9 @@ export const birFaturaAPI = {
                 ShippingCity: retailForm.city || ".",
                 ShippingCountry: "Türkiye",
                 ShippingPhone: retailForm.phone || "",
+                ShipCompany: null,
+                CargoCampaignCode: null,
+                DeliveryFeeType: null,
                 PaymentTypeId: 1,
                 Currency: "TRY",
                 CurrencyRate: 1.0,
