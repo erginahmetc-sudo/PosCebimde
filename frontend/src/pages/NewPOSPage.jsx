@@ -615,7 +615,19 @@ export default function NewPOSPage() {
             setCustomer(`${retailCustomerForm.name.trim()} (Perakende)`);
             setShowRetailCustomerModal(false);
             setShowCustomerModal(false);
-            setStatusModal({ isOpen: true, title: 'Fatura Gönderildi ✓', message: 'E-Fatura/E-Arşiv fatura başarıyla gönderildi.', type: 'success', details: null });
+            const pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
+            console.log('[NewPOS] Fatura response:', JSON.stringify(result.data, null, 2));
+            setStatusModal({
+                isOpen: true,
+                title: 'Fatura Gönderildi ✓',
+                message: 'E-Fatura/E-Arşiv fatura başarıyla gönderildi.',
+                type: 'success',
+                details: null,
+                actionButton: pdfUrl ? {
+                    label: '📄 Kesilen Faturayı Görüntüle',
+                    onClick: () => window.open(pdfUrl, '_blank')
+                } : null
+            });
         } else {
             setStatusModal({ isOpen: true, title: 'Fatura Hatası', message: result.message, type: 'error', details: null });
         }

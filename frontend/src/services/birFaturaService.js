@@ -117,7 +117,7 @@ export const birFaturaAPI = {
         };
 
         try {
-            console.log(`[BirFaturaService] Direkt fatura gönderiliyor: ${invoicePayload.invoice.orderCode}`);
+            console.log(`[BirFaturaService] Direkt fatura gönderiliyor...`);
             const response = await axios.post(`${LOCAL_BACKEND_URL}/api/birfatura-proxy`, {
                 endpoint: "OutEBelgeV2/SendBasicInvoiceFromModel",
                 apiKey: config.api_key,
