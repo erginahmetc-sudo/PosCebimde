@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Backend proxy URL (must point to KasaPos Node.js backend)
 // For dev it is typically same host on port 3001, or relative if served together.
-const LOCAL_BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const LOCAL_BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 export const birFaturaAPI = {
     /**

@@ -9,7 +9,8 @@ const axios = require('axios');
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+// app.py varsayılan olarak 5000 portunda çalıştığı için 5000 kullanıyoruz
+const PORT = process.env.PORT || 5000;
 
 
 // Supabase Config
