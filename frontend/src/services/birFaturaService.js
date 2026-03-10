@@ -35,7 +35,8 @@ export const birFaturaAPI = {
         }, 0);
         const totalExclTax = total / 1.20;
 
-        const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
 
         // Ürün satırları (camelCase - API şemasına uygun)
         const orderDetails = cart.map(item => {
