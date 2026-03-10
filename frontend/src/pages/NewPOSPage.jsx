@@ -1790,6 +1790,21 @@ export default function NewPOSPage() {
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
                             <div
+                                onClick={() => { setShowRetailCustomerModal(true); }}
+                                className="mb-2 p-4 bg-amber-50 border border-amber-200 rounded-xl hover:border-amber-500 hover:bg-amber-100 cursor-pointer flex justify-between items-center group transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center text-white">
+                                        <span className="material-symbols-outlined">person_pin</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-bold text-amber-900 block">Perakende Müşteri</span>
+                                        <span className="text-xs text-amber-700">Adres ve TC Kimlik bilgileri ile</span>
+                                    </div>
+                                </div>
+                                <span className="material-symbols-outlined text-amber-300 group-hover:text-amber-600 transition-colors">arrow_forward_ios</span>
+                            </div>
+                            <div
                                 onClick={() => { setCustomer('Toptan Satış'); setShowCustomerModal(false); }}
                                 className="p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-500 cursor-pointer flex justify-between items-center group"
                             >

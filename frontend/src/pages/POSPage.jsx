@@ -1798,6 +1798,24 @@ overflow: hidden;
                             <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-gray-50 to-white">
                                 {/* Quick Select - Toptan Satış */}
                                 <div
+                                    onClick={() => { setShowRetailCustomerModal(true); }}
+                                    className="mb-3 p-4 bg-gradient-to-r from-amber-500 to-orange-500 cursor-pointer hover:shadow-lg transition-all group overflow-hidden"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-white/20 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-2xl">👤</span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-white font-bold text-lg truncate">Perakende Müşteri</h4>
+                                            <p className="text-white/80 text-sm truncate">Adres ve TC Kimlik bilgileri ile</p>
+                                        </div>
+                                        <svg className="w-6 h-6 text-white/60 group-hover:text-white group-hover:translate-x-1 transition-all flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                <div
                                     onClick={() => { setCustomer('Toptan Satis'); setShowCustomerModal(false); }}
                                     className="mb-3 p-4 bg-gradient-to-r from-emerald-500 to-green-500  cursor-pointer hover:shadow-lg transition-all group overflow-hidden"
                                 >
