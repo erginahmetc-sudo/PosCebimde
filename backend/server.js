@@ -253,11 +253,16 @@ app.post('/api/orders/', async (req, res) => {
     let companyCode = null;
 
     // A) Veritabanından secret_token kontrolü
-    const { data: setting1 } = await supabase
+    const { data: setting1, error: tokenError } = await supabase
         .from('app_settings')
         .select('company_code, value')
         .eq('key', 'secret_token')
-        .single();
+        .eq('value', receivedToken)
+        .maybeSingle();
+
+    if (tokenError) {
+        console.error("Token sorgulama hatası:", tokenError);
+    }
 
     if (setting1 && setting1.value) {
         let storedToken = setting1.value;
