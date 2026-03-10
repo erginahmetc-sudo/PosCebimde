@@ -73,7 +73,6 @@ export const birFaturaAPI = {
 
         const invoicePayload = {
             invoice: {
-                orderCode: saleCode || ('SLS-' + Date.now()),
                 orderDate: today,
                 invoiceDate: today,
                 invoiceExplanation: "POS Satış",
@@ -91,8 +90,6 @@ export const birFaturaAPI = {
                 taxOffice: retailForm.tax_office || "",
                 taxNo: taxNo,
                 email: retailForm.email || "",
-                shipCompany: "",
-                cargoCampaignCode: "",
                 shippingName: retailForm.name || "",
                 shippingAddress: retailForm.address || "",
                 shippingTown: retailForm.district || "",
@@ -101,7 +98,6 @@ export const birFaturaAPI = {
                 shippingZipCode: "",
                 shippingPhone: retailForm.phone || "",
                 deliveryFeeType: 3,
-                paymentType: paymentMethod || "Nakit",
                 currency: "TRY",
                 currencyRate: 1.0,
                 totalPaidTaxExcluding: Number(totalExclTax.toFixed(2)),
@@ -114,8 +110,6 @@ export const birFaturaAPI = {
                 installmentChargeTotalTaxIncluding: 0.00,
                 bankTransferDiscountTotalTaxExcluding: 0.00,
                 bankTransferDiscountTotalTaxIncluding: 0.00,
-                payingAtTheDoorChargeTotalTaxExcluding: 0.00,
-                payingAtTheDoorChargeTotalTaxIncluding: 0.00,
                 discountTotalTaxExcluding: 0.00,
                 discountTotalTaxIncluding: 0.00,
                 orderDetails: orderDetails
