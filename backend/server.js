@@ -137,8 +137,38 @@ app.post('/api/orderStatus/', async (req, res) => {
     }
     // Return order statuses
     res.json({
-        OrderStatus: [{ Id: 1, Value: "Onaylandı" }]
+        OrderStatus: [{ Id: 1, Value: "Onaylandı" }, { Id: 2, Value: "Kargolandı" }, { Id: 3, Value: "İptal Edildi" }]
     });
+});
+
+// --- ENDPOINT: BirFatura Payment Methods ---
+app.post('/api/paymentMethods/', async (req, res) => {
+    const receivedToken = req.headers['token'];
+    if (!receivedToken) {
+        return res.status(401).json({ error: "Yetkisiz Erişim" });
+    }
+    // Return payment methods required by Birfatura
+    res.json({
+        PaymentMethods: [
+            { Id: 1, Value: "Kredi Kartı" },
+            { Id: 2, Value: "Banka EFT-Havale" },
+            { Id: 3, Value: "Kapıda Ödeme Nakit" },
+            { Id: 4, Value: "Kapıda Ödeme Kredi Kartı" },
+            { Id: 5, Value: "Nakit" }
+        ]
+    });
+});
+
+// --- ENDPOINT: BirFatura Cargo Update ---
+app.post('/api/orderCargoUpdate/', async (req, res) => {
+    // Acknowledge cargo update (stub method)
+    res.status(200).send();
+});
+
+// --- ENDPOINT: BirFatura Invoice Link Update ---
+app.post('/api/invoiceLinkUpdate/', async (req, res) => {
+    // Acknowledge invoice link generation (stub method)
+    res.status(200).send();
 });
 
 
@@ -345,9 +375,10 @@ app.post('/api/orders/', async (req, res) => {
 
                 orderDetails.push({
                     "ProductId": 0,
-                    "ProductCode": item.stock_code || "",
+                    "ProductCode": item.stock_code || "URUN01",
                     "Barcode": item.stock_code || "",
-                    "ProductName": item.name || "",
+                    "ProductName": item.name || "Ürün",
+                    "ProductQuantityType": "Adet",
                     "ProductQuantity": quantity,
                     "VatRate": 20.0,
                     "ProductUnitPriceTaxExcluding": Number(unitPriceExclTax.toFixed(4)),
@@ -372,13 +403,14 @@ app.post('/api/orders/', async (req, res) => {
 
         ordersToSend.push({
             "OrderId": orderId,
-            "OrderCode": sale.sale_code,
+            "OrderCode": sale.sale_code || `S-${orderId}`,
             "OrderDate": formattedDate,
             "CustomerId": 0,
             "BillingName": customerName,
             "BillingAddress": address,
             "BillingTown": district,
             "BillingCity": city,
+            "BillingMobilePhone": "5555555555", // Required by BirFatura
             "BillingTaxOffice": "",
             "TaxNo": taxNo,
             "SSNTCNo": ssnTcNo,
@@ -395,6 +427,8 @@ app.post('/api/orders/', async (req, res) => {
             "CurrencyRate": 1,
             "TotalPaidTaxIncluding": Number(calculatedTotal.toFixed(2)),
             "TotalPaidTaxExcluding": Number(calculatedTotalExclTax.toFixed(2)),
+            "ProductsTotalTaxIncluding": Number(calculatedTotal.toFixed(2)), // Required
+            "ProductsTotalTaxExcluding": Number(calculatedTotalExclTax.toFixed(2)), // Required
             "OrderDetails": orderDetails
         });
     }

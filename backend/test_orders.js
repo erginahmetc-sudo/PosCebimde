@@ -1,14 +1,14 @@
 async function testOrders() {
     try {
-        const response = await fetch('http://localhost:5000/api/orders/', {
+        const response = await fetch('https://www.poscebimde.com/api/orders/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'token': 'kasapos-2026-secret-api-token'
             },
             body: JSON.stringify({
-                "startDateTime": "15.01.2000 00:00:00",
-                "endDateTime": "15.01.2035 23:59:59"
+                "startDateTime": "10.03.2026 00:00:00",
+                "endDateTime": "10.03.2026 23:59:59"
             })
         });
         const data = await response.json();
