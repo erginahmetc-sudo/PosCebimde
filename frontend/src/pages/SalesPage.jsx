@@ -270,10 +270,10 @@ export default function SalesPage() {
     const printCustomA5Receipt = (saleData, paperSize) => {
         const savedConfig = localStorage.getItem('receipt_design_config');
         let companyInfo = {
-            name: 'ERCAN YAPI MARKET',
-            address: 'Fatih Mh. Mücahitler Cd. 151/C Seyhan/Adana',
-            phone: '0553 878 58 85',
-            logo_text: 'E',
+            name: 'Firma Adı',
+            address: '',
+            phone: '',
+            logo_text: 'K',
             showWatermark: true
         };
 

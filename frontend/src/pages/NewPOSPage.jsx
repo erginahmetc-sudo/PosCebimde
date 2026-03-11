@@ -111,11 +111,11 @@ export default function NewPOSPage() {
     const [keyboardShortcuts, setKeyboardShortcuts] = useState({});
 
     const [companySettings, setCompanySettings] = useState({
-        name: 'ERCAN YAPI MARKET',
-        address: 'Fatih Mh. Mücahitler Cd. 151/C Seyhan/Adana',
-        phone: '0553 878 58 85',
+        name: 'Firma Adı',
+        address: '',
+        phone: '',
         logo_url: null,
-        logo_text: 'E'
+        logo_text: 'K'
     });
     const [debtLimits, setDebtLimits] = useState({});
     const [showDebtLimitAlert, setShowDebtLimitAlert] = useState(false);
