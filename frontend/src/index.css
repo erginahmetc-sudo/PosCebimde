@@ -27,6 +27,8 @@
 
   --color-border-subtle: #E2E8F0;
 
+  --teal-gradient: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+
   --color-pos-primary: #0f172a;
   --color-pos-accent-blue: #2563eb;
   --color-pos-accent-green: #10b981;
@@ -80,10 +82,18 @@ body {
 
 /* Glassmorphism Utilities */
 .glass-card {
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.teal-gradient {
+  background: var(--teal-gradient);
+}
+
+.soft-shadow {
+  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.08);
 }
 
 .glass-input {
