@@ -622,19 +622,19 @@ export default function NewPOSPage() {
         setInvoiceLoading(false);
         if (result.success) {
             // Fatura başarılı → satışı tamamla
-            setCustomer(`Perakende-${retailCustomerForm.name.trim()}`);
+            const perakendeCustomerName = `Perakende-${retailCustomerForm.name.trim()}`;
+            setCustomer(perakendeCustomerName);
             setShowRetailCustomerModal(false);
             setShowCustomerModal(false);
             const pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
             console.log('[NewPOS] Fatura response:', JSON.stringify(result.data, null, 2));
 
             try {
-                const selectedCust = customers.find(c => c.name === customer);
-                const cleanCustomerName = (customer || 'Toptan Satış').replace(/^Perakende-/i, '').trim();
+                const selectedCust = customers.find(c => c.name === perakendeCustomerName);
                 await salesAPI.complete({
                     sale_code: saleCode,
                     customer: selectedCust || null,
-                    customer_name: !selectedCust ? cleanCustomerName : undefined,
+                    customer_name: !selectedCust ? perakendeCustomerName : undefined,
                     tax_number: retailCustomerForm.tax_number,
                     address: retailCustomerForm.address,
                     phone: retailCustomerForm.phone,
@@ -649,7 +649,7 @@ export default function NewPOSPage() {
 
                 if (localStorage.getItem('receipt_auto_print') === 'true') {
                     printReceipt({
-                        customer: customer, paymentMethod: retailPaymentType, items: cart,
+                        customer: perakendeCustomerName, paymentMethod: retailPaymentType, items: cart,
                         total: calculateTotal(), customerData: selectedCust
                     });
                 }
@@ -716,12 +716,12 @@ export default function NewPOSPage() {
         try {
             const saleCode = 'SLS-' + Date.now();
             const selectedCustomer = customers.find(c => c.name === customer);
-            const cleanCustomerName = (customer || 'Toptan Satış').replace(/^Perakende-/i, '').trim();
+            const displayCustomerName = (customer || 'Toptan Satış').trim();
 
             await salesAPI.complete({
                 sale_code: saleCode,
                 customer: selectedCustomer || null,
-                customer_name: !selectedCustomer ? cleanCustomerName : undefined,
+                customer_name: !selectedCustomer ? displayCustomerName : undefined,
                 tax_number: retailCustomerForm.tax_number,
                 address: retailCustomerForm.address,
                 phone: retailCustomerForm.phone,
