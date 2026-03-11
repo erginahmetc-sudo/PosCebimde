@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { salesAPI, productsAPI, settingsAPI } from '../services/api';
+import { salesAPI, productsAPI, settingsAPI, customersAPI } from '../services/api';
+import { birFaturaAPI } from '../services/birFaturaService';
 
 export default function SalesPage() {
     const [sales, setSales] = useState([]);
+    const [invoiceLoadingSaleId, setInvoiceLoadingSaleId] = useState(null);
     const [loading, setLoading] = useState(true);
 
     // Default Date: Last 7 Days
@@ -88,6 +90,89 @@ export default function SalesPage() {
     const handleDateChange = (e) => {
         const { name, value } = e.target;
         setDateRange(prev => ({ ...prev, [name]: value }));
+    };
+
+    // Fatura Kes - Mevcut satış için BirFatura e-fatura/e-arşiv gönder
+    const handleInvoiceForSale = async (sale) => {
+        const customerName = sale.customerName || sale.customer || '';
+        if (!customerName || customerName === 'Toptan Satış' || customerName === 'Misafir') return;
+
+        const configStr = localStorage.getItem('birfatura_config');
+        if (!configStr) {
+            alert('BirFatura ayarları bulunamadı. Ayarlar sayfasından API anahtarlarını kaydedin.');
+            return;
+        }
+
+        setInvoiceLoadingSaleId(sale.id);
+
+        try {
+            // Müşteri bilgilerini çek - önce satış verisinden, yoksa customer tablosundan
+            let customerData = {
+                name: customerName,
+                tax_number: sale.tax_number || '',
+                tax_office: '',
+                address: sale.address || '',
+                phone: sale.phone || '',
+                email: '',
+                city: '',
+                district: '',
+            };
+
+            // Kayıtlı müşteri ise detay bilgilerini çek
+            if (sale.customer_id) {
+                try {
+                    const custRes = await customersAPI.getAll();
+                    const cust = custRes.data?.customers?.find(c => c.id === sale.customer_id);
+                    if (cust) {
+                        customerData = {
+                            name: cust.name || customerName,
+                            tax_number: cust.tax_number || sale.tax_number || '',
+                            tax_office: cust.tax_office || '',
+                            address: cust.address || sale.address || '',
+                            phone: cust.phone || sale.phone || '',
+                            email: cust.email || '',
+                            city: cust.city || '',
+                            district: cust.district || '',
+                        };
+                    }
+                } catch (e) {
+                    console.error('Müşteri bilgileri alınamadı:', e);
+                }
+            }
+
+            const paymentTypeMap = {
+                'Nakit': 'Nakit olarak Ödendi',
+                'Kredi Kartı': 'Kredi Kartı ile Ödendi',
+                'POS': 'Kredi Kartı ile Ödendi',
+                'Havale': 'Havale-EFT ile ödendi',
+            };
+
+            const result = await birFaturaAPI.sendBasicInvoice({
+                retailForm: customerData,
+                cart: sale.items || [],
+                paymentMethod: paymentTypeMap[sale.payment_method] || '',
+                saleCode: sale.sale_code
+            });
+
+            if (result.success) {
+                // birfatura_uuid kaydet
+                const invoiceUuid = result.data?.Result?.UUID || result.data?.result?.uuid || '';
+                if (invoiceUuid) {
+                    await salesAPI.update(sale.sale_code, { birfatura_uuid: invoiceUuid });
+                }
+                const pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
+                alert('Fatura başarıyla kesildi!' + (pdfUrl ? '\nPDF linki konsola yazıldı.' : ''));
+                if (pdfUrl) window.open(pdfUrl, '_blank');
+                loadSales();
+            } else {
+                alert('Fatura Hatası: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Fatura kesme hatası:', error);
+            alert('Fatura kesme sırasında hata oluştu: ' + error.message);
+        } finally {
+            setInvoiceLoadingSaleId(null);
+        }
     };
 
     // Open Modal
@@ -924,12 +1009,42 @@ export default function SalesPage() {
                                                     ₺{sale.total?.toFixed(2)}
                                                 </td>
                                                 <td className="px-6 py-2 text-center">
-                                                    <button
-                                                        onClick={() => openDetailModal(sale)}
-                                                        className="px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-sm font-bold transition-colors"
-                                                    >
-                                                        Detay
-                                                    </button>
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        <button
+                                                            onClick={() => openDetailModal(sale)}
+                                                            className="px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-sm font-bold transition-colors"
+                                                        >
+                                                            Detay
+                                                        </button>
+                                                        {(() => {
+                                                            const custName = sale.customerName || sale.customer || '';
+                                                            const isToptan = custName === 'Toptan Satış' || custName === 'Misafir' || custName === 'Misafir Müşteri' || !custName || custName === '-';
+                                                            const isReturn = sale.sale_code?.startsWith('RET') || sale.payment_method === 'İade';
+                                                            const isDeleted = sale.is_deleted;
+                                                            if (isToptan || isReturn || isDeleted) return null;
+                                                            if (sale.birfatura_uuid) {
+                                                                return (
+                                                                    <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold inline-flex items-center gap-1">
+                                                                        <span className="material-symbols-outlined text-sm">check_circle</span>
+                                                                        Faturası Kesildi
+                                                                    </span>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <button
+                                                                    onClick={() => handleInvoiceForSale(sale)}
+                                                                    disabled={invoiceLoadingSaleId === sale.id}
+                                                                    className="px-3 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                                                                >
+                                                                    {invoiceLoadingSaleId === sale.id ? (
+                                                                        <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Kesiliyor</>
+                                                                    ) : (
+                                                                        <><span className="material-symbols-outlined text-sm">receipt_long</span> Fatura Kes</>
+                                                                    )}
+                                                                </button>
+                                                            );
+                                                        })()}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         </tbody>
