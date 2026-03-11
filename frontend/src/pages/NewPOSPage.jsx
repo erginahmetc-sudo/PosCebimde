@@ -2523,9 +2523,14 @@ export default function NewPOSPage() {
                                             type="text"
                                             name="tax_number"
                                             value={retailCustomerForm.tax_number}
-                                            onChange={handleRetailCustomerChange}
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, '').slice(0, 11);
+                                                setRetailCustomerForm(prev => ({ ...prev, tax_number: val }));
+                                                setTaxPayerResult(null);
+                                            }}
+                                            maxLength={11}
                                             className="flex-1 px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400 font-mono tracking-wider"
-                                            placeholder="11111111111"
+                                            placeholder="VKN (10) veya TCKN (11)"
                                         />
                                         {retailCustomerForm.tax_number.trim().length >= 10 && (
                                             <button
@@ -2590,23 +2595,33 @@ export default function NewPOSPage() {
                                 {/* Vergi Dairesi + E-posta */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2 relative">
-                                        <label className="block text-base font-semibold text-slate-700">Vergi Dairesi</label>
+                                        <label className="block text-base font-semibold text-slate-700">
+                                            Vergi Dairesi
+                                            {retailCustomerForm.tax_number.replace(/\D/g, '').length === 11 && (
+                                                <span className="text-xs text-slate-400 font-normal ml-2">(TCKN için gerekli değil)</span>
+                                            )}
+                                        </label>
                                         <input
                                             type="text"
                                             name="tax_office"
-                                            value={retailCustomerForm.tax_office}
+                                            value={retailCustomerForm.tax_number.replace(/\D/g, '').length === 11 ? '' : retailCustomerForm.tax_office}
                                             onChange={(e) => {
                                                 handleRetailCustomerChange(e);
                                                 setTaxOfficeSearch(e.target.value);
                                                 setShowTaxOfficeDropdown(true);
                                             }}
-                                            onFocus={() => setShowTaxOfficeDropdown(true)}
+                                            onFocus={() => { if (retailCustomerForm.tax_number.replace(/\D/g, '').length !== 11) setShowTaxOfficeDropdown(true); }}
                                             onBlur={() => setTimeout(() => setShowTaxOfficeDropdown(false), 200)}
                                             autoComplete="off"
-                                            className="w-full px-5 py-4 text-base rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
-                                            placeholder="Vergi dairesi adı yazın..."
+                                            disabled={retailCustomerForm.tax_number.replace(/\D/g, '').length === 11}
+                                            className={`w-full px-5 py-4 text-base rounded-2xl border-2 outline-none transition-all placeholder:text-slate-400 ${
+                                                retailCustomerForm.tax_number.replace(/\D/g, '').length === 11
+                                                    ? 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed'
+                                                    : 'border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500'
+                                            }`}
+                                            placeholder={retailCustomerForm.tax_number.replace(/\D/g, '').length === 11 ? 'TCKN için gerekli değil' : 'Vergi dairesi adı yazın...'}
                                         />
-                                        {showTaxOfficeDropdown && filteredTaxOffices.length > 0 && (
+                                        {showTaxOfficeDropdown && filteredTaxOffices.length > 0 && retailCustomerForm.tax_number.replace(/\D/g, '').length !== 11 && (
                                             <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border-2 border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto">
                                                 {filteredTaxOffices.map((office, idx) => (
                                                     <div
