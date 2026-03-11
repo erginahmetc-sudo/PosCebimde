@@ -689,6 +689,15 @@ export default function NewPOSPage() {
     const completeSale = async (paymentMethod) => {
         if (cart.length === 0) return alert('Sepet boş!');
 
+        // Veresiye sadece kayıtlı müşterilere verilebilir
+        if (paymentMethod === 'Açık Hesap' || paymentMethod === 'Veresiye') {
+            const isRegisteredCustomer = customers.find(c => c.name === customer);
+            if (!isRegisteredCustomer) {
+                setStatusModal({ isOpen: true, title: 'Veresiye Satış Yapılamaz', message: 'Veresiye satış sadece sistemde kayıtlı müşteri veya firmalara yapılabilir. Lütfen önce bir müşteri seçin.', type: 'error', details: null });
+                return;
+            }
+        }
+
         // Debt Limit Check
         if (paymentMethod === 'Açık Hesap' || paymentMethod === 'Veresiye') {
             const selectedCustomer = customers.find(c => c.name === customer);
@@ -1660,9 +1669,13 @@ export default function NewPOSPage() {
                                 </button>
                                 <button
                                     onClick={() => completeSale('Açık Hesap')}
-                                    className="flex items-center justify-center p-2 bg-orange-50 border border-orange-200 rounded-xl hover:border-orange-500 hover:bg-orange-100 hover:shadow-md transition-all"
+                                    disabled={!customers.find(c => c.name === customer)}
+                                    className={`flex items-center justify-center p-2 rounded-xl transition-all ${customers.find(c => c.name === customer)
+                                        ? 'bg-orange-50 border border-orange-200 hover:border-orange-500 hover:bg-orange-100 hover:shadow-md'
+                                        : 'bg-slate-50 border border-slate-200 opacity-50 cursor-not-allowed'
+                                    }`}
                                 >
-                                    <span className="text-base font-extrabold text-orange-700 whitespace-nowrap">VERESİYE</span>
+                                    <span className={`text-base font-extrabold whitespace-nowrap ${customers.find(c => c.name === customer) ? 'text-orange-700' : 'text-slate-400'}`}>VERESİYE</span>
                                 </button>
                             </div>
 
