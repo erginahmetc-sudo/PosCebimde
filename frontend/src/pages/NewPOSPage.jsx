@@ -2480,122 +2480,119 @@ export default function NewPOSPage() {
             {
                 showRetailCustomerModal && (
                     <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[60] p-4">
-                        <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-                            {/* Minimalist Header */}
-                            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-10 py-8">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30">
-                                        <span className="text-3xl">👤</span>
+                        <div className="bg-white rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+                            {/* Compact Header */}
+                            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-8 py-5">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/30">
+                                        <span className="text-xl">👤</span>
                                     </div>
                                     <div>
-                                        <h3 className="text-3xl font-bold text-white tracking-tight">Perakende Müşteri</h3>
-                                        <p className="text-slate-400 text-base mt-1">Hızlı satış için bilgileri doldurun</p>
+                                        <h3 className="text-2xl font-bold text-white tracking-tight">Perakende Müşteri</h3>
+                                        <p className="text-slate-400 text-sm">Hızlı satış için bilgileri doldurun</p>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Form Content */}
-                            <form onSubmit={handleRetailCustomerSubmit} className="p-10 space-y-6 bg-gradient-to-b from-slate-50 to-white">
-                                {/* İsim Soyisim - En Önemli Alan */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">
-                                        İsim Soyisim <span className="text-rose-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="name"
-                                        value={retailCustomerForm.name}
-                                        onChange={handleRetailCustomerChange}
-                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
-                                        placeholder="Müşteri adını giriniz..."
-                                        required
-                                        autoFocus
-                                    />
-                                </div>
-
-                                {/* TC / Vergi No */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">
-                                        TC Kimlik / Vergi Numarası
-                                    </label>
-                                    <div className="flex gap-2">
+                            {/* Form Content - 2 Column Layout */}
+                            <form onSubmit={handleRetailCustomerSubmit} className="p-6 bg-gradient-to-b from-slate-50 to-white">
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                                    {/* Sol Sütun */}
+                                    {/* İsim Soyisim */}
+                                    <div className="space-y-1">
+                                        <label className="block text-sm font-semibold text-slate-700">
+                                            İsim Soyisim <span className="text-rose-500">*</span>
+                                        </label>
                                         <input
                                             type="text"
-                                            name="tax_number"
-                                            value={retailCustomerForm.tax_number}
-                                            onChange={(e) => {
-                                                const val = e.target.value.replace(/\D/g, '').slice(0, 11);
-                                                setRetailCustomerForm(prev => ({ ...prev, tax_number: val }));
-                                                setTaxPayerResult(null);
-                                            }}
-                                            maxLength={11}
-                                            className="flex-1 px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400 font-mono tracking-wider"
-                                            placeholder="VKN (10) veya TCKN (11)"
+                                            name="name"
+                                            value={retailCustomerForm.name}
+                                            onChange={handleRetailCustomerChange}
+                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            placeholder="Müşteri adını giriniz..."
+                                            required
+                                            autoFocus
                                         />
-                                        {retailCustomerForm.tax_number.trim().length >= 10 && (
-                                            <button
-                                                type="button"
-                                                onClick={handleTaxPayerQuery}
-                                                disabled={taxPayerLoading}
-                                                className="px-5 py-5 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl hover:from-blue-600 hover:to-indigo-700 shadow-lg shadow-blue-500/30 transition-all active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
-                                            >
-                                                {taxPayerLoading ? (
-                                                    <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Sorgulanıyor</>
-                                                ) : (
-                                                    <><span className="material-symbols-outlined text-lg">person_search</span> Müşteriyi Getir</>
-                                                )}
-                                            </button>
-                                        )}
                                     </div>
-                                    {taxPayerResult && (
-                                        <div className={`mt-2 px-4 py-3 rounded-xl text-sm font-medium ${
-                                            taxPayerResult.isEFatura
-                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                                : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                        }`}>
-                                            {taxPayerResult.isEFatura ? (
-                                                <><span className="material-symbols-outlined text-base align-middle mr-1">verified</span> e-Fatura Mükellefi: {taxPayerResult.title}</>
-                                            ) : (
-                                                <><span className="material-symbols-outlined text-base align-middle mr-1">info</span> {taxPayerResult.message}</>
+
+                                    {/* TC / Vergi No + Müşteriyi Getir */}
+                                    <div className="space-y-1">
+                                        <label className="block text-sm font-semibold text-slate-700">
+                                            TC Kimlik / Vergi Numarası
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                name="tax_number"
+                                                value={retailCustomerForm.tax_number}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/\D/g, '').slice(0, 11);
+                                                    setRetailCustomerForm(prev => ({ ...prev, tax_number: val }));
+                                                    setTaxPayerResult(null);
+                                                }}
+                                                maxLength={11}
+                                                className="flex-1 px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400 font-mono tracking-wider"
+                                                placeholder="VKN (10) veya TCKN (11)"
+                                            />
+                                            {retailCustomerForm.tax_number.trim().length >= 10 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleTaxPayerQuery}
+                                                    disabled={taxPayerLoading}
+                                                    className="px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl hover:from-blue-600 hover:to-indigo-700 shadow-lg shadow-blue-500/30 transition-all active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap"
+                                                >
+                                                    {taxPayerLoading ? (
+                                                        <><span className="material-symbols-outlined animate-spin text-base">progress_activity</span> Sorgulanıyor</>
+                                                    ) : (
+                                                        <><span className="material-symbols-outlined text-base">person_search</span> Müşteriyi Getir</>
+                                                    )}
+                                                </button>
                                             )}
                                         </div>
-                                    )}
-                                </div>
+                                        {taxPayerResult && (
+                                            <div className={`mt-1 px-3 py-2 rounded-lg text-xs font-medium ${
+                                                taxPayerResult.isEFatura
+                                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                            }`}>
+                                                {taxPayerResult.isEFatura ? (
+                                                    <><span className="material-symbols-outlined text-sm align-middle mr-1">verified</span> e-Fatura Mükellefi: {taxPayerResult.title}</>
+                                                ) : (
+                                                    <><span className="material-symbols-outlined text-sm align-middle mr-1">info</span> {taxPayerResult.message}</>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
 
-                                {/* Adres */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">
-                                        Adres
-                                    </label>
-                                    <textarea
-                                        name="address"
-                                        value={retailCustomerForm.address}
-                                        onChange={handleRetailCustomerChange}
-                                        rows="3"
-                                        className="w-full px-6 py-5 text-lg rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all resize-none placeholder:text-slate-400"
-                                        placeholder="Adres bilgisi..."
-                                    ></textarea>
-                                </div>
+                                    {/* Telefon */}
+                                    <div className="space-y-1">
+                                        <label className="block text-sm font-semibold text-slate-700">Telefon</label>
+                                        <input
+                                            type="tel"
+                                            name="phone"
+                                            value={retailCustomerForm.phone}
+                                            onChange={handleRetailCustomerChange}
+                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            placeholder="0532 xxx xx xx"
+                                        />
+                                    </div>
 
-                                {/* Telefon */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">
-                                        Telefon
-                                    </label>
-                                    <input
-                                        type="tel"
-                                        name="phone"
-                                        value={retailCustomerForm.phone}
-                                        onChange={handleRetailCustomerChange}
-                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
-                                        placeholder="0532 xxx xx xx"
-                                    />
-                                </div>
+                                    {/* E-posta */}
+                                    <div className="space-y-1">
+                                        <label className="block text-sm font-semibold text-slate-700">E-posta</label>
+                                        <input
+                                            type="email"
+                                            name="email"
+                                            value={retailCustomerForm.email}
+                                            onChange={handleRetailCustomerChange}
+                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            placeholder="ornek@email.com"
+                                        />
+                                    </div>
 
-                                {/* Vergi Dairesi + E-posta */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2 relative">
-                                        <label className="block text-base font-semibold text-slate-700">
+                                    {/* Vergi Dairesi */}
+                                    <div className="space-y-1 relative">
+                                        <label className="block text-sm font-semibold text-slate-700">
                                             Vergi Dairesi
                                             {retailCustomerForm.tax_number.replace(/\D/g, '').length === 11 && (
                                                 <span className="text-xs text-slate-400 font-normal ml-2">(TCKN için gerekli değil)</span>
@@ -2614,7 +2611,7 @@ export default function NewPOSPage() {
                                             onBlur={() => setTimeout(() => setShowTaxOfficeDropdown(false), 200)}
                                             autoComplete="off"
                                             disabled={retailCustomerForm.tax_number.replace(/\D/g, '').length === 11}
-                                            className={`w-full px-5 py-4 text-base rounded-2xl border-2 outline-none transition-all placeholder:text-slate-400 ${
+                                            className={`w-full px-4 py-3 text-base rounded-xl border-2 outline-none transition-all placeholder:text-slate-400 ${
                                                 retailCustomerForm.tax_number.replace(/\D/g, '').length === 11
                                                     ? 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed'
                                                     : 'border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500'
@@ -2626,7 +2623,7 @@ export default function NewPOSPage() {
                                                 {filteredTaxOffices.map((office, idx) => (
                                                     <div
                                                         key={office.TaxOfficeCode || idx}
-                                                        className="px-4 py-3 text-sm hover:bg-blue-50 cursor-pointer transition-colors border-b border-slate-100 last:border-b-0"
+                                                        className="px-4 py-2.5 text-sm hover:bg-blue-50 cursor-pointer transition-colors border-b border-slate-100 last:border-b-0"
                                                         onMouseDown={() => {
                                                             setRetailCustomerForm(prev => ({ ...prev, tax_office: office.TaxOfficeName }));
                                                             setShowTaxOfficeDropdown(false);
@@ -2640,55 +2637,57 @@ export default function NewPOSPage() {
                                             </div>
                                         )}
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="block text-base font-semibold text-slate-700">E-posta</label>
+
+                                    {/* Adres */}
+                                    <div className="space-y-1">
+                                        <label className="block text-sm font-semibold text-slate-700">Adres</label>
                                         <input
-                                            type="email"
-                                            name="email"
-                                            value={retailCustomerForm.email}
+                                            type="text"
+                                            name="address"
+                                            value={retailCustomerForm.address}
                                             onChange={handleRetailCustomerChange}
-                                            className="w-full px-5 py-4 text-base rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
-                                            placeholder="ornek@email.com"
+                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            placeholder="Adres bilgisi..."
                                         />
                                     </div>
-                                </div>
 
-                                {/* İl / İlçe */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="block text-base font-semibold text-slate-700">İl</label>
+                                    {/* İl */}
+                                    <div className="space-y-1">
+                                        <label className="block text-sm font-semibold text-slate-700">İl</label>
                                         <input
                                             type="text"
                                             name="city"
                                             value={retailCustomerForm.city}
                                             onChange={handleRetailCustomerChange}
-                                            className="w-full px-5 py-4 text-base rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
                                             placeholder="Adana"
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="block text-base font-semibold text-slate-700">İlçe</label>
+
+                                    {/* İlçe */}
+                                    <div className="space-y-1">
+                                        <label className="block text-sm font-semibold text-slate-700">İlçe</label>
                                         <input
                                             type="text"
                                             name="district"
                                             value={retailCustomerForm.district}
                                             onChange={handleRetailCustomerChange}
-                                            className="w-full px-5 py-4 text-base rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
                                             placeholder="Seyhan"
                                         />
                                     </div>
                                 </div>
 
-                                {/* Ödeme Tipi Seçimi */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">Ödeme Tipi</label>
+                                {/* Ödeme Tipi - Full width */}
+                                <div className="mt-4 space-y-1">
+                                    <label className="block text-sm font-semibold text-slate-700">Ödeme Tipi</label>
                                     <div className="grid grid-cols-3 gap-2">
                                         {['Kredi Kartı', 'Havale', 'Nakit'].map(type => (
                                             <button
                                                 key={type}
                                                 type="button"
                                                 onClick={() => setRetailPaymentType(type)}
-                                                className={`py-3 rounded-xl font-bold text-sm transition-all active:scale-95 border-2 ${
+                                                className={`py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95 border-2 ${
                                                     retailPaymentType === type
                                                         ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-md'
                                                         : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
@@ -2701,11 +2700,11 @@ export default function NewPOSPage() {
                                 </div>
 
                                 {/* Buttons */}
-                                <div className="flex gap-3 pt-4">
+                                <div className="flex gap-3 mt-5">
                                     <button
                                         type="button"
                                         onClick={() => setShowRetailCustomerModal(false)}
-                                        className="flex-1 py-5 text-lg font-bold text-slate-600 bg-slate-100 rounded-2xl hover:bg-slate-200 transition-all active:scale-[0.98]"
+                                        className="flex-1 py-4 text-base font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all active:scale-[0.98]"
                                     >
                                         İptal
                                     </button>
@@ -2713,19 +2712,19 @@ export default function NewPOSPage() {
                                         type="button"
                                         onClick={handleDirectInvoice}
                                         disabled={invoiceLoading}
-                                        className="flex-[2] py-5 text-lg font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/30 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        className="flex-[2] py-4 text-base font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/30 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     >
                                         {invoiceLoading ? (
-                                            <><span className="material-symbols-outlined animate-spin text-xl">progress_activity</span> Gönderiliyor...</>
+                                            <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Gönderiliyor...</>
                                         ) : (
-                                            <><span className="material-symbols-outlined text-xl">receipt_long</span> Direkt Fatura Kes</>
+                                            <><span className="material-symbols-outlined text-lg">receipt_long</span> Direkt Fatura Kes</>
                                         )}
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-[2] py-5 text-xl font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl hover:from-amber-600 hover:to-orange-600 shadow-xl shadow-orange-500/30 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                                        className="flex-[2] py-4 text-base font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl hover:from-amber-600 hover:to-orange-600 shadow-xl shadow-orange-500/30 transition-all hover:scale-[1.01] active:scale-[0.99]"
                                     >
-                                        ✓ Tamamla
+                                        Tamamla
                                     </button>
                                 </div>
                             </form>
