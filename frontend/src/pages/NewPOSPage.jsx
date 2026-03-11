@@ -189,7 +189,7 @@ export default function NewPOSPage() {
         district: 'Seyhan'
     };
     const [retailCustomerForm, setRetailCustomerForm] = useState(defaultRetailForm);
-    const [retailPaymentType, setRetailPaymentType] = useState('Nakit');
+    const [retailPaymentType, setRetailPaymentType] = useState('Kredi Kartı');
 
     // Ask Quantity Logic
     const [showAskQuantityModal, setShowAskQuantityModal] = useState(false);
@@ -657,7 +657,7 @@ export default function NewPOSPage() {
                 setCart([]);
                 setCustomer('Toptan Satış');
                 setRetailCustomerForm(defaultRetailForm);
-                setRetailPaymentType('Nakit');
+                setRetailPaymentType('Kredi Kartı');
                 loadProducts();
             } catch (error) {
                 console.error('[NewPOS] Satış kaydetme hatası:', error);
@@ -2563,7 +2563,7 @@ export default function NewPOSPage() {
                                 <div className="space-y-2">
                                     <label className="block text-base font-semibold text-slate-700">Ödeme Tipi</label>
                                     <div className="grid grid-cols-3 gap-2">
-                                        {['Nakit', 'Kredi Kartı', 'Havale'].map(type => (
+                                        {['Kredi Kartı', 'Havale', 'Nakit'].map(type => (
                                             <button
                                                 key={type}
                                                 type="button"
