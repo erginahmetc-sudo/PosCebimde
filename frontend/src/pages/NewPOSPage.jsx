@@ -1926,13 +1926,7 @@ export default function NewPOSPage() {
                                     </div>
                                 ))}
                         </div>
-                        <div className="p-4 border-t bg-gray-50 flex justify-end">
-                            <button
-                                onClick={() => setShowRetailCustomerModal(true)}
-                                className="px-4 py-2 bg-orange-500 text-white rounded-lg font-bold hover:bg-orange-600 transition-colors"
-                            >
-                                + Perakende Müşteri
-                            </button>
+                        <div className="p-4 border-t bg-gray-50">
                         </div>
                     </div>
                 </div>
