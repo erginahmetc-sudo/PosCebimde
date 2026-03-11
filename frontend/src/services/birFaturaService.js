@@ -196,6 +196,45 @@ export const birFaturaAPI = {
     },
 
     /**
+     * Tüm vergi dairesi bilgilerini getir (GetTaxOfficesAndCodes endpoint).
+     * @returns {Object} { success, data: [{ TaxOfficeName, TaxOfficeCode }] }
+     */
+    getTaxOffices: async () => {
+        const configStr = localStorage.getItem('birfatura_config');
+        if (!configStr) {
+            return { success: false, message: "BirFatura ayarları bulunamadı." };
+        }
+        let config;
+        try { config = JSON.parse(configStr); }
+        catch (e) { return { success: false, message: "Ayar dosyası bozuk." }; }
+
+        if (!config.api_key || !config.secret_key || !config.integration_key) {
+            return { success: false, message: "API anahtarları eksik." };
+        }
+
+        try {
+            const response = await axios.post(`${LOCAL_BACKEND_URL}/api/birfatura-proxy`, {
+                endpoint: "OutEBelgeV2/GetTaxOfficesAndCodes",
+                apiKey: config.api_key,
+                secretKey: config.secret_key,
+                integrationKey: config.integration_key,
+                payload: {}
+            }, { headers: { 'Content-Type': 'application/json' } });
+
+            const responseData = response.data;
+            if (responseData && (responseData.Success || responseData.success)) {
+                const results = responseData.Result || responseData.result || [];
+                return { success: true, data: results };
+            } else {
+                return { success: false, message: responseData?.Message || "Vergi daireleri alınamadı." };
+            }
+        } catch (error) {
+            console.error("[BirFaturaService] Vergi Dairesi Hatası:", error);
+            return { success: false, message: error.message || "Ağ Hatası" };
+        }
+    },
+
+    /**
      * Trigger BirFatura to pull the order and create an invoice.
      * Uses 'OutEBelge/CreateEBelgeFromTemplateAndSend' endpoint via backend proxy.
      * @param {Object} sale - The sale object from KasaPos

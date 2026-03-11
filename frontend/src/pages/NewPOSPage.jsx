@@ -590,6 +590,33 @@ export default function NewPOSPage() {
     const [invoiceLoading, setInvoiceLoading] = useState(false);
     const [taxPayerLoading, setTaxPayerLoading] = useState(false);
     const [taxPayerResult, setTaxPayerResult] = useState(null); // null | { isEFatura, title }
+    const [taxOffices, setTaxOffices] = useState([]);
+    const [taxOfficeSearch, setTaxOfficeSearch] = useState('');
+    const [showTaxOfficeDropdown, setShowTaxOfficeDropdown] = useState(false);
+
+    useEffect(() => {
+        const loadTaxOffices = async () => {
+            const cached = sessionStorage.getItem('birfatura_tax_offices');
+            if (cached) {
+                try { setTaxOffices(JSON.parse(cached)); return; } catch (e) {}
+            }
+            const result = await birFaturaAPI.getTaxOffices();
+            if (result.success && result.data) {
+                setTaxOffices(result.data);
+                sessionStorage.setItem('birfatura_tax_offices', JSON.stringify(result.data));
+            }
+        };
+        loadTaxOffices();
+    }, []);
+
+    const filteredTaxOffices = useMemo(() => {
+        const search = (taxOfficeSearch || retailCustomerForm.tax_office || '').toUpperCase().replace(/İ/g, 'I').replace(/Ş/g, 'S').replace(/Ğ/g, 'G').replace(/Ü/g, 'U').replace(/Ö/g, 'O').replace(/Ç/g, 'C');
+        if (!search || search.length < 2) return [];
+        return taxOffices.filter(o => {
+            const name = (o.TaxOfficeName || '').toUpperCase().replace(/İ/g, 'I').replace(/Ş/g, 'S').replace(/Ğ/g, 'G').replace(/Ü/g, 'U').replace(/Ö/g, 'O').replace(/Ç/g, 'C');
+            return name.includes(search);
+        }).slice(0, 10);
+    }, [taxOfficeSearch, retailCustomerForm.tax_office, taxOffices]);
 
     const handleTaxPayerQuery = async () => {
         const taxNo = retailCustomerForm.tax_number.trim();
@@ -2562,16 +2589,41 @@ export default function NewPOSPage() {
 
                                 {/* Vergi Dairesi + E-posta */}
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
+                                    <div className="space-y-2 relative">
                                         <label className="block text-base font-semibold text-slate-700">Vergi Dairesi</label>
                                         <input
                                             type="text"
                                             name="tax_office"
                                             value={retailCustomerForm.tax_office}
-                                            onChange={handleRetailCustomerChange}
+                                            onChange={(e) => {
+                                                handleRetailCustomerChange(e);
+                                                setTaxOfficeSearch(e.target.value);
+                                                setShowTaxOfficeDropdown(true);
+                                            }}
+                                            onFocus={() => setShowTaxOfficeDropdown(true)}
+                                            onBlur={() => setTimeout(() => setShowTaxOfficeDropdown(false), 200)}
+                                            autoComplete="off"
                                             className="w-full px-5 py-4 text-base rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
-                                            placeholder="Vergi dairesi adı..."
+                                            placeholder="Vergi dairesi adı yazın..."
                                         />
+                                        {showTaxOfficeDropdown && filteredTaxOffices.length > 0 && (
+                                            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border-2 border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                                                {filteredTaxOffices.map((office, idx) => (
+                                                    <div
+                                                        key={office.TaxOfficeCode || idx}
+                                                        className="px-4 py-3 text-sm hover:bg-blue-50 cursor-pointer transition-colors border-b border-slate-100 last:border-b-0"
+                                                        onMouseDown={() => {
+                                                            setRetailCustomerForm(prev => ({ ...prev, tax_office: office.TaxOfficeName }));
+                                                            setShowTaxOfficeDropdown(false);
+                                                            setTaxOfficeSearch('');
+                                                        }}
+                                                    >
+                                                        <span className="font-medium text-slate-700">{office.TaxOfficeName}</span>
+                                                        <span className="text-slate-400 ml-2 text-xs">({office.TaxOfficeCode})</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="space-y-2">
                                         <label className="block text-base font-semibold text-slate-700">E-posta</label>
