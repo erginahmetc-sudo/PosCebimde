@@ -582,7 +582,7 @@ export default function NewPOSPage() {
     const handleRetailCustomerSubmit = (e) => {
         e.preventDefault();
         if (!retailCustomerForm.name.trim()) return alert('İsim Soyisim zorunludur!');
-        setCustomer(`${retailCustomerForm.name.trim()} (Perakende)`);
+        setCustomer(`Perakende-${retailCustomerForm.name.trim()}`);
         setShowRetailCustomerModal(false);
         setShowCustomerModal(false);
     };
@@ -622,7 +622,7 @@ export default function NewPOSPage() {
         setInvoiceLoading(false);
         if (result.success) {
             // Fatura başarılı → satışı tamamla
-            setCustomer(`${retailCustomerForm.name.trim()} (Perakende)`);
+            setCustomer(`Perakende-${retailCustomerForm.name.trim()}`);
             setShowRetailCustomerModal(false);
             setShowCustomerModal(false);
             const pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
@@ -630,7 +630,7 @@ export default function NewPOSPage() {
 
             try {
                 const selectedCust = customers.find(c => c.name === customer);
-                const cleanCustomerName = (customer || 'Toptan Satış').replace(/ \(Perakende\)$/i, '').trim();
+                const cleanCustomerName = (customer || 'Toptan Satış').replace(/^Perakende-/i, '').trim();
                 await salesAPI.complete({
                     sale_code: saleCode,
                     customer: selectedCust || null,
@@ -716,7 +716,7 @@ export default function NewPOSPage() {
         try {
             const saleCode = 'SLS-' + Date.now();
             const selectedCustomer = customers.find(c => c.name === customer);
-            const cleanCustomerName = (customer || 'Toptan Satış').replace(/ \(Perakende\)$/i, '').trim();
+            const cleanCustomerName = (customer || 'Toptan Satış').replace(/^Perakende-/i, '').trim();
 
             await salesAPI.complete({
                 sale_code: saleCode,
@@ -898,7 +898,7 @@ export default function NewPOSPage() {
         const showBalanceSetting = localStorage.getItem('receipt_show_balance') === 'true';
         const isRegisteredCustomer = saleData.customer &&
             saleData.customer !== 'Toptan Satış' &&
-            !saleData.customer.includes('(Perakende)');
+            !saleData.customer.startsWith('Perakende-');
         const shouldShowBalance = showBalanceSetting && isRegisteredCustomer;
 
         // Separate product rows from static items and filter footer items
@@ -1400,7 +1400,7 @@ export default function NewPOSPage() {
         </div>
         <div class="info-line">
             <span class="left">${new Date().toLocaleDateString('tr-TR')} ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
-            <span class="right">${saleData.customer?.includes('Perakende') ? 'Perakende Satış' : 'Toptan Satış'}</span>
+            <span class="right">${saleData.customer?.startsWith('Perakende-') ? 'Perakende Satış' : 'Toptan Satış'}</span>
         </div>
         <table class="items">
             <thead>

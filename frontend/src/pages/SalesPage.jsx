@@ -894,7 +894,7 @@ export default function SalesPage() {
                                     const status = returnStatusMap[sale.sale_code]?.status;
 
                                     return (
-                                        <tbody key={sale.id} className="group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+                                        <tbody key={sale.id} className={`group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 ${!sale.is_deleted && (sale.customerName || sale.customer || '').startsWith('Perakende-') ? 'bg-gray-100' : ''}`}>
                                             <tr className={`${sale.is_deleted ? 'bg-red-50/70 opacity-60' : ''}`}>
                                                 <td className="px-6 py-2 text-sm text-slate-600 whitespace-nowrap">
                                                     {new Date(sale.date).toLocaleString('tr-TR')}
