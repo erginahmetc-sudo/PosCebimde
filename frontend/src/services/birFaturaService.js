@@ -99,7 +99,7 @@ export const birFaturaAPI = {
                 ShippingZipCode: "",
                 ShippingPhone: retailForm.phone || "",
                 DeliveryFeeType: 3,
-                PaymentType: "",
+                PaymentType: paymentMethod || "",
                 Currency: "TRY",
                 CurrencyRate: 1.0,
                 TotalPaidTaxExcluding: Number(totalExclTax.toFixed(2)),
