@@ -144,6 +144,58 @@ export const birFaturaAPI = {
     },
 
     /**
+     * Vergi numarası ile e-fatura mükellefini sorgula (GetUserPK endpoint).
+     * 10 haneli VKN veya 11 haneli TCKN ile kullanılır.
+     * @param {string} taxNumber - VKN veya TCKN
+     * @returns {Object} { success, data: { title, identifier, name } } veya { success: false, message }
+     */
+    queryTaxPayer: async (taxNumber) => {
+        const configStr = localStorage.getItem('birfatura_config');
+        if (!configStr) {
+            return { success: false, message: "BirFatura ayarları bulunamadı." };
+        }
+        let config;
+        try { config = JSON.parse(configStr); }
+        catch (e) { return { success: false, message: "Ayar dosyası bozuk." }; }
+
+        if (!config.api_key || !config.secret_key || !config.integration_key) {
+            return { success: false, message: "API anahtarları eksik." };
+        }
+
+        const cleanTaxNo = String(taxNumber || "").trim();
+        if (cleanTaxNo.length < 10) {
+            return { success: false, message: "Geçersiz vergi numarası." };
+        }
+
+        try {
+            console.log(`[BirFaturaService] Mükellef sorgulanıyor: ${cleanTaxNo}`);
+            const response = await axios.post(`${LOCAL_BACKEND_URL}/api/birfatura-proxy`, {
+                endpoint: "OutEBelgeV2/GetUserPK",
+                apiKey: config.api_key,
+                secretKey: config.secret_key,
+                integrationKey: config.integration_key,
+                payload: { kn: cleanTaxNo }
+            }, { headers: { 'Content-Type': 'application/json' } });
+
+            const responseData = response.data;
+            if (responseData && (responseData.Success || responseData.success)) {
+                const results = responseData.Result || responseData.result || [];
+                if (results.length > 0) {
+                    return { success: true, data: results[0], isEFatura: true };
+                } else {
+                    return { success: true, data: null, isEFatura: false, message: "Bu numara e-fatura mükellefi değil." };
+                }
+            } else {
+                return { success: false, message: responseData?.Message || responseData?.message || "Sorgulama başarısız." };
+            }
+        } catch (error) {
+            console.error("[BirFaturaService] Mükellef Sorgulama Hatası:", error);
+            const errorMsg = error.response?.data?.Message || error.response?.data?.message || error.message || "Ağ Hatası";
+            return { success: false, message: `Sorgulama Hatası: ${errorMsg}` };
+        }
+    },
+
+    /**
      * Trigger BirFatura to pull the order and create an invoice.
      * Uses 'OutEBelge/CreateEBelgeFromTemplateAndSend' endpoint via backend proxy.
      * @param {Object} sale - The sale object from KasaPos

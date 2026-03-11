@@ -588,6 +588,29 @@ export default function NewPOSPage() {
     };
 
     const [invoiceLoading, setInvoiceLoading] = useState(false);
+    const [taxPayerLoading, setTaxPayerLoading] = useState(false);
+    const [taxPayerResult, setTaxPayerResult] = useState(null); // null | { isEFatura, title }
+
+    const handleTaxPayerQuery = async () => {
+        const taxNo = retailCustomerForm.tax_number.trim();
+        if (taxNo.length < 10) return;
+        setTaxPayerLoading(true);
+        setTaxPayerResult(null);
+        const result = await birFaturaAPI.queryTaxPayer(taxNo);
+        setTaxPayerLoading(false);
+        if (result.success && result.data) {
+            const title = result.data.title || result.data.name || '';
+            setRetailCustomerForm(prev => ({
+                ...prev,
+                name: title || prev.name,
+            }));
+            setTaxPayerResult({ isEFatura: true, title });
+        } else if (result.success && !result.data) {
+            setTaxPayerResult({ isEFatura: false, message: result.message });
+        } else {
+            setTaxPayerResult({ isEFatura: false, message: result.message });
+        }
+    };
 
     // Ödeme tipi → BirFatura açıklama eşlemesi
     const paymentTypeMap = {
@@ -684,6 +707,9 @@ export default function NewPOSPage() {
     const handleRetailCustomerChange = (e) => {
         const { name, value } = e.target;
         setRetailCustomerForm(prev => ({ ...prev, [name]: value }));
+        if (name === 'tax_number') {
+            setTaxPayerResult(null);
+        }
     };
 
     const completeSale = async (paymentMethod) => {
@@ -1891,7 +1917,7 @@ export default function NewPOSPage() {
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
                             <div
-                                onClick={() => { setShowRetailCustomerModal(true); }}
+                                onClick={() => { setShowRetailCustomerModal(true); setTaxPayerResult(null); setRetailCustomerForm(defaultRetailForm); }}
                                 className="mb-2 p-4 bg-amber-50 border border-amber-200 rounded-xl hover:border-amber-500 hover:bg-amber-100 cursor-pointer flex justify-between items-center group transition-colors"
                             >
                                 <div className="flex items-center gap-3">
@@ -2465,14 +2491,43 @@ export default function NewPOSPage() {
                                     <label className="block text-base font-semibold text-slate-700">
                                         TC Kimlik / Vergi Numarası
                                     </label>
-                                    <input
-                                        type="text"
-                                        name="tax_number"
-                                        value={retailCustomerForm.tax_number}
-                                        onChange={handleRetailCustomerChange}
-                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400 font-mono tracking-wider"
-                                        placeholder="11111111111"
-                                    />
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            name="tax_number"
+                                            value={retailCustomerForm.tax_number}
+                                            onChange={handleRetailCustomerChange}
+                                            className="flex-1 px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400 font-mono tracking-wider"
+                                            placeholder="11111111111"
+                                        />
+                                        {retailCustomerForm.tax_number.trim().length >= 10 && (
+                                            <button
+                                                type="button"
+                                                onClick={handleTaxPayerQuery}
+                                                disabled={taxPayerLoading}
+                                                className="px-5 py-5 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl hover:from-blue-600 hover:to-indigo-700 shadow-lg shadow-blue-500/30 transition-all active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+                                            >
+                                                {taxPayerLoading ? (
+                                                    <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Sorgulanıyor</>
+                                                ) : (
+                                                    <><span className="material-symbols-outlined text-lg">person_search</span> Müşteriyi Getir</>
+                                                )}
+                                            </button>
+                                        )}
+                                    </div>
+                                    {taxPayerResult && (
+                                        <div className={`mt-2 px-4 py-3 rounded-xl text-sm font-medium ${
+                                            taxPayerResult.isEFatura
+                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                        }`}>
+                                            {taxPayerResult.isEFatura ? (
+                                                <><span className="material-symbols-outlined text-base align-middle mr-1">verified</span> e-Fatura Mükellefi: {taxPayerResult.title}</>
+                                            ) : (
+                                                <><span className="material-symbols-outlined text-base align-middle mr-1">info</span> {taxPayerResult.message}</>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Adres */}
