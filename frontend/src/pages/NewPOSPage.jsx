@@ -676,23 +676,10 @@ export default function NewPOSPage() {
             setCustomer(perakendeCustomerName);
             setShowRetailCustomerModal(false);
             setShowCustomerModal(false);
-            let pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
             const invoiceUuid = result.ettn || result.data?.Result?.ETTN || result.data?.result?.ETTN || result.data?.Result?.UUID || result.data?.result?.UUID || null;
+            let pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
             console.log('[NewPOS] Fatura response:', JSON.stringify(result.data, null, 2));
-
-            // PDF linki doğrudan gelmezse UUID ile sorgula
-            if (!pdfUrl && invoiceUuid) {
-                try {
-                    // API'nin faturayı işlemesi için kısa bir bekleme
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    const pdfResult = await birFaturaAPI.getPdfLink(invoiceUuid);
-                    if (pdfResult.success && pdfResult.pdfUrl) {
-                        pdfUrl = pdfResult.pdfUrl;
-                    }
-                } catch (pdfErr) {
-                    console.warn('[NewPOS] PDF link alınamadı:', pdfErr);
-                }
-            }
+            console.log('[NewPOS] Invoice UUID:', invoiceUuid, 'PDF URL:', pdfUrl);
 
             try {
                 const selectedCust = customers.find(c => c.name === perakendeCustomerName);
@@ -734,9 +721,26 @@ export default function NewPOSPage() {
                 message: 'E-Fatura/E-Arşiv fatura başarıyla gönderildi ve satış tamamlandı.',
                 type: 'success',
                 details: null,
-                actionButton: pdfUrl ? {
+                actionButton: (pdfUrl || invoiceUuid) ? {
                     label: '📄 Kesilen Faturayı Görüntüle',
-                    onClick: () => window.open(pdfUrl, '_blank')
+                    onClick: async () => {
+                        if (pdfUrl) {
+                            window.open(pdfUrl, '_blank');
+                            return;
+                        }
+                        // UUID ile PDF linkini sorgula
+                        try {
+                            const pdfResult = await birFaturaAPI.getPdfLink(invoiceUuid);
+                            if (pdfResult.success && pdfResult.pdfUrl) {
+                                window.open(pdfResult.pdfUrl, '_blank');
+                            } else {
+                                alert('PDF henüz hazır değil. Lütfen birkaç saniye sonra tekrar deneyin.');
+                            }
+                        } catch (err) {
+                            console.error('[NewPOS] PDF açma hatası:', err);
+                            alert('PDF alınırken hata oluştu.');
+                        }
+                    }
                 } : null
             });
             setSuccessMessage('Satış İşlemi Başarılı');
