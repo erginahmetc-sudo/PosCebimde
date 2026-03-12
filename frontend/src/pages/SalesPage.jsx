@@ -155,15 +155,16 @@ export default function SalesPage() {
             });
 
             if (result.success) {
-                // birfatura_uuid kaydet
-                const invoiceUuid = result.data?.Result?.UUID || result.data?.result?.uuid || '';
-                if (invoiceUuid) {
+                // birfatura_uuid kaydet - UUID yoksa bile "INVOICED" olarak işaretle
+                const invoiceUuid = result.data?.Result?.UUID || result.data?.result?.uuid || result.data?.Result?.ETTN || 'INVOICED-' + Date.now();
+                try {
                     await salesAPI.update(sale.sale_code, { birfatura_uuid: invoiceUuid });
+                } catch (updateErr) {
+                    console.error('birfatura_uuid güncellenemedi:', updateErr);
                 }
                 const pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
-                alert('Fatura başarıyla kesildi!' + (pdfUrl ? '\nPDF linki konsola yazıldı.' : ''));
                 if (pdfUrl) window.open(pdfUrl, '_blank');
-                loadSales();
+                await loadSales();
             } else {
                 alert('Fatura Hatası: ' + result.message);
             }

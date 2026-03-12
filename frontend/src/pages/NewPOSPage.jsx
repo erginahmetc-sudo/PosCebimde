@@ -676,8 +676,23 @@ export default function NewPOSPage() {
             setCustomer(perakendeCustomerName);
             setShowRetailCustomerModal(false);
             setShowCustomerModal(false);
-            const pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
+            let pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
+            const invoiceUuid = result.ettn || result.data?.Result?.ETTN || result.data?.result?.ETTN || result.data?.Result?.UUID || result.data?.result?.UUID || null;
             console.log('[NewPOS] Fatura response:', JSON.stringify(result.data, null, 2));
+
+            // PDF linki doğrudan gelmezse UUID ile sorgula
+            if (!pdfUrl && invoiceUuid) {
+                try {
+                    // API'nin faturayı işlemesi için kısa bir bekleme
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    const pdfResult = await birFaturaAPI.getPdfLink(invoiceUuid);
+                    if (pdfResult.success && pdfResult.pdfUrl) {
+                        pdfUrl = pdfResult.pdfUrl;
+                    }
+                } catch (pdfErr) {
+                    console.warn('[NewPOS] PDF link alınamadı:', pdfErr);
+                }
+            }
 
             try {
                 const selectedCust = customers.find(c => c.name === perakendeCustomerName);

@@ -132,7 +132,7 @@ export const birFaturaAPI = {
 
             const responseData = response.data;
             if (responseData && (responseData.Success || responseData.success)) {
-                return { success: true, data: responseData };
+                return { success: true, data: responseData, ettn };
             } else {
                 return { success: false, message: `BirFatura Hatası: ${responseData?.Message || responseData?.message || "Bilinmeyen API hatası."}` };
             }
@@ -192,6 +192,44 @@ export const birFaturaAPI = {
             console.error("[BirFaturaService] Mükellef Sorgulama Hatası:", error);
             const errorMsg = error.response?.data?.Message || error.response?.data?.message || error.message || "Ağ Hatası";
             return { success: false, message: `Sorgulama Hatası: ${errorMsg}` };
+        }
+    },
+
+    /**
+     * UUID ile fatura PDF linkini getir (GetPDFLinkByUUID endpoint).
+     * @param {string} uuid - Fatura UUID (ETTN)
+     * @returns {Object} { success, pdfUrl }
+     */
+    getPdfLink: async (uuid) => {
+        const configStr = localStorage.getItem('birfatura_config');
+        if (!configStr) return { success: false, message: "Ayarlar bulunamadı." };
+        let config;
+        try { config = JSON.parse(configStr); }
+        catch (e) { return { success: false, message: "Ayar dosyası bozuk." }; }
+
+        if (!config.api_key || !config.secret_key || !config.integration_key) {
+            return { success: false, message: "API anahtarları eksik." };
+        }
+
+        try {
+            const response = await axios.post(`${LOCAL_BACKEND_URL}/api/birfatura-proxy`, {
+                endpoint: "OutEBelgeV2/GetPDFLinkByUUID",
+                apiKey: config.api_key,
+                secretKey: config.secret_key,
+                integrationKey: config.integration_key,
+                payload: { UUID: uuid }
+            }, { headers: { 'Content-Type': 'application/json' } });
+
+            const responseData = response.data;
+            if (responseData && (responseData.Success || responseData.success)) {
+                const pdfUrl = responseData.Result || responseData.result || '';
+                return { success: true, pdfUrl };
+            } else {
+                return { success: false, message: responseData?.Message || "PDF linki alınamadı." };
+            }
+        } catch (error) {
+            console.error("[BirFaturaService] PDF Link Hatası:", error);
+            return { success: false, message: error.message || "Ağ Hatası" };
         }
     },
 
