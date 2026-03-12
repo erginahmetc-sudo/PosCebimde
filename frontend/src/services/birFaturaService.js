@@ -211,26 +211,49 @@ export const birFaturaAPI = {
             return { success: false, message: "API anahtarları eksik." };
         }
 
-        try {
-            const response = await axios.post(`${LOCAL_BACKEND_URL}/api/birfatura-proxy`, {
-                endpoint: "OutEBelgeV2/GetPDFLinkByUUID",
-                apiKey: config.api_key,
-                secretKey: config.secret_key,
-                integrationKey: config.integration_key,
-                payload: { UUID: uuid }
-            }, { headers: { 'Content-Type': 'application/json' } });
-
-            const responseData = response.data;
-            if (responseData && (responseData.Success || responseData.success)) {
-                const pdfUrl = responseData.Result || responseData.result || '';
-                return { success: true, pdfUrl };
-            } else {
-                return { success: false, message: responseData?.Message || "PDF linki alınamadı." };
+        const extractPdfUrl = (responseData) => {
+            // Response bir array olarak dönebilir: [{ uuid, pdfLink, success, message }]
+            if (Array.isArray(responseData) && responseData.length > 0) {
+                const item = responseData[0];
+                if (item.pdfLink) return item.pdfLink;
+                if (item.PdfLink) return item.PdfLink;
             }
-        } catch (error) {
-            console.error("[BirFaturaService] PDF Link Hatası:", error);
-            return { success: false, message: error.message || "Ağ Hatası" };
+            // Result alanında array olarak dönebilir
+            if (responseData && (responseData.Success || responseData.success)) {
+                const results = responseData.Result || responseData.result;
+                if (Array.isArray(results) && results.length > 0) {
+                    if (results[0].pdfLink) return results[0].pdfLink;
+                    if (results[0].PdfLink) return results[0].PdfLink;
+                }
+                if (typeof results === 'string' && results.length > 0) return results;
+            }
+            return null;
+        };
+
+        // Önce EARSIV, sonra EFATURA dene
+        for (const systemType of ["EARSIV", "EFATURA"]) {
+            try {
+                console.log(`[BirFaturaService] PDF link sorgulanıyor (${systemType}), UUID:`, uuid);
+                const response = await axios.post(`${LOCAL_BACKEND_URL}/api/birfatura-proxy`, {
+                    endpoint: "OutEBelgeV2/GetPDFLinkByUUID",
+                    apiKey: config.api_key,
+                    secretKey: config.secret_key,
+                    integrationKey: config.integration_key,
+                    payload: { uuids: [uuid], systemType }
+                }, { headers: { 'Content-Type': 'application/json' } });
+
+                console.log(`[BirFaturaService] PDF link response (${systemType}):`, JSON.stringify(response.data, null, 2));
+
+                const pdfUrl = extractPdfUrl(response.data);
+                if (pdfUrl) {
+                    return { success: true, pdfUrl };
+                }
+            } catch (error) {
+                console.warn(`[BirFaturaService] PDF Link (${systemType}) hatası:`, error.message);
+            }
         }
+
+        return { success: false, message: "PDF linki alınamadı." };
     },
 
     /**
