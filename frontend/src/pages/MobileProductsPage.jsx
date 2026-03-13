@@ -561,5 +561,6 @@ export default function MobileProductsPage() {
                 }
             `}</style>
         </div>
+        </div>
     );
 }

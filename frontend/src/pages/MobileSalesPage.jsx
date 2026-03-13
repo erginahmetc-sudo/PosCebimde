@@ -260,5 +260,6 @@ export default function MobileSalesPage() {
                 }
             `}</style>
         </div>
+        </div>
     );
 }

@@ -1860,5 +1860,6 @@ export default function MobilePOSPage() {
                 }
             `}</style>
         </div>
+        </div>
     );
 }

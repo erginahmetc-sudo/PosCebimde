@@ -1029,15 +1029,6 @@ export default function MobileInvoicesPage() {
                 .animate-slide-up {
                     animation: slide-up 0.3s ease-out;
                 }
-            `}</style>
-            <style>{`
-                @keyframes slide-up {
-                    from { transform: translateY(100%); }
-                    to { transform: translateY(0); }
-                }
-                .animate-slide-up {
-                    animation: slide-up 0.3s ease-out;
-                }
                 @keyframes fade-in-up {
                     from { opacity: 0; transform: translateY(20px); }
                     to { opacity: 1; transform: translateY(0); }
@@ -1067,6 +1058,7 @@ export default function MobileInvoicesPage() {
                     animation: typewriter 1s infinite;
                 }
             `}</style>
+        </div>
         </div>
     );
 }
