@@ -22,6 +22,8 @@ export default function SettingsPage() {
     const [showInvoiceTotal, setShowInvoiceTotal] = useState(true);
     const [sendSalesToBirFatura, setSendSalesToBirFatura] = useState(false);
     const [autoPrintReceipt, setAutoPrintReceipt] = useState(false);
+    const [showCustomerTotalDebt, setShowCustomerTotalDebt] = useState(true);
+    const [showCustomerTotalCredit, setShowCustomerTotalCredit] = useState(true);
 
     const [receiptPaperSize, setReceiptPaperSize] = useState('A5 (148x210mm)');
     const [secretToken, setSecretToken] = useState('...');
@@ -76,6 +78,9 @@ export default function SettingsPage() {
                 }
 
                 if (data['secret_token']) setSecretToken(data['secret_token']);
+
+                if (data['customers_show_total_debt'] !== undefined) setShowCustomerTotalDebt(data['customers_show_total_debt']);
+                if (data['customers_show_total_credit'] !== undefined) setShowCustomerTotalCredit(data['customers_show_total_credit']);
 
                 // Restore BirFatura Config to localStorage
                 if (data['birfatura_api_key'] || data['birfatura_secret_key'] || data['birfatura_integration_key']) {
@@ -159,6 +164,18 @@ export default function SettingsPage() {
         const newValue = !sendSalesToBirFatura;
         setSendSalesToBirFatura(newValue);
         updateSetting('integration_send_sales_to_birfatura', newValue);
+    };
+
+    const toggleShowCustomerTotalDebt = () => {
+        const newValue = !showCustomerTotalDebt;
+        setShowCustomerTotalDebt(newValue);
+        updateSetting('customers_show_total_debt', newValue);
+    };
+
+    const toggleShowCustomerTotalCredit = () => {
+        const newValue = !showCustomerTotalCredit;
+        setShowCustomerTotalCredit(newValue);
+        updateSetting('customers_show_total_credit', newValue);
     };
 
 
