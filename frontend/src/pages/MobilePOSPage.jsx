@@ -564,19 +564,19 @@ export default function MobilePOSPage() {
                         <div
                             key={product.id || product.stock_code}
                             onClick={() => handleProductClick(product)}
-                            className="bg-white border border-gray-200 rounded-xl p-2 text-center cursor-pointer transition-all hover:shadow-lg flex flex-col h-[155px]"
+                            className="bg-white border border-gray-200 rounded-xl px-1.5 pt-1.5 pb-0 text-center cursor-pointer transition-all hover:shadow-lg flex flex-col h-[140px] overflow-hidden"
                         >
-                            <div className="flex-1 flex flex-col items-center pt-1">
+                            <div className="flex-1 flex flex-col items-center pt-0.5 overflow-hidden">
                                 {product.image_url ? (
-                                    <img src={product.image_url} alt={product.name} className="w-16 h-16 object-cover rounded-md mb-2" />
+                                    <img src={product.image_url} alt={product.name} className="w-full h-16 object-contain rounded-md mb-1" />
                                 ) : (
-                                    <div className="w-16 h-16 flex items-center justify-center text-3xl text-gray-300 mb-2">📦</div>
+                                    <div className="w-full h-16 flex items-center justify-center text-3xl text-gray-300 mb-1">📦</div>
                                 )}
-                                <div className="text-[11px] font-bold leading-tight line-clamp-2 px-1 text-gray-800">
+                                <div className="text-[11px] font-bold leading-tight line-clamp-2 px-0.5 text-gray-800">
                                     {product.name}
                                 </div>
                             </div>
-                            <div className="text-green-600 text-xs font-black mt-1 py-1 border-t border-gray-100 flex items-center justify-center">
+                            <div className="text-green-600 text-base font-black py-1 border-t border-gray-100 flex items-center justify-center bg-gray-50/80 -mx-1.5">
                                 {product.price?.toFixed(2)} TL
                             </div>
                         </div>
