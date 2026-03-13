@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { customersAPI } from '../services/api';
+import { customersAPI, settingsAPI } from '../services/api';
 import { birFaturaAPI } from '../services/birFaturaService';
 import * as XLSX from 'xlsx';
 
@@ -52,6 +52,10 @@ export default function CustomersPage() {
     const [excelImporting, setExcelImporting] = useState(false);
     const [excelPreview, setExcelPreview] = useState([]);
     const [importResult, setImportResult] = useState({ show: false, success: 0, error: 0 });
+
+    // Cari Ayarları - visibility settings
+    const [showTotalDebt, setShowTotalDebt] = useState(true);
+    const [showTotalCredit, setShowTotalCredit] = useState(true);
 
     // Tax payer query & tax office autocomplete state (for edit modal)
     const [editTaxPayerLoading, setEditTaxPayerLoading] = useState(false);
@@ -117,7 +121,20 @@ export default function CustomersPage() {
 
     useEffect(() => {
         loadCustomers();
+        loadCariSettings();
     }, []);
+
+    const loadCariSettings = async () => {
+        try {
+            const { data } = await settingsAPI.getAll();
+            if (data) {
+                if (data['customers_show_total_debt'] !== undefined) setShowTotalDebt(data['customers_show_total_debt']);
+                if (data['customers_show_total_credit'] !== undefined) setShowTotalCredit(data['customers_show_total_credit']);
+            }
+        } catch (error) {
+            console.error('Cari ayarları yüklenirken hata:', error);
+        }
+    };
 
     const loadCustomers = async () => {
         try {
@@ -481,6 +498,46 @@ export default function CustomersPage() {
                     </div>
                 </div>
             </header>
+
+            {/* Toplam Borç / Alacak Summary Cards */}
+            {(showTotalDebt || showTotalCredit) && (
+                <div className="px-6 py-4 flex gap-4 flex-wrap">
+                    {showTotalDebt && (() => {
+                        const totalDebt = customers.reduce((sum, c) => sum + (parseFloat(c.total_debt) || 0), 0);
+                        return (
+                            <div className="flex-1 min-w-[220px] bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl p-5 shadow-lg shadow-red-500/20 text-white">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-2xl">trending_down</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-red-100 font-medium">Toplam Borç</p>
+                                        <p className="text-2xl font-black">{totalDebt.toFixed(2)} TL</p>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-red-200">Tüm müşterilerin toplam borç tutarı</p>
+                            </div>
+                        );
+                    })()}
+                    {showTotalCredit && (() => {
+                        const totalCredit = customers.reduce((sum, c) => sum + (parseFloat(c.total_credit) || 0), 0);
+                        return (
+                            <div className="flex-1 min-w-[220px] bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-5 shadow-lg shadow-emerald-500/20 text-white">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-2xl">trending_up</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-emerald-100 font-medium">Toplam Alacak</p>
+                                        <p className="text-2xl font-black">{totalCredit.toFixed(2)} TL</p>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-emerald-200">Tüm müşterilerin toplam alacak tutarı</p>
+                            </div>
+                        );
+                    })()}
+                </div>
+            )}
 
             {/* Main Content */}
             <div className="flex-1 p-5 flex flex-col">

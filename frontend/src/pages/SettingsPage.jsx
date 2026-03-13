@@ -237,8 +237,51 @@ export default function SettingsPage() {
                             Firma Bilgileri
                         </button>
                     </div>
+                </div>
+            </div>
 
-                    {/* Debt Limit Section */}
+            {/* Cari Ayarları Bölümü */}
+            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">
+                    Cari Ayarları
+                </h2>
+
+                <div className="space-y-4">
+                    {/* Toplam Borç Göster/Gizle */}
+                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-red-50 to-rose-50 rounded-lg border border-red-200">
+                        <div>
+                            <h3 className="font-semibold text-gray-800">Toplam Borç Tutarını Göster</h3>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Bakiyeler sayfasındaki tüm müşterilerin genel "Toplam Borç" tutarını göster veya gizle.
+                            </p>
+                        </div>
+
+                        <button
+                            onClick={toggleShowCustomerTotalDebt}
+                            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ${showCustomerTotalDebt ? 'bg-red-500' : 'bg-gray-200'}`}
+                        >
+                            <span className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${showCustomerTotalDebt ? 'translate-x-7' : 'translate-x-1'}`} />
+                        </button>
+                    </div>
+
+                    {/* Toplam Alacak Göster/Gizle */}
+                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                        <div>
+                            <h3 className="font-semibold text-gray-800">Toplam Alacak Tutarını Göster</h3>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Bakiyeler sayfasındaki tüm müşterilerin genel "Toplam Alacak" tutarını göster veya gizle.
+                            </p>
+                        </div>
+
+                        <button
+                            onClick={toggleShowCustomerTotalCredit}
+                            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${showCustomerTotalCredit ? 'bg-green-500' : 'bg-gray-200'}`}
+                        >
+                            <span className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${showCustomerTotalCredit ? 'translate-x-7' : 'translate-x-1'}`} />
+                        </button>
+                    </div>
+
+                    {/* Veresiye Limitleri - Moved under Cari Ayarları */}
                     <div className="flex items-center justify-between p-4 bg-gradient-to-r from-rose-50 to-pink-50 rounded-lg border border-rose-200">
                         <div>
                             <h3 className="font-semibold text-gray-800">Veresiye Limitleri</h3>
