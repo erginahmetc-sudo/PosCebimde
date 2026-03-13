@@ -564,17 +564,21 @@ export default function MobilePOSPage() {
                         <div
                             key={product.id || product.stock_code}
                             onClick={() => handleProductClick(product)}
-                            className="bg-white border border-gray-200 rounded-xl p-3 text-center cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 flex flex-col justify-between min-h-[150px]"
+                            className="bg-white border border-gray-200 rounded-xl p-2 text-center cursor-pointer transition-all hover:shadow-lg flex flex-col h-[155px]"
                         >
-                            <div className="flex flex-col items-center">
+                            <div className="flex-1 flex flex-col items-center pt-1">
                                 {product.image_url ? (
                                     <img src={product.image_url} alt={product.name} className="w-16 h-16 object-cover rounded-md mb-2" />
                                 ) : (
                                     <div className="w-16 h-16 flex items-center justify-center text-3xl text-gray-300 mb-2">📦</div>
                                 )}
-                                <div className="text-[11px] font-semibold line-clamp-2 h-8 flex items-center justify-center overflow-hidden">{product.name}</div>
+                                <div className="text-[11px] font-bold leading-tight line-clamp-2 px-1 text-gray-800">
+                                    {product.name}
+                                </div>
                             </div>
-                            <div className="text-green-600 text-sm font-bold mt-auto border-t border-gray-50 pt-1">{product.price?.toFixed(2)} TL</div>
+                            <div className="text-green-600 text-xs font-black mt-1 py-1 border-t border-gray-100 flex items-center justify-center">
+                                {product.price?.toFixed(2)} TL
+                            </div>
                         </div>
                     ))}
                 </div>
