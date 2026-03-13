@@ -543,7 +543,7 @@ export default function MobilePOSPage() {
                             </div>
                         </div>
                         <h1 className="text-2xl font-light tracking-[0.3em] uppercase mb-4 text-center leading-relaxed text-slate-900 dark:text-slate-100">
-                            Ürünler <br />
+                            Satış <br />
                             <span className="font-medium">Yükleniyor</span>
                         </h1>
                         <p className="text-sm font-light text-slate-400 dark:text-slate-500 tracking-wider h-5 typewriter-cursor animate-typewriter">
@@ -1859,7 +1859,6 @@ export default function MobilePOSPage() {
                     animation: typewriter 1s infinite;
                 }
             `}</style>
-        </div>
         </div>
     );
 }
