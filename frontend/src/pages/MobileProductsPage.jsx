@@ -244,11 +244,11 @@ export default function MobileProductsPage() {
                             ) : (
                                 <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl text-gray-400">📦</div>
                             )}
-                            <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-gray-800 truncate">{product.name}</h3>
-                                <p className="text-sm text-gray-500">{product.stock_code}</p>
-                                <p className="text-xs text-gray-400">{product.barcode || '-'}</p>
-                            </div>
+                             <div className="flex-1 min-w-0">
+                                 <h3 className="font-semibold text-gray-800 line-clamp-2 leading-tight mb-1">{product.name}</h3>
+                                 <p className="text-sm text-gray-500">{product.stock_code}</p>
+                                 <p className="text-xs text-gray-400">{product.barcode || '-'}</p>
+                             </div>
                             <div className="text-right">
                                 <p className="text-lg font-bold text-green-600">{product.price?.toFixed(2)} TL</p>
                                 <p className="text-xs text-gray-500">Stok: {product.stock || 0}</p>
