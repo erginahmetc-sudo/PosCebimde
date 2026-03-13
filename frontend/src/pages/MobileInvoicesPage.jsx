@@ -56,7 +56,7 @@ export default function MobileInvoicesPage() {
         } catch (error) {
             console.error('Veri yüklenirken hata:', error);
         } finally {
-            setLoading(false);
+            setTimeout(() => setLoading(false), 500);
         }
     };
 
@@ -373,15 +373,37 @@ export default function MobileInvoicesPage() {
     };
 
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100">
-                <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-        );
-    }
-
     return (
+        <div className="flex flex-col w-screen h-screen bg-gray-100 overflow-hidden select-none relative">
+            {/* Modern Loading Screen */}
+            {loading && (
+                <div className="absolute inset-0 z-[2000] bg-white dark:bg-[#0a0a0a] flex flex-col items-center justify-center overflow-hidden transition-all duration-500">
+                    <div className="relative w-full max-w-[430px] flex flex-col items-center justify-center animate-fade-in-up">
+                        <div className="relative mb-12">
+                            <div className="absolute inset-0 bg-blue-600/20 rounded-full blur-2xl animate-pulse-glow"></div>
+                            <div className="relative w-24 h-24 flex items-center justify-center border border-slate-100 dark:border-slate-800 rounded-full bg-white/50 dark:bg-white/5 backdrop-blur-sm shadow-sm">
+                                <span className="material-symbols-outlined text-4xl text-blue-600 font-extralight scale-125">
+                                    description
+                                </span>
+                            </div>
+                        </div>
+                        <h1 className="text-2xl font-light tracking-[0.3em] uppercase mb-4 text-center leading-relaxed text-slate-900 dark:text-slate-100">
+                            Faturalar <br />
+                            <span className="font-medium">Yükleniyor</span>
+                        </h1>
+                        <p className="text-sm font-light text-slate-400 dark:text-slate-500 tracking-wider h-5 typewriter-cursor animate-typewriter">
+                            Lütfen bekleyiniz...
+                        </p>
+
+                        <div className="w-full max-w-[280px] mt-12">
+                            <div className="relative h-[2px] w-full bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden">
+                                <div className="absolute top-0 h-full bg-blue-600 animate-progress shadow-[0_0_10px_#2563eb]"></div>
+                                <div className="absolute top-[-2px] h-[6px] bg-blue-600/30 blur-sm animate-progress w-full"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         <div className="min-h-screen bg-gray-100 pb-24">
             {/* Header */}
             <header className="bg-gradient-to-r from-violet-600 to-purple-600 text-white sticky top-0 z-20 px-4 py-4 shadow-lg">
@@ -1006,6 +1028,43 @@ export default function MobileInvoicesPage() {
                 }
                 .animate-slide-up {
                     animation: slide-up 0.3s ease-out;
+                }
+            `}</style>
+            <style>{`
+                @keyframes slide-up {
+                    from { transform: translateY(100%); }
+                    to { transform: translateY(0); }
+                }
+                .animate-slide-up {
+                    animation: slide-up 0.3s ease-out;
+                }
+                @keyframes fade-in-up {
+                    from { opacity: 0; transform: translateY(20px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .animate-fade-in-up {
+                    animation: fade-in-up 0.8s ease-out;
+                }
+                @keyframes pulse-glow {
+                    0%, 100% { opacity: 0.5; transform: scale(1); }
+                    50% { opacity: 0.8; transform: scale(1.1); }
+                }
+                .animate-pulse-glow {
+                    animation: pulse-glow 3s infinite ease-in-out;
+                }
+                @keyframes progress {
+                    0% { left: -100%; width: 100%; }
+                    100% { left: 100%; width: 100%; }
+                }
+                .animate-progress {
+                    animation: progress 2s infinite linear;
+                }
+                @keyframes typewriter {
+                    0%, 100% { opacity: 0; }
+                    50% { opacity: 1; }
+                }
+                .animate-typewriter {
+                    animation: typewriter 1s infinite;
                 }
             `}</style>
         </div>
