@@ -1803,7 +1803,7 @@ export default function NewPOSPage() {
                             <button
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
-                                className={`flex-shrink-0 px-6 py-2.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all shadow-sm active:scale-95 ${selectedCategory === cat
+                                className={`flex-shrink-0 px-6 py-1.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all shadow-sm active:scale-95 ${selectedCategory === cat
                                     ? 'bg-slate-900 text-white shadow-md hover:bg-slate-800 ring-2 ring-slate-900 ring-offset-2'
                                     : 'bg-white border-2 border-slate-200 text-slate-600 hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50'
                                     }`}
