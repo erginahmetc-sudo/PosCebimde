@@ -374,7 +374,7 @@ export default function MobileInvoicesPage() {
 
 
     return (
-        <div className="flex flex-col w-screen h-screen bg-gray-100 overflow-hidden select-none relative">
+        <div className="flex flex-col w-screen h-[100dvh] bg-gray-100 overflow-hidden select-none relative">
             {/* Modern Loading Screen */}
             {loading && (
                 <div className="absolute inset-0 z-[2000] bg-gradient-to-b from-white to-slate-50 flex flex-col items-center justify-center overflow-hidden transition-all duration-500">
@@ -432,7 +432,7 @@ export default function MobileInvoicesPage() {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Fatura no veya tedarikçi ara..."
+                    placeholder="Ürün Ara"
                     className="w-full px-4 py-2.5 bg-white/20 placeholder-violet-200 text-white rounded-xl focus:outline-none focus:bg-white/30"
                 />
             </header>
