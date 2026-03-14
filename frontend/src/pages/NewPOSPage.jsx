@@ -1798,7 +1798,7 @@ export default function NewPOSPage() {
                 <main className="flex-1 flex flex-col bg-slate-50 overflow-hidden relative">
 
                     {/* Categories */}
-                    <div className="px-6 py-2 flex gap-2 overflow-x-auto no-scrollbar border-b border-slate-200 bg-white flex-none z-10">
+                    <div className="px-6 py-3 flex flex-wrap gap-3 border-b border-slate-200 bg-white flex-none z-10">
                         {categories.map(cat => (
                             <button
                                 key={cat}
