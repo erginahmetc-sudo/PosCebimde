@@ -869,13 +869,13 @@ export default function MobilePOSPage() {
                         >
                             &times;
                         </span>
-                        <h3 className="text-xl font-bold text-slate-800 mb-2">Miktar Girin</h3>
-                        <p className="text-gray-600 mb-4">{productToAdd?.name}</p>
+                        <h3 className="text-xl font-bold text-slate-800 mb-2 text-center">Miktar Girin</h3>
+                        <p className="text-gray-600 mb-4 text-center text-lg font-bold text-slate-900 border-b border-slate-100 pb-2">{productToAdd?.name}</p>
                         <input
                             type="number"
                             value={addQuantityValue}
                             onChange={(e) => setAddQuantityValue(e.target.value)}
-                            className="w-full p-4 text-2xl text-center border-2 border-blue-500 rounded-lg mb-4 focus:outline-none"
+                            className="w-full p-4 text-4xl font-black text-center border-2 border-blue-500 rounded-xl mb-4 focus:outline-none bg-slate-50"
                             min="1"
                             autoFocus
                             onFocus={(e) => e.target.select()}
@@ -900,13 +900,13 @@ export default function MobilePOSPage() {
                         >
                             &times;
                         </span>
-                        <h3 className="text-xl font-bold text-slate-800 mb-2">Miktar Düzenle</h3>
-                        <p className="text-gray-600 mb-4">{cart[selectedCartIndex]?.name}</p>
+                        <h3 className="text-xl font-bold text-slate-800 mb-2 text-center">Miktar Düzenle</h3>
+                        <p className="text-gray-600 mb-4 text-center text-lg font-bold text-slate-900 border-b border-slate-100 pb-2">{cart[selectedCartIndex]?.name}</p>
                         <input
                             type="number"
                             value={modalValue}
                             onChange={(e) => setModalValue(e.target.value)}
-                            className="w-full p-4 text-2xl text-center border-2 border-blue-500 rounded-lg mb-4 focus:outline-none"
+                            className="w-full p-4 text-4xl font-black text-center border-2 border-blue-500 rounded-xl mb-4 focus:outline-none bg-slate-50"
                             min="1"
                             autoFocus
                             onFocus={(e) => e.target.select()}
