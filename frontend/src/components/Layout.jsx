@@ -37,7 +37,7 @@ export default function Layout({ children }) {
                     <div className="w-9 h-9 rounded-lg bg-slate-900 flex items-center justify-center text-white shadow-lg shadow-slate-900/20">
                         <span className="material-symbols-outlined text-xl">point_of_sale</span>
                     </div>
-                    <span className="font-bold text-lg text-slate-900 tracking-tight hidden sm:block">Poscebimde</span>
+                    <span className="font-bold text-lg text-slate-900 tracking-tight hidden sm:block">PosCebimde</span>
                 </div>
 
                 {/* Center: Desktop Navigation */}

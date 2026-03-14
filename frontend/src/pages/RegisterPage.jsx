@@ -97,7 +97,7 @@ export default function RegisterPage() {
                             <svg className="text-primary size-7" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                                 <path clipRule="evenodd" d="M24 0.757355L47.2426 24L24 47.2426L0.757355 24L24 0.757355ZM21 35.7574V12.2426L9.24264 24L21 35.7574Z" fill="currentColor" fillRule="evenodd"></path>
                             </svg>
-                            <span className="font-bold text-lg text-primary-deep">Kasa POS</span>
+                            <span className="font-bold text-lg text-primary-deep">PosCebimde</span>
                         </div>
                         <Link className="text-primary font-bold text-sm bg-mint-light px-4 py-2 rounded-full hover:bg-mint-accent transition-colors" to="/login">Giriş Yap</Link>
                     </div>
@@ -106,7 +106,7 @@ export default function RegisterPage() {
                         <div className="w-full max-w-[480px]">
                             <div className="mb-8 text-center lg:text-left">
                                 <h1 className="text-text-main tracking-tight text-3xl lg:text-4xl font-extrabold mb-3">Hesabınızı Oluşturun</h1>
-                                <p className="text-text-sub text-lg">Kasa POS ile işletmenizi büyütmeye başlayın.</p>
+                                <p className="text-text-sub text-lg">PosCebimde ile işletmenizi büyütmeye başlayın.</p>
                             </div>
 
                             {error && (
