@@ -282,8 +282,8 @@ export default function MobileProductsPage() {
 
             {/* Edit Product Modal */}
             {showEditModal && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
-                    <div className="bg-white w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto">
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-start justify-center pt-10">
+                    <div className="bg-white rounded-2xl p-6 w-[90%] max-w-md shadow-2xl overflow-y-auto max-h-[80vh]">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-gray-800">Ürün Düzenle</h2>
                             <button

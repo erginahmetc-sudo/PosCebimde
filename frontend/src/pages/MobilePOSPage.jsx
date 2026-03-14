@@ -861,7 +861,7 @@ export default function MobilePOSPage() {
 
             {/* Add Quantity Modal */}
             {showAddQuantityModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1000]">
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center pt-10 z-[1000]">
                     <div className="bg-white rounded-xl p-6 w-80 shadow-2xl">
                         <span
                             onClick={() => setShowAddQuantityModal(false)}
@@ -892,7 +892,7 @@ export default function MobilePOSPage() {
 
             {/* Edit Quantity Modal */}
             {showQuantityModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1000]">
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center pt-10 z-[1000]">
                     <div className="bg-white rounded-xl p-6 w-80 shadow-2xl">
                         <span
                             onClick={() => setShowQuantityModal(false)}
@@ -923,7 +923,7 @@ export default function MobilePOSPage() {
 
             {/* Edit Discount Modal */}
             {showDiscountModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1000]">
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center pt-10 z-[1000]">
                     <div className="bg-white rounded-xl p-6 w-80 shadow-2xl">
                         <span
                             onClick={() => setShowDiscountModal(false)}
@@ -1638,7 +1638,7 @@ export default function MobilePOSPage() {
                 </div>
             )}
             {showUndefinedStockModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1000]">
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center pt-10 z-[1000]">
                     <div className="bg-white rounded-xl p-6 w-80 shadow-2xl">
                         <span
                             onClick={() => {
