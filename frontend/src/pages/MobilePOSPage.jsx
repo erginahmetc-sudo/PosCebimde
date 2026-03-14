@@ -636,7 +636,7 @@ export default function MobilePOSPage() {
             {/* Main Content */}
             <div className="flex-1 flex flex-col p-3 overflow-hidden">
                 {/* Category Buttons */}
-                <div className="flex gap-2 overflow-x-auto pb-3 mb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <div className="flex flex-nowrap gap-2 overflow-x-auto pb-4 mb-2 scroll-smooth no-scrollbar" style={{ WebkitOverflowScrolling: 'touch', minHeight: '60px' }}>
                     {categories.map(cat => (
                         <button
                             key={cat}
