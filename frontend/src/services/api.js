@@ -1127,7 +1127,7 @@ export const salesAPI = {
         // 1. Fetch existing sale for customer_id validation and total check
         const { data: existingSale, error: fetchError } = await supabase
             .from('sales')
-            .select('customer_id, total')
+            .select('customer_id, total, items')
             .eq('sale_code', saleCode)
             .eq('company_code', companyCode)
             .single();
@@ -1154,21 +1154,48 @@ export const salesAPI = {
 
         // Log the update
         try {
-            const oldTotal = parseFloat(existingSale.total || 0).toFixed(2);
-            const newTotal = parseFloat(data.total || existingSale.total || 0).toFixed(2);
-            const itemSummary = data.products ? data.products.map(it => `${it.quantity} ${it.unit || 'AD.'} ${it.name}`).join(', ') : 'Ürünler değişmedi';
+            const oldItems = existingSale.items || [];
+            const newProducts = data.products || oldItems;
             
+            // Compare items to find quantity and price changes
+            const changeDetails = [];
+            newProducts.forEach(newP => {
+                const oldP = oldItems.find(o => o.stock_code === newP.stock_code || o.name === newP.name);
+                if (oldP) {
+                    if (parseFloat(oldP.quantity) !== parseFloat(newP.quantity)) {
+                        changeDetails.push(`${newP.name}: Miktar ${oldP.quantity} -> ${newP.quantity}`);
+                    }
+                    if (parseFloat(oldP.price) !== parseFloat(newP.price)) {
+                        changeDetails.push(`${newP.name}: Fiyat ${oldP.price} TL -> ${newP.price} TL`);
+                    }
+                } else {
+                    changeDetails.push(`Yeni Ürün Eklendi: ${newP.name} (${newP.quantity} ${newP.unit || 'AD.'})`);
+                }
+            });
+
+            // Check for removed items
+            oldItems.forEach(oldP => {
+                const stillExists = newProducts.find(n => n.stock_code === oldP.stock_code || n.name === oldP.name);
+                if (!stillExists) {
+                    changeDetails.push(`Ürün Çıkarıldı: ${oldP.name}`);
+                }
+            });
+
+            const detailedMessage = changeDetails.length > 0 ? changeDetails.join(' | ') : 'Ürün detayları değişmedi';
+            const itemSummary = newProducts.map(it => `${it.quantity} ${it.unit || 'AD.'} ${it.name}`).join(', ');
+
             await logsAPI.logAction({
                 module: 'SATIŞLAR',
                 action_type: 'UPDATE',
                 details: {
                     title: `${saleCode} numaralı satış GÜNCELLENDİ.`,
-                    message: `Satış detayları ve ürün listesi değiştirildi.`,
+                    message: detailedMessage,
                     sale_code: saleCode,
                     old_total: `${oldTotal} TL`,
                     new_total: `${newTotal} TL`,
                     change: `${oldTotal} TL → ${newTotal} TL`,
-                    items: itemSummary
+                    items: itemSummary,
+                    detailed_changes: detailedMessage
                 }
             });
         } catch (e) {

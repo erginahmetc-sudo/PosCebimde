@@ -711,6 +711,18 @@ export default function UsersPage() {
                                                             )}
                                                         </div>
 
+                                                        {/* Item-level Details (Quantity/Price per product) */}
+                                                        {log.details?.detailed_changes && (
+                                                            <div className="flex flex-wrap gap-1.5 mt-1">
+                                                                {String(log.details.detailed_changes).split(' | ').map((ch, idx) => (
+                                                                    <div key={idx} className="text-[10px] bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-100 font-medium flex items-center gap-1 shadow-sm">
+                                                                        <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
+                                                                        {ch}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
                                                         {/* Items List Block */}
                                                         {log.details?.items && (
                                                             <div className="text-[11px] bg-gray-50 p-2 rounded-lg border border-gray-200">
@@ -726,7 +738,7 @@ export default function UsersPage() {
 
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                             {Object.entries(log.details || {})
-                                                                .filter(([key]) => !['title', 'message', 'change', 'items', 'sale_code'].includes(key))
+                                                                .filter(([key]) => !['title', 'message', 'change', 'items', 'sale_code', 'detailed_changes'].includes(key))
                                                                 .map(([key, value]) => (
                                                                     <div key={key} className="text-[11px] bg-slate-50/50 p-1.5 rounded-lg border border-gray-100 flex items-center gap-2 group/item">
                                                                         <span className="text-gray-400 font-bold uppercase min-w-[75px] text-[9px] tracking-tighter">{key.replace(/_/g, ' ')}:</span>
