@@ -186,13 +186,16 @@ export const productsAPI = {
 
         if (error) throw error;
 
-        // Log the new customer
+        // Log the new product
         logsAPI.logAction({
-            module: 'MÜŞTERİLER',
+            module: 'ÜRÜNLER',
             action_type: 'CREATE',
             details: {
-                title: `Yeni müşteri eklendi: ${customer.name}`,
-                new_value: `Bakiye: ${customer.balance || 0} TL`
+                title: `Yeni ürün eklendi: ${product.name}`,
+                product_name: product.name,
+                stock_code: product.stock_code,
+                price: `${product.price} TL`,
+                stock: product.stock
             }
         });
 
@@ -234,9 +237,11 @@ export const productsAPI = {
             action_type: 'UPDATE',
             details: {
                 title: `Fiyat Güncelleme: ${prodName}`,
-                message: `${unitTag}${prodName} isimli ürün ${oldPrice} TL'den ${product.price} TL olmuştur.`,
-                old_value: `${oldPrice} TL`,
-                new_value: `${product.price} TL`,
+                message: `${unitTag}${prodName} isimli ürünün fiyatı değiştirildi.`,
+                product_name: prodName,
+                old_price: `${oldPrice} TL`,
+                new_price: `${product.price} TL`,
+                change: `${oldPrice} TL → ${product.price} TL`,
                 unit: unit
             }
         });
@@ -276,7 +281,9 @@ export const productsAPI = {
                 action_type: 'UPDATE',
                 details: {
                     title: `Ürün (${stockCode}) stok/maliyet güncellendi.`,
-                    new_value: `Yeni Stok: ${stockData.stock}, Yeni Maliyet: ${stockData.buying_price || '-'}`
+                    stock_code: stockCode,
+                    new_stock: stockData.stock,
+                    new_buying_price: stockData.buying_price ? `${stockData.buying_price} TL` : undefined
                 }
             });
         }
@@ -563,7 +570,8 @@ export const customersAPI = {
                     customer_name: customerNameString,
                     amount: `${payment.amount.toFixed(2)} TL`,
                     type: payment.payment_type,
-                    message: payment.description
+                    message: payment.description,
+                    sale_code: payment.description?.match(/(SLS|RET)-\d+/)?.[0] || undefined
                 }
             });
         } catch (e) { 
@@ -576,7 +584,8 @@ export const customersAPI = {
                     title: `Müşteri (ID: ${payment.customer_id}) ödeme/tahsilat işlendi.`,
                     amount: `${payment.amount.toFixed(2)} TL`,
                     type: payment.payment_type,
-                    message: payment.description
+                    message: payment.description,
+                    sale_code: payment.description?.match(/(SLS|RET)-\d+/)?.[0] || undefined
                 }
             });
         }
@@ -1046,6 +1055,7 @@ export const salesAPI = {
             details: {
                 title: `${data?.sale_code || 'Satış'} tamamlandı.`,
                 message: `${cleanSale.customer_name} müşterisine ${cleanSale.total.toFixed(2)} TL tutarında satış yapıldı.`,
+                sale_code: data?.sale_code || cleanSale.sale_code,
                 items: itemSummary,
                 total: `${cleanSale.total.toFixed(2)} TL`,
                 payment: cleanSale.payment_method
@@ -1095,6 +1105,7 @@ export const salesAPI = {
             action_type: 'DELETE',
             details: {
                 title: `${saleCode} numaralı satış SİLİNDİ / İPTAL EDİLDİ.`,
+                sale_code: saleCode,
                 customer: sale?.customer_name || 'Misafir',
                 message: `Satış kaydı silindi ve müşteri hareketlerinden kaldırıldı.`
             }
@@ -1152,10 +1163,12 @@ export const salesAPI = {
                 action_type: 'UPDATE',
                 details: {
                     title: `${saleCode} numaralı satış GÜNCELLENDİ.`,
-                    message: `Satış detayları değiştirildi. Tutar: ${oldTotal} TL -> ${newTotal} TL`,
-                    items: itemSummary,
+                    message: `Satış detayları ve ürün listesi değiştirildi.`,
+                    sale_code: saleCode,
                     old_total: `${oldTotal} TL`,
-                    new_total: `${newTotal} TL`
+                    new_total: `${newTotal} TL`,
+                    change: `${oldTotal} TL → ${newTotal} TL`,
+                    items: itemSummary
                 }
             });
         } catch (e) {
@@ -1627,12 +1640,26 @@ export const logsAPI = {
         }
 
         const { data, error } = await query.order('created_at', { ascending: false });
+        
+        // Standardise and parse details if they arrived as strings
+        const processedLogs = (data || []).map(log => {
+            let details = log.details;
+            if (typeof details === 'string') {
+                try {
+                    details = JSON.parse(details);
+                } catch (e) {
+                    console.warn("Failed to parse log details", e);
+                }
+            }
+            return { ...log, details };
+        });
+
         // Standardise error format for frontend
         if (error) {
             console.error('Supabase Error:', error);
             return { data: { logs: [] }, error: error.message };
         }
-        return { data: { logs: data || [] } };
+        return { data: { logs: processedLogs } };
     },
     
     logAction: async (actionData) => {

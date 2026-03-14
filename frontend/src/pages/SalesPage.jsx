@@ -183,6 +183,7 @@ export default function SalesPage() {
             action_type: 'VIEW',
             details: {
                 title: `${sale.sale_code} numaralı Satış Detayı'na girildi.`,
+                sale_code: sale.sale_code,
                 customer: sale.customerName || sale.customer || 'Misafir',
                 total: `${sale.total.toFixed(2)} TL`
             }

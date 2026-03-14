@@ -24,6 +24,7 @@ export default function CustomerDetailPage() {
             action_type: 'VIEW',
             details: {
                 title: `${sale.sale_code} numaralı Satış Detayı'na girildi.`,
+                sale_code: sale.sale_code,
                 customer: sale.customer || customer?.name || 'Müşteri',
                 total: `${parseFloat(sale.total || 0).toFixed(2)} TL`
             }

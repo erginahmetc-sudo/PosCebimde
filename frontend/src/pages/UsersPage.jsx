@@ -688,16 +688,49 @@ export default function UsersPage() {
                                                     
                                                     <div className="mt-2 space-y-2">
                                                         {log.details?.message && log.details?.title && (
-                                                            <p className="text-xs text-gray-500 italic">{log.details.message}</p>
+                                                            <p className="text-xs text-blue-600/70 font-medium bg-blue-50/50 p-2 rounded-lg border border-blue-100/50">
+                                                                {log.details.message}
+                                                            </p>
                                                         )}
                                                         
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {/* Explicit Sale Code Badge */}
+                                                            {log.details?.sale_code && (
+                                                                <div className="text-[11px] bg-slate-900 text-white px-2 py-1 rounded flex items-center gap-1.5 shadow-sm">
+                                                                    <span className="material-symbols-outlined text-[14px]">receipt_long</span>
+                                                                    <span className="font-mono font-bold tracking-wider">{log.details.sale_code}</span>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Explicit Price Change Visual */}
+                                                            {log.details?.change && (
+                                                                <div className="text-[11px] bg-emerald-50 text-emerald-700 px-2 py-1 rounded border border-emerald-100 flex items-center gap-2 font-bold shadow-sm">
+                                                                    <span className="material-symbols-outlined text-[14px]">trending_up</span>
+                                                                    <span>{log.details.change}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Items List Block */}
+                                                        {log.details?.items && (
+                                                            <div className="text-[11px] bg-gray-50 p-2 rounded-lg border border-gray-200">
+                                                                <div className="text-[9px] font-bold text-gray-400 uppercase mb-1 flex items-center gap-1">
+                                                                    <span className="material-symbols-outlined text-[12px]">inventory_2</span>
+                                                                    İşlem Gören Ürünler
+                                                                </div>
+                                                                <p className="text-gray-700 leading-relaxed font-medium">
+                                                                    {log.details.items}
+                                                                </p>
+                                                            </div>
+                                                        )}
+
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                             {Object.entries(log.details || {})
-                                                                .filter(([key]) => !['title', 'message'].includes(key))
+                                                                .filter(([key]) => !['title', 'message', 'change', 'items', 'sale_code'].includes(key))
                                                                 .map(([key, value]) => (
-                                                                    <div key={key} className="text-[11px] bg-slate-50 p-1.5 rounded border border-gray-100 flex items-center gap-2">
-                                                                        <span className="text-gray-400 font-bold uppercase min-w-[65px]">{key.replace('_', ' ')}:</span>
-                                                                        <span className="text-gray-700 font-medium truncate" title={String(value)}>{String(value)}</span>
+                                                                    <div key={key} className="text-[11px] bg-slate-50/50 p-1.5 rounded-lg border border-gray-100 flex items-center gap-2 group/item">
+                                                                        <span className="text-gray-400 font-bold uppercase min-w-[75px] text-[9px] tracking-tighter">{key.replace(/_/g, ' ')}:</span>
+                                                                        <span className="text-gray-700 font-bold truncate transition-colors group-hover/item:text-blue-600" title={String(value)}>{String(value)}</span>
                                                                     </div>
                                                                 ))}
                                                         </div>
