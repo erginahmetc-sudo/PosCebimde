@@ -421,6 +421,16 @@ export const customersAPI = {
 
         console.log('Fetched customer_payments for transactions:', payments.length);
 
+        // Log the view action
+        logsAPI.logAction({
+            module: 'MÜŞTERİLER',
+            action_type: 'VIEW',
+            details: {
+                title: `Müşteri (ID: ${customerId}) hareket raporu görüntülendi.`,
+                message: `Cari hareket raporu incelendi.`
+            }
+        });
+
         // Transform payments to transaction format
         const allTransactions = payments.map(p => ({
             ...p,
@@ -474,6 +484,18 @@ export const customersAPI = {
             .eq('id', payment.customer_id);
 
         if (updateError) throw updateError;
+
+        // Log the payment
+        logsAPI.logAction({
+            module: 'MÜŞTERİLER',
+            action_type: 'UPDATE',
+            details: {
+                title: `Müşteri (ID: ${payment.customer_id}) ödeme/tahsilat işlendi.`,
+                new_value: `${payment.amount.toFixed(2)} TL (${payment.payment_type})`,
+                message: payment.description
+            }
+        });
+
         return { data: { success: true, message: 'Ödeme alındı ve bakiye güncellendi.' } };
     },
     // NEW: Add Sale Debit (Borç) - Increases customer balance for a sale
@@ -839,6 +861,17 @@ export const salesAPI = {
             });
         }
 
+        // Log the return
+        logsAPI.logAction({
+            module: 'SATIŞLAR',
+            action_type: 'CREATE',
+            details: {
+                title: `${originalSale.sale_code} numaralı satış için iade oluşturuldu.`,
+                message: `${originalSale.customerName || originalSale.customer_name} müşterisine ${refundTotal.toFixed(2)} TL iade yapıldı.`,
+                new_value: `İade Kodu: ${returnSaleCode}`
+            }
+        });
+
         return response({ success: true, message: 'İade işlemi tamamlandı.' });
     },
     complete: async (sale) => {
@@ -957,6 +990,17 @@ export const salesAPI = {
             .from('sales')
             .update({ is_deleted: true })
             .eq('sale_code', saleCode);
+
+        // Log the deletion
+        logsAPI.logAction({
+            module: 'SATIŞLAR',
+            action_type: 'DELETE',
+            details: {
+                title: `${saleCode} numaralı satış iptal/silme edildi.`,
+                message: `Satış kaydı silindi ve müşteri hareketlerinden kaldırıldı.`
+            }
+        });
+
         return response({ success: true, message: 'Satış iptal edildi' }, error);
     },
     getByCode: async (saleCode) => {
@@ -1445,6 +1489,53 @@ export const settingsAPI = {
         });
 
         return { data: settingsMap };
+    }
+};
+
+
+// ============ LOGS API ============
+export const logsAPI = {
+    getAll: async (userId) => {
+        const companyCode = getCurrentCompanyCode();
+        let query = supabase
+            .from('activity_logs')
+            .select('*')
+            .eq('company_code', companyCode);
+        
+        if (userId) {
+            query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false });
+        // Standardise error format for frontend
+        if (error) {
+            console.error('Supabase Error:', error);
+            return { data: { logs: [] }, error: error.message };
+        }
+        return { data: { logs: data || [] } };
+    },
+    
+    logAction: async (actionData) => {
+        try {
+            const userStr = localStorage.getItem('user');
+            if (!userStr) return;
+            
+            const user = JSON.parse(userStr);
+            const logData = {
+                user_id: user.id || user.uid,
+                username: user.username,
+                company_code: user.company_code,
+                module: actionData.module,
+                action_type: actionData.action_type,
+                details: actionData.details || {},
+                created_at: new Date().toISOString()
+            };
+
+            const { error } = await supabase.from('activity_logs').insert([logData]);
+            if (error) console.error('Logging Error:', error);
+        } catch (e) {
+            console.error('Logging Exception:', e);
+        }
     }
 };
 
