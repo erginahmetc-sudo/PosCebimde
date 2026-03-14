@@ -345,55 +345,56 @@ export default function UsersPage() {
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-right">
-                                                <button
-                                                    onClick={() => handleOpenLogs(user)}
-                                                    className="px-2 py-1.5 text-xs bg-slate-50 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
-                                                    title="İşlem Logları"
-                                                >
-                                                    📋 Loglar
-                                                </button>
-                                                {isKurucu && user.id !== currentUser?.id && (
-                                            <div className="flex justify-end gap-1 flex-wrap">
-                                                <button
-                                                    onClick={() => openEditModal(user)}
-                                                    className="px-2 py-1.5 text-xs bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
-                                                    title="Düzenle"
-                                                >
-                                                    ✏️ Düzenle
-                                                </button>
-                                                <button
-                                                    onClick={() => handleForceLogout(user.id)}
-                                                    className="px-2 py-1.5 text-xs bg-amber-50 text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
-                                                    title="Oturumu Kapat"
-                                                >
-                                                    ⚡ Çıkış
-                                                </button>
-                                                <button
-                                                    onClick={() => openPermModal(user)}
-                                                    className="px-2 py-1.5 text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                                                    title="Erişim Yetkileri"
-                                                >
-                                                    🔐 Erişim Yetkileri
-                                                </button>
-                                                <button
-                                                    onClick={() => openScheduleModal(user)}
-                                                    className="px-2 py-1.5 text-xs bg-violet-50 text-violet-600 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors"
-                                                    title="Erişim Takvimi"
-                                                >
-                                                    📅 Takvim
-                                                </button>
-                                                {/* Only allow deleting 'calisan', protect 'kurucu' (Main Account) */}
-                                                {user.role !== 'kurucu' && (
+                                        <div className="flex justify-end gap-1 flex-wrap">
+                                            <button
+                                                onClick={() => handleOpenLogs(user)}
+                                                className="px-2 py-1.5 text-xs bg-slate-50 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
+                                                title="İşlem Logları"
+                                            >
+                                                📋 Loglar
+                                            </button>
+                                            {isKurucu && user.id !== currentUser?.id && (
+                                                <>
                                                     <button
-                                                        onClick={() => handleDeleteUser(user.id)}
-                                                        className="px-2 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-                                                        title="Sil"
+                                                        onClick={() => openEditModal(user)}
+                                                        className="px-2 py-1.5 text-xs bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
+                                                        title="Düzenle"
                                                     >
-                                                        🗑️ Sil
+                                                        ✏️ Düzenle
                                                     </button>
-                                                )}
-                                            </div>
-                                        )}
+                                                    <button
+                                                        onClick={() => handleForceLogout(user.id)}
+                                                        className="px-2 py-1.5 text-xs bg-amber-50 text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+                                                        title="Oturumu Kapat"
+                                                    >
+                                                        ⚡ Çıkış
+                                                    </button>
+                                                    <button
+                                                        onClick={() => openPermModal(user)}
+                                                        className="px-2 py-1.5 text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        title="Erişim Yetkileri"
+                                                    >
+                                                        🔐 Erişim Yetkileri
+                                                    </button>
+                                                    <button
+                                                        onClick={() => openScheduleModal(user)}
+                                                        className="px-2 py-1.5 text-xs bg-violet-50 text-violet-600 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors"
+                                                        title="Erişim Takvimi"
+                                                    >
+                                                        📅 Takvim
+                                                    </button>
+                                                    {user.role !== 'kurucu' && (
+                                                        <button
+                                                            onClick={() => handleDeleteUser(user.id)}
+                                                            className="px-2 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                                                            title="Sil"
+                                                        >
+                                                            🗑️ Sil
+                                                        </button>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
