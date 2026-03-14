@@ -1154,6 +1154,8 @@ export const salesAPI = {
 
         // Log the update
         try {
+            const oldTotal = parseFloat(existingSale.total || 0).toFixed(2);
+            const newTotal = parseFloat(data.total || existingSale.total || 0).toFixed(2);
             const oldItems = existingSale.items || [];
             const newProducts = data.products || oldItems;
             

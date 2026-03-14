@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { salesAPI, productsAPI, settingsAPI, customersAPI, logsAPI } from '../services/api';
 import { birFaturaAPI } from '../services/birFaturaService';
 
