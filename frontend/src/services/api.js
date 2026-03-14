@@ -222,14 +222,16 @@ export const productsAPI = {
         if (error) throw error;
 
         // Log the change
+        const unit = product.unit || 'Adet';
         logsAPI.logAction({
             module: 'ÜRÜNLER',
             action_type: 'UPDATE',
             details: {
-                title: `${product.name} (${stockCode}) bilgileri güncellendi.`,
-                old_value: product.old_price ? `Eski Fiyat: ${product.old_price} TL` : 'Fiyat Güncellendi',
-                new_value: `Yeni Fiyat: ${product.price} TL`,
-                stock: `Stok: ${product.stock}`
+                title: `Fiyat Güncelleme: ${product.name}`,
+                message: `(${unit.toUpperCase()}) ${product.name} isimli ürün ${product.old_price || '0'} TL'den ${product.price} TL olmuştur.`,
+                old_value: `${product.old_price} TL`,
+                new_value: `${product.price} TL`,
+                unit: unit
             }
         });
 
@@ -461,17 +463,29 @@ export const customersAPI = {
         // Log the view action
         try {
             const { data: cust } = await supabase.from('customers').select('name').eq('id', customerId).single();
+            const customerNameString = cust?.name || `Müşteri (ID: ${customerId})`;
             logsAPI.logAction({
                 module: 'MÜŞTERİLER',
                 action_type: 'VIEW',
                 details: {
-                    title: `${cust?.name || 'Müşteri'} hareket raporu görüntülendi.`,
+                    title: `${customerNameString} hareket raporu görüntülendi.`,
                     customer_id: customerId,
-                    customer_name: cust?.name || 'Bilinmiyor',
+                    customer_name: customerNameString,
                     message: `Cari hareket raporu incelendi.`
                 }
             });
-        } catch (e) { console.warn('Logging name fetch error', e); }
+        } catch (e) { 
+            console.warn('Logging name fetch error', e);
+            logsAPI.logAction({
+                module: 'MÜŞTERİLER',
+                action_type: 'VIEW',
+                details: {
+                    title: `Müşteri (ID: ${customerId}) hareket raporu görüntülendi.`,
+                    customer_id: customerId,
+                    message: `Cari hareket raporu incelendi.`
+                }
+            });
+        }
 
         // Transform payments to transaction format
         const allTransactions = payments.map(p => ({
@@ -530,18 +544,32 @@ export const customersAPI = {
         // Log the payment
         try {
             const { data: cust } = await supabase.from('customers').select('name').eq('id', payment.customer_id).single();
+            const customerNameString = cust?.name || `Müşteri (ID: ${payment.customer_id})`;
             logsAPI.logAction({
                 module: 'MÜŞTERİLER',
                 action_type: 'UPDATE',
                 details: {
-                    title: `${cust?.name || 'Müşteri'} ödeme/tahsilat işlendi.`,
-                    customer_name: cust?.name || 'Bilinmiyor',
+                    title: `${customerNameString} ödeme/tahsilat işlendi.`,
+                    customer_name: customerNameString,
                     amount: `${payment.amount.toFixed(2)} TL`,
                     type: payment.payment_type,
                     message: payment.description
                 }
             });
-        } catch (e) { console.warn('Logging name fetch error', e); }
+        } catch (e) { 
+            console.warn('Logging name fetch error', e);
+            logsAPI.logAction({
+                module: 'MÜŞTERİLER',
+                action_type: 'UPDATE',
+                details: {
+                    title: `Ödeme/Tahsilat işlendi.`,
+                    customer_id: payment.customer_id,
+                    amount: `${payment.amount.toFixed(2)} TL`,
+                    type: payment.payment_type,
+                    message: payment.description
+                }
+            });
+        }
 
         return { data: { success: true, message: 'Ödeme alındı ve bakiye güncellendi.' } };
     },

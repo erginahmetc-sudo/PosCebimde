@@ -178,6 +178,17 @@ export default function SalesPage() {
 
     // Open Modal
     const openDetailModal = (sale) => {
+        // Log viewing details
+        logsAPI.logAction({
+            module: 'SATIŞLAR',
+            action_type: 'VIEW',
+            details: {
+                title: `${sale.sale_code} numaralı Satış Detayı'na girildi.`,
+                customer: sale.customerName || sale.customer || 'Misafir',
+                total: `${sale.total.toFixed(2)} TL`
+            }
+        });
+
         setSelectedSale(sale);
         // Initialize Edit Form (Deep copy to avoid direct mutation)
         // Ensure items have vat_rate and UI flags
