@@ -685,18 +685,23 @@ export default function UsersPage() {
                                                     <p className="text-sm text-gray-700 font-medium">
                                                         {log.details?.title || log.details?.message || `${log.module} işlemi yapıldı.`}
                                                     </p>
-                                                    {log.details?.old_value !== undefined && log.details?.new_value !== undefined && (
-                                                        <div className="mt-2 text-xs grid grid-cols-2 gap-2 p-2 bg-gray-50 rounded-lg">
-                                                            <div className="text-gray-500">
-                                                                <span className="block font-bold text-gray-400 uppercase mb-0.5">Eski</span>
-                                                                <span className="text-red-500 bg-red-50 px-1 rounded line-through">{String(log.details.old_value)}</span>
-                                                            </div>
-                                                            <div className="text-gray-500 border-l border-gray-200 pl-2">
-                                                                <span className="block font-bold text-gray-400 uppercase mb-0.5">Yeni</span>
-                                                                <span className="text-green-600 bg-green-50 px-1 rounded font-bold">{String(log.details.new_value)}</span>
-                                                            </div>
+                                                    
+                                                    <div className="mt-2 space-y-2">
+                                                        {log.details?.message && log.details?.title && (
+                                                            <p className="text-xs text-gray-500 italic">{log.details.message}</p>
+                                                        )}
+                                                        
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                            {Object.entries(log.details || {})
+                                                                .filter(([key]) => !['title', 'message'].includes(key))
+                                                                .map(([key, value]) => (
+                                                                    <div key={key} className="text-[11px] bg-slate-50 p-1.5 rounded border border-gray-100 flex items-center gap-2">
+                                                                        <span className="text-gray-400 font-bold uppercase min-w-[65px]">{key.replace('_', ' ')}:</span>
+                                                                        <span className="text-gray-700 font-medium truncate" title={String(value)}>{String(value)}</span>
+                                                                    </div>
+                                                                ))}
                                                         </div>
-                                                    )}
+                                                    </div>
                                                 </div>
                                                 <div className="text-right whitespace-nowrap">
                                                     <p className="text-xs text-gray-400 group-hover:text-gray-600 font-medium">{formatDate(log.created_at)}</p>

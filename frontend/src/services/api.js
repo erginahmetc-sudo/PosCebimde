@@ -227,8 +227,9 @@ export const productsAPI = {
             action_type: 'UPDATE',
             details: {
                 title: `${product.name} (${stockCode}) bilgileri güncellendi.`,
-                old_value: `Fiyat: ${product.old_price || '-'}`,
-                new_value: `Fiyat: ${product.price}`
+                old_value: product.old_price ? `Eski Fiyat: ${product.old_price} TL` : 'Fiyat Güncellendi',
+                new_value: `Yeni Fiyat: ${product.price} TL`,
+                stock: `Stok: ${product.stock}`
             }
         });
 
@@ -458,14 +459,19 @@ export const customersAPI = {
         console.log('Fetched customer_payments for transactions:', payments.length);
 
         // Log the view action
-        logsAPI.logAction({
-            module: 'MÜŞTERİLER',
-            action_type: 'VIEW',
-            details: {
-                title: `Müşteri (ID: ${customerId}) hareket raporu görüntülendi.`,
-                message: `Cari hareket raporu incelendi.`
-            }
-        });
+        try {
+            const { data: cust } = await supabase.from('customers').select('name').eq('id', customerId).single();
+            logsAPI.logAction({
+                module: 'MÜŞTERİLER',
+                action_type: 'VIEW',
+                details: {
+                    title: `${cust?.name || 'Müşteri'} hareket raporu görüntülendi.`,
+                    customer_id: customerId,
+                    customer_name: cust?.name || 'Bilinmiyor',
+                    message: `Cari hareket raporu incelendi.`
+                }
+            });
+        } catch (e) { console.warn('Logging name fetch error', e); }
 
         // Transform payments to transaction format
         const allTransactions = payments.map(p => ({
@@ -522,15 +528,20 @@ export const customersAPI = {
         if (updateError) throw updateError;
 
         // Log the payment
-        logsAPI.logAction({
-            module: 'MÜŞTERİLER',
-            action_type: 'UPDATE',
-            details: {
-                title: `Müşteri (ID: ${payment.customer_id}) ödeme/tahsilat işlendi.`,
-                new_value: `${payment.amount.toFixed(2)} TL (${payment.payment_type})`,
-                message: payment.description
-            }
-        });
+        try {
+            const { data: cust } = await supabase.from('customers').select('name').eq('id', payment.customer_id).single();
+            logsAPI.logAction({
+                module: 'MÜŞTERİLER',
+                action_type: 'UPDATE',
+                details: {
+                    title: `${cust?.name || 'Müşteri'} ödeme/tahsilat işlendi.`,
+                    customer_name: cust?.name || 'Bilinmiyor',
+                    amount: `${payment.amount.toFixed(2)} TL`,
+                    type: payment.payment_type,
+                    message: payment.description
+                }
+            });
+        } catch (e) { console.warn('Logging name fetch error', e); }
 
         return { data: { success: true, message: 'Ödeme alındı ve bakiye güncellendi.' } };
     },
@@ -1045,7 +1056,8 @@ export const salesAPI = {
             module: 'SATIŞLAR',
             action_type: 'DELETE',
             details: {
-                title: `${saleCode} numaralı satış iptal/silme edildi.`,
+                title: `${saleCode} numaralı satış SİLİNDİ / İPTAL EDİLDİ.`,
+                customer: sale?.customer_name || 'Misafir',
                 message: `Satış kaydı silindi ve müşteri hareketlerinden kaldırıldı.`
             }
         });
@@ -1566,34 +1578,31 @@ export const logsAPI = {
     
     logAction: async (actionData) => {
         try {
-            console.log('Logging action:', actionData.module, actionData.action_type);
             const userStr = localStorage.getItem('user');
-            if (!userStr) {
-                console.warn('Logging skipped: No user in localStorage');
-                return;
-            }
+            if (!userStr) return;
             
             const user = JSON.parse(userStr);
+            const companyCode = user.company_code || getCurrentCompanyCode();
+            
+            if (!companyCode) {
+                console.warn('Logging skipped: No company_code found');
+                return;
+            }
+
             const logData = {
                 user_id: user.id || user.uid,
                 username: user.username,
-                company_code: user.company_code,
+                company_code: companyCode,
                 module: actionData.module,
                 action_type: actionData.action_type,
                 details: actionData.details || {},
                 created_at: new Date().toISOString()
             };
 
-            const { data, error } = await supabase.from('activity_logs').insert([logData]).select();
-            if (error) {
-                console.error('Logging Supabase Error:', error);
-                // If the error says table not found, it's a migration issue
-                if (error.message.includes('relation "public.activity_logs" does not exist')) {
-                    alert('SİSTEM UYARISI: activity_logs tablosu veritabanında bulunamadı. Lütfen SQL kodunu Supabase panelinde çalıştırın.');
-                }
-            } else {
-                console.log('Log created successfully:', data);
-            }
+            // Use fire & forget for logging, but with better error handling
+            supabase.from('activity_logs').insert([logData]).then(({ error }) => {
+                if (error) console.error('Supabase Logging Error:', error);
+            });
         } catch (e) {
             console.error('Logging Exception:', e);
         }
