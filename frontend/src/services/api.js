@@ -185,6 +185,17 @@ export const productsAPI = {
             .single();
 
         if (error) throw error;
+
+        // Log the new customer
+        logsAPI.logAction({
+            module: 'MÜŞTERİLER',
+            action_type: 'CREATE',
+            details: {
+                title: `Yeni müşteri eklendi: ${customer.name}`,
+                new_value: `Bakiye: ${customer.balance || 0} TL`
+            }
+        });
+
         return { data };
     },
     update: async (stockCode, product) => {
@@ -209,6 +220,18 @@ export const productsAPI = {
             .select();
 
         if (error) throw error;
+
+        // Log the change
+        logsAPI.logAction({
+            module: 'ÜRÜNLER',
+            action_type: 'UPDATE',
+            details: {
+                title: `${product.name} (${stockCode}) bilgileri güncellendi.`,
+                old_value: `Fiyat: ${product.old_price || '-'}`,
+                new_value: `Fiyat: ${product.price}`
+            }
+        });
+
         return { data };
     },
     delete: async (stockCode) => {
@@ -236,6 +259,19 @@ export const productsAPI = {
             .select();
 
         if (error) throw error;
+
+        // Log the change
+        if (stockData.stock !== undefined || stockData.buying_price !== undefined) {
+            logsAPI.logAction({
+                module: 'ÜRÜNLER',
+                action_type: 'UPDATE',
+                details: {
+                    title: `Ürün (${stockCode}) stok/maliyet güncellendi.`,
+                    new_value: `Yeni Stok: ${stockData.stock}, Yeni Maliyet: ${stockData.buying_price || '-'}`
+                }
+            });
+        }
+
         return { data };
     },
     updateImage: async (stockCode, formData) => {
@@ -949,6 +985,19 @@ export const salesAPI = {
             // NOTE: For Veresiye/Açık Hesap - no Alacak is added, so balance stays increased (debt)
         }
 
+        if (error) throw error;
+
+        // Log the new sale
+        logsAPI.logAction({
+            module: 'SATIŞLAR',
+            action_type: 'CREATE',
+            details: {
+                title: `${data?.sale_code || 'Satış'} tamamlandı.`,
+                message: `${cleanSale.customer_name} müşterisine ${cleanSale.total.toFixed(2)} TL tutarında satış yapıldı.`,
+                new_value: `Ödeme: ${cleanSale.payment_method}`
+            }
+        });
+
         return response({ success: true, message: 'Satış tamamlandı', sale_code: data?.sale_code }, error);
     },
     // Alias for backward compatibility if needed
@@ -1517,8 +1566,12 @@ export const logsAPI = {
     
     logAction: async (actionData) => {
         try {
+            console.log('Logging action:', actionData.module, actionData.action_type);
             const userStr = localStorage.getItem('user');
-            if (!userStr) return;
+            if (!userStr) {
+                console.warn('Logging skipped: No user in localStorage');
+                return;
+            }
             
             const user = JSON.parse(userStr);
             const logData = {
@@ -1531,8 +1584,16 @@ export const logsAPI = {
                 created_at: new Date().toISOString()
             };
 
-            const { error } = await supabase.from('activity_logs').insert([logData]);
-            if (error) console.error('Logging Error:', error);
+            const { data, error } = await supabase.from('activity_logs').insert([logData]).select();
+            if (error) {
+                console.error('Logging Supabase Error:', error);
+                // If the error says table not found, it's a migration issue
+                if (error.message.includes('relation "public.activity_logs" does not exist')) {
+                    alert('SİSTEM UYARISI: activity_logs tablosu veritabanında bulunamadı. Lütfen SQL kodunu Supabase panelinde çalıştırın.');
+                }
+            } else {
+                console.log('Log created successfully:', data);
+            }
         } catch (e) {
             console.error('Logging Exception:', e);
         }

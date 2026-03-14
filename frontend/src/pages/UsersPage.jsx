@@ -13,6 +13,7 @@ export default function UsersPage() {
     const [showLogsModal, setShowLogsModal] = useState(false);
     const [userLogs, setUserLogs] = useState([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
+    const [logError, setLogError] = useState(null);
     const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
     const [selectedUser, setSelectedUser] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
@@ -93,11 +94,16 @@ export default function UsersPage() {
         setSelectedUser(user);
         setShowLogsModal(true);
         setLoadingLogs(true);
+        setLogError(null);
         try {
             const res = await logsAPI.getAll(user.id);
+            if (res.error) {
+                setLogError(res.error);
+            }
             setUserLogs(res.data?.logs || []);
         } catch (error) {
             console.error('Loglar yüklenirken hata:', error);
+            setLogError(error.message);
         } finally {
             setLoadingLogs(false);
         }
@@ -644,6 +650,16 @@ export default function UsersPage() {
                                 <div className="flex flex-col items-center justify-center py-12 gap-3">
                                     <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
                                     <p className="text-gray-500 font-medium">Loglar yükleniyor...</p>
+                                </div>
+                            ) : logError ? (
+                                <div className="p-6 bg-red-50 border border-red-200 rounded-2xl text-red-600">
+                                    <p className="font-bold flex items-center gap-2">⚠️ Veritabanı Hatası</p>
+                                    <p className="text-sm mt-1">{logError}</p>
+                                    {logError.includes('relation') && logError.includes('not exist') && (
+                                        <p className="text-xs mt-3 bg-white/50 p-2 rounded border border-red-100 italic">
+                                            İpucu: `activity_logs` tablosu bulunamadı. Lütfen SQL betiğini çalıştırdığınızdan emin olun.
+                                        </p>
+                                    )}
                                 </div>
                             ) : userLogs.length === 0 ? (
                                 <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
