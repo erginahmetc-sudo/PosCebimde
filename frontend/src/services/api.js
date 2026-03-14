@@ -212,6 +212,12 @@ export const productsAPI = {
             image_url: product.image_url
         };
 
+        // Fetch old product for logging before update
+        const { data: oldProd } = await supabase.from('products').select('sale_price, name, unit').eq('stock_code', stockCode).eq('company_code', companyCode).single();
+        const oldPrice = oldProd?.sale_price || 0;
+        const prodName = oldProd?.name || product.name;
+        const unit = oldProd?.unit || product.unit || 'Adet';
+
         const { data, error } = await supabase
             .from('products')
             .update(dbProduct)
@@ -222,14 +228,14 @@ export const productsAPI = {
         if (error) throw error;
 
         // Log the change
-        const unit = product.unit || 'Adet';
-        logsAPI.logAction({
+        const unitTag = unit ? `(${unit.toUpperCase()}) ` : '';
+        await logsAPI.logAction({
             module: 'ÜRÜNLER',
             action_type: 'UPDATE',
             details: {
-                title: `Fiyat Güncelleme: ${product.name}`,
-                message: `(${unit.toUpperCase()}) ${product.name} isimli ürün ${product.old_price || '0'} TL'den ${product.price} TL olmuştur.`,
-                old_value: `${product.old_price} TL`,
+                title: `Fiyat Güncelleme: ${prodName}`,
+                message: `${unitTag}${prodName} isimli ürün ${oldPrice} TL'den ${product.price} TL olmuştur.`,
+                old_value: `${oldPrice} TL`,
                 new_value: `${product.price} TL`,
                 unit: unit
             }
@@ -462,9 +468,11 @@ export const customersAPI = {
 
         // Log the view action
         try {
-            const { data: cust } = await supabase.from('customers').select('name').eq('id', customerId).single();
+            const companyCode = getCurrentCompanyCode();
+            const { data: cust } = await supabase.from('customers').select('name').eq('id', customerId).eq('company_code', companyCode).single();
             const customerNameString = cust?.name || `Müşteri (ID: ${customerId})`;
-            logsAPI.logAction({
+            
+            await logsAPI.logAction({
                 module: 'MÜŞTERİLER',
                 action_type: 'VIEW',
                 details: {
@@ -476,12 +484,12 @@ export const customersAPI = {
             });
         } catch (e) { 
             console.warn('Logging name fetch error', e);
+            // Even more desperate fallback if first logic failed
             logsAPI.logAction({
                 module: 'MÜŞTERİLER',
                 action_type: 'VIEW',
                 details: {
                     title: `Müşteri (ID: ${customerId}) hareket raporu görüntülendi.`,
-                    customer_id: customerId,
                     message: `Cari hareket raporu incelendi.`
                 }
             });
@@ -543,9 +551,11 @@ export const customersAPI = {
 
         // Log the payment
         try {
-            const { data: cust } = await supabase.from('customers').select('name').eq('id', payment.customer_id).single();
+            const companyCode = getCurrentCompanyCode();
+            const { data: cust } = await supabase.from('customers').select('name').eq('id', payment.customer_id).eq('company_code', companyCode).single();
             const customerNameString = cust?.name || `Müşteri (ID: ${payment.customer_id})`;
-            logsAPI.logAction({
+            
+            await logsAPI.logAction({
                 module: 'MÜŞTERİLER',
                 action_type: 'UPDATE',
                 details: {
@@ -558,12 +568,12 @@ export const customersAPI = {
             });
         } catch (e) { 
             console.warn('Logging name fetch error', e);
+            // Fallback log if name fetch fails
             logsAPI.logAction({
                 module: 'MÜŞTERİLER',
                 action_type: 'UPDATE',
                 details: {
-                    title: `Ödeme/Tahsilat işlendi.`,
-                    customer_id: payment.customer_id,
+                    title: `Müşteri (ID: ${payment.customer_id}) ödeme/tahsilat işlendi.`,
                     amount: `${payment.amount.toFixed(2)} TL`,
                     type: payment.payment_type,
                     message: payment.description
@@ -1026,14 +1036,19 @@ export const salesAPI = {
 
         if (error) throw error;
 
+        // Generate item details for log
+        const itemSummary = items.map(it => `${it.quantity} ${it.unit || 'AD.'} ${it.name}`).join(', ');
+
         // Log the new sale
-        logsAPI.logAction({
+        await logsAPI.logAction({
             module: 'SATIŞLAR',
             action_type: 'CREATE',
             details: {
                 title: `${data?.sale_code || 'Satış'} tamamlandı.`,
                 message: `${cleanSale.customer_name} müşterisine ${cleanSale.total.toFixed(2)} TL tutarında satış yapıldı.`,
-                new_value: `Ödeme: ${cleanSale.payment_method}`
+                items: itemSummary,
+                total: `${cleanSale.total.toFixed(2)} TL`,
+                payment: cleanSale.payment_method
             }
         });
 
@@ -1047,7 +1062,7 @@ export const salesAPI = {
         // 1. Get Sale Details to find Customer
         const { data: sale, error: fetchError } = await supabase
             .from('sales')
-            .select('customer_id')
+            .select('customer_id, customer_name')
             .eq('sale_code', saleCode)
             .eq('company_code', companyCode) // Ensure fetch respects company code
             .single();
@@ -1056,12 +1071,6 @@ export const salesAPI = {
             console.error('Sale fetch error during delete:', fetchError);
         } else if (sale && sale.customer_id) {
             // 2. Remove Financial Records (Double-Entry) from Customer Ledger
-            // We need to delete BOTH the Debit (Borç) and Credit (Alacak) records associated with this sale.
-            // Patterns used in creation:
-            // Debit: `Satış - ${saleCode}`
-            // Credit: `Alacak (Tahsilat) - ${saleCode}` (for Nakit/POS)
-
-            // We can delete both by matching the sale code in the description
             const { error: ledgerError } = await supabase
                 .from('customer_payments')
                 .delete()
@@ -1077,10 +1086,11 @@ export const salesAPI = {
         const { error } = await supabase
             .from('sales')
             .update({ is_deleted: true })
-            .eq('sale_code', saleCode);
+            .eq('sale_code', saleCode)
+            .eq('company_code', companyCode);
 
         // Log the deletion
-        logsAPI.logAction({
+        await logsAPI.logAction({
             module: 'SATIŞLAR',
             action_type: 'DELETE',
             details: {
@@ -1130,6 +1140,27 @@ export const salesAPI = {
             .eq('company_code', companyCode);
 
         if (error) throw error;
+
+        // Log the update
+        try {
+            const oldTotal = parseFloat(existingSale.total || 0).toFixed(2);
+            const newTotal = parseFloat(data.total || existingSale.total || 0).toFixed(2);
+            const itemSummary = data.products ? data.products.map(it => `${it.quantity} ${it.unit || 'AD.'} ${it.name}`).join(', ') : 'Ürünler değişmedi';
+            
+            await logsAPI.logAction({
+                module: 'SATIŞLAR',
+                action_type: 'UPDATE',
+                details: {
+                    title: `${saleCode} numaralı satış GÜNCELLENDİ.`,
+                    message: `Satış detayları değiştirildi. Tutar: ${oldTotal} TL -> ${newTotal} TL`,
+                    items: itemSummary,
+                    old_total: `${oldTotal} TL`,
+                    new_total: `${newTotal} TL`
+                }
+            });
+        } catch (e) {
+            console.warn('Logging sale update error', e);
+        }
 
         // 3. Sync Customer Ledger (Only if total changed and customer exists)
         // We use the existing customer_id from the sale (or the new one if updated)
@@ -1627,10 +1658,14 @@ export const logsAPI = {
                 created_at: new Date().toISOString()
             };
 
-            // Use fire & forget for logging, but with better error handling
-            supabase.from('activity_logs').insert([logData]).then(({ error }) => {
-                if (error) console.error('Supabase Logging Error:', error);
-            });
+            // Perform insert
+            const { error } = await supabase.from('activity_logs').insert([logData]);
+            if (error) {
+                console.error('Supabase Logging Error:', error);
+                // Return descriptive error for high-importance logs
+                return { success: false, error };
+            }
+            return { success: true };
         } catch (e) {
             console.error('Logging Exception:', e);
         }

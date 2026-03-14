@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import XLSX from 'xlsx-js-style';
-import { customersAPI, salesAPI, productsAPI } from '../services/api';
+import { customersAPI, salesAPI, productsAPI, logsAPI } from '../services/api';
 import { supabase } from '../lib/supabaseClient';
 import SaleDetailModal from '../components/modals/SaleDetailModal';
 
@@ -16,6 +16,20 @@ export default function CustomerDetailPage() {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [products, setProducts] = useState([]);
     const [reportFilters, setReportFilters] = useState({ productName: '', stockCode: '', barcode: '' });
+
+    const openSaleDetail = (sale) => {
+        // Log viewing details
+        logsAPI.logAction({
+            module: 'SATIŞLAR',
+            action_type: 'VIEW',
+            details: {
+                title: `${sale.sale_code} numaralı Satış Detayı'na girildi.`,
+                customer: sale.customer || customer?.name || 'Müşteri',
+                total: `${parseFloat(sale.total || 0).toFixed(2)} TL`
+            }
+        });
+        setSelectedSale(sale);
+    };
 
     const handleTransactionClick = (tx) => {
         // Only open modal for sales (where we have products or items)
@@ -64,7 +78,7 @@ export default function CustomerDetailPage() {
                 items: tx.items || tx.products || [],
                 is_deleted: false
             };
-            setSelectedSale(saleObj);
+            openSaleDetail(saleObj);
         }
         // If it's a PAYMENT
         else if (tx.transactionType?.includes('Ödeme')) {

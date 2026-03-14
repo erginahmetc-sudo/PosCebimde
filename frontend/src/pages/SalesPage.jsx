@@ -1,5 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
-import { salesAPI, productsAPI, settingsAPI, customersAPI } from '../services/api';
+import { salesAPI, productsAPI, settingsAPI, customersAPI, logsAPI } from '../services/api';
 import { birFaturaAPI } from '../services/birFaturaService';
 
 export default function SalesPage() {
