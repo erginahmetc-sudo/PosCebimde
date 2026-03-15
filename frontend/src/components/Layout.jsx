@@ -34,10 +34,8 @@ export default function Layout({ children }) {
             <header className="h-16 flex items-center justify-between px-6 bg-white border-b border-slate-200 z-50 flex-none shadow-sm">
                 {/* Left Side: Logo */}
                 <div className="flex items-center gap-3 w-auto lg:w-1/4">
-                    <div className="w-9 h-9 rounded-lg bg-slate-900 flex items-center justify-center text-white shadow-lg shadow-slate-900/20">
-                        <span className="material-symbols-outlined text-xl">point_of_sale</span>
-                    </div>
-                    <span className="font-bold text-lg text-slate-900 tracking-tight hidden sm:block">Poscebimde</span>
+                    <img src="/logo.png" alt="PosCebimde Logo" className="w-10 h-10 object-contain" />
+                    <span className="font-bold text-lg text-slate-900 tracking-tight hidden sm:block">PosCebimde</span>
                 </div>
 
                 {/* Center: Desktop Navigation */}
