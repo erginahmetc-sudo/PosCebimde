@@ -34,19 +34,20 @@ try {
 // Admin Client for Force Deletes (Bypassing RLS if Service Role Key is available)
 let adminSupabase = null;
 try {
-    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-    if (SERVICE_KEY && SUPABASE_URL) {
-        adminSupabase = createClient(SUPABASE_URL, SERVICE_KEY, {
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (serviceRoleKey && SUPABASE_URL) {
+        adminSupabase = createClient(SUPABASE_URL, serviceRoleKey, {
             auth: {
                 autoRefreshToken: false,
                 persistSession: false
             }
         });
-        console.log("Admin Supabase client initialized (Service Role).");
+        console.log("Admin Supabase client initialized (using Service Role Key).");
     } else {
+        console.warn("SUPABASE_SERVICE_ROLE_KEY not found in .env. Admin operations will use standard client.");
         // Fallback to normal client if no service key
         adminSupabase = supabase;
-        console.log("Service Code not found, falling back to standard client for admin ops.");
     }
 } catch (e) {
     console.error("Admin client init failed", e);
