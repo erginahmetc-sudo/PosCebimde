@@ -942,6 +942,7 @@ export default function SalesPage() {
                                 value={filters.searchTerm}
                                 onChange={handleFilterChange}
                                 placeholder="Satış No, Müşteri..."
+                                autoComplete="off"
                                 className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                             />
                         </div>
@@ -956,6 +957,7 @@ export default function SalesPage() {
                             value={filters.productName}
                             onChange={handleFilterChange}
                             placeholder="Ürün Adı"
+                            autoComplete="off"
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                         <input
@@ -964,6 +966,7 @@ export default function SalesPage() {
                             value={filters.stockCode}
                             onChange={handleFilterChange}
                             placeholder="Stok Kodu"
+                            autoComplete="off"
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                         <input
@@ -972,6 +975,7 @@ export default function SalesPage() {
                             value={filters.barcode}
                             onChange={handleFilterChange}
                             placeholder="Barkod"
+                            autoComplete="off"
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                     </div>
