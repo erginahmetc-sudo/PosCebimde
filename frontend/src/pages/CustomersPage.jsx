@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { customersAPI } from '../services/api';
+import { customersAPI, settingsAPI } from '../services/api';
+import { birFaturaAPI } from '../services/birFaturaService';
 import * as XLSX from 'xlsx';
 
 export default function CustomersPage() {
@@ -52,6 +53,65 @@ export default function CustomersPage() {
     const [excelPreview, setExcelPreview] = useState([]);
     const [importResult, setImportResult] = useState({ show: false, success: 0, error: 0 });
 
+    // Cari Ayarları - visibility settings
+    const [showTotalDebt, setShowTotalDebt] = useState(true);
+    const [showTotalCredit, setShowTotalCredit] = useState(true);
+
+    // Tax payer query & tax office autocomplete state (for edit modal)
+    const [editTaxPayerLoading, setEditTaxPayerLoading] = useState(false);
+    const [editTaxPayerResult, setEditTaxPayerResult] = useState(null);
+    const [editTaxOffices, setEditTaxOffices] = useState([]);
+    const [editTaxOfficeSearch, setEditTaxOfficeSearch] = useState('');
+    const [showEditTaxOfficeDropdown, setShowEditTaxOfficeDropdown] = useState(false);
+
+    useEffect(() => {
+        const loadTaxOffices = async () => {
+            const cached = sessionStorage.getItem('birfatura_tax_offices');
+            if (cached) {
+                try { setEditTaxOffices(JSON.parse(cached)); return; } catch (e) {}
+            }
+            const result = await birFaturaAPI.getTaxOffices();
+            if (result.success && result.data) {
+                setEditTaxOffices(result.data);
+                sessionStorage.setItem('birfatura_tax_offices', JSON.stringify(result.data));
+            }
+        };
+        loadTaxOffices();
+    }, []);
+
+    const editFilteredTaxOffices = useMemo(() => {
+        const search = (editTaxOfficeSearch || formData.tax_office || '').toUpperCase().replace(/İ/g, 'I').replace(/Ş/g, 'S').replace(/Ğ/g, 'G').replace(/Ü/g, 'U').replace(/Ö/g, 'O').replace(/Ç/g, 'C');
+        if (!search || search.length < 2) return [];
+        return editTaxOffices.filter(o => {
+            const name = (o.TaxOfficeName || '').toUpperCase().replace(/İ/g, 'I').replace(/Ş/g, 'S').replace(/Ğ/g, 'G').replace(/Ü/g, 'U').replace(/Ö/g, 'O').replace(/Ç/g, 'C');
+            return name.includes(search);
+        }).slice(0, 10);
+    }, [editTaxOfficeSearch, formData.tax_office, editTaxOffices]);
+
+    const editTaxNumDigits = (formData.tax_number || '').replace(/\D/g, '');
+    const editIsTCKN = editTaxNumDigits.length === 11;
+
+    const handleEditTaxPayerQuery = async () => {
+        if (editTaxNumDigits.length < 10) return;
+        setEditTaxPayerLoading(true);
+        setEditTaxPayerResult(null);
+        const result = await birFaturaAPI.queryTaxPayer(editTaxNumDigits);
+        setEditTaxPayerLoading(false);
+        if (result.success && result.data) {
+            const title = result.data.title || result.data.name || '';
+            setFormData(prev => ({
+                ...prev,
+                name: title || prev.name,
+                company: title || prev.company,
+            }));
+            setEditTaxPayerResult({ isEFatura: true, title });
+        } else if (result.success && !result.data) {
+            setEditTaxPayerResult({ isEFatura: false, message: result.message });
+        } else {
+            setEditTaxPayerResult({ isEFatura: false, message: result.message });
+        }
+    };
+
     const filteredSearchCustomers = showCustomerSearchModal ? customers.filter(c => {
         const term = searchCustomerTerm.toLowerCase();
         return ((c.name || '').toLowerCase().includes(term) ||
@@ -61,7 +121,20 @@ export default function CustomersPage() {
 
     useEffect(() => {
         loadCustomers();
+        loadCariSettings();
     }, []);
+
+    const loadCariSettings = async () => {
+        try {
+            const { data } = await settingsAPI.getAll();
+            if (data) {
+                if (data['customers_show_total_debt'] !== undefined) setShowTotalDebt(data['customers_show_total_debt']);
+                if (data['customers_show_total_credit'] !== undefined) setShowTotalCredit(data['customers_show_total_credit']);
+            }
+        } catch (error) {
+            console.error('Cari ayarları yüklenirken hata:', error);
+        }
+    };
 
     const loadCustomers = async () => {
         try {
@@ -157,6 +230,7 @@ export default function CustomersPage() {
             tax_number: customer.tax_number || '',
         });
         setShowEditModal(true);
+        setEditTaxPayerResult(null);
     };
 
     // Generate next customer code based on existing codes
@@ -424,6 +498,46 @@ export default function CustomersPage() {
                     </div>
                 </div>
             </header>
+
+            {/* Toplam Borç / Alacak Summary Cards */}
+            {(showTotalDebt || showTotalCredit) && (
+                <div className="px-6 py-4 flex gap-4 flex-wrap">
+                    {showTotalDebt && (() => {
+                        const totalDebt = customers.reduce((sum, c) => sum + (parseFloat(c.total_debt) || 0), 0);
+                        return (
+                            <div className="flex-1 min-w-[220px] bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl p-5 shadow-lg shadow-red-500/20 text-white">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-2xl">trending_down</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-red-100 font-medium">Toplam Borç</p>
+                                        <p className="text-2xl font-black">{totalDebt.toFixed(2)} TL</p>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-red-200">Tüm müşterilerin toplam borç tutarı</p>
+                            </div>
+                        );
+                    })()}
+                    {showTotalCredit && (() => {
+                        const totalCredit = customers.reduce((sum, c) => sum + (parseFloat(c.total_credit) || 0), 0);
+                        return (
+                            <div className="flex-1 min-w-[220px] bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-5 shadow-lg shadow-emerald-500/20 text-white">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-2xl">trending_up</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-emerald-100 font-medium">Toplam Alacak</p>
+                                        <p className="text-2xl font-black">{totalCredit.toFixed(2)} TL</p>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-emerald-200">Tüm müşterilerin toplam alacak tutarı</p>
+                            </div>
+                        );
+                    })()}
+                </div>
+            )}
 
             {/* Main Content */}
             <div className="flex-1 p-5 flex flex-col">
@@ -865,23 +979,90 @@ export default function CustomersPage() {
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-5">
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Vergi Dairesi</label>
+                                <div className="relative">
+                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                        Vergi Dairesi
+                                        {editIsTCKN && <span className="text-xs text-slate-400 font-normal ml-2 normal-case">(TCKN için gerekli değil)</span>}
+                                    </label>
                                     <input
                                         type="text"
-                                        value={formData.tax_office}
-                                        onChange={(e) => setFormData({ ...formData, tax_office: e.target.value })}
-                                        className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                        value={editIsTCKN ? '' : formData.tax_office}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, tax_office: e.target.value });
+                                            setEditTaxOfficeSearch(e.target.value);
+                                            setShowEditTaxOfficeDropdown(true);
+                                        }}
+                                        onFocus={() => { if (!editIsTCKN) setShowEditTaxOfficeDropdown(true); }}
+                                        onBlur={() => setTimeout(() => setShowEditTaxOfficeDropdown(false), 200)}
+                                        autoComplete="off"
+                                        disabled={editIsTCKN}
+                                        className={`w-full px-4 py-3 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                                            editIsTCKN ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50'
+                                        }`}
+                                        placeholder={editIsTCKN ? 'TCKN için gerekli değil' : 'Vergi dairesi adı yazın...'}
                                     />
+                                    {showEditTaxOfficeDropdown && editFilteredTaxOffices.length > 0 && !editIsTCKN && (
+                                        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border-2 border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                                            {editFilteredTaxOffices.map((office, idx) => (
+                                                <div
+                                                    key={office.TaxOfficeCode || idx}
+                                                    className="px-4 py-2.5 text-sm hover:bg-blue-50 cursor-pointer transition-colors border-b border-slate-100 last:border-b-0"
+                                                    onMouseDown={() => {
+                                                        setFormData(prev => ({ ...prev, tax_office: office.TaxOfficeName }));
+                                                        setShowEditTaxOfficeDropdown(false);
+                                                        setEditTaxOfficeSearch('');
+                                                    }}
+                                                >
+                                                    <span className="font-medium text-slate-700">{office.TaxOfficeName}</span>
+                                                    <span className="text-slate-400 ml-2 text-xs">({office.TaxOfficeCode})</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Vergi Numarası</label>
-                                    <input
-                                        type="text"
-                                        value={formData.tax_number}
-                                        onChange={(e) => setFormData({ ...formData, tax_number: e.target.value })}
-                                        className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                                    />
+                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">TC Kimlik / Vergi Numarası</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={formData.tax_number}
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, '').slice(0, 11);
+                                                setFormData({ ...formData, tax_number: val });
+                                                setEditTaxPayerResult(null);
+                                            }}
+                                            maxLength={11}
+                                            className="flex-1 px-4 py-3 bg-gray-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono tracking-wider"
+                                            placeholder="VKN (10) veya TCKN (11)"
+                                        />
+                                        {editTaxNumDigits.length >= 10 && (
+                                            <button
+                                                type="button"
+                                                onClick={handleEditTaxPayerQuery}
+                                                disabled={editTaxPayerLoading}
+                                                className="px-3 py-3 text-xs font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl hover:from-blue-600 hover:to-indigo-700 shadow-lg shadow-blue-500/30 transition-all active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1 whitespace-nowrap"
+                                            >
+                                                {editTaxPayerLoading ? (
+                                                    <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Sorgu</>
+                                                ) : (
+                                                    <><span className="material-symbols-outlined text-sm">person_search</span> Getir</>
+                                                )}
+                                            </button>
+                                        )}
+                                    </div>
+                                    {editTaxPayerResult && (
+                                        <div className={`mt-1 px-3 py-2 rounded-lg text-xs font-medium ${
+                                            editTaxPayerResult.isEFatura
+                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                        }`}>
+                                            {editTaxPayerResult.isEFatura ? (
+                                                <><span className="material-symbols-outlined text-sm align-middle mr-1">verified</span> e-Fatura: {editTaxPayerResult.title}</>
+                                            ) : (
+                                                <><span className="material-symbols-outlined text-sm align-middle mr-1">info</span> {editTaxPayerResult.message}</>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

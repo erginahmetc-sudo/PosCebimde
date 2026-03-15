@@ -99,7 +99,7 @@ export const birFaturaAPI = {
                 ShippingZipCode: "",
                 ShippingPhone: retailForm.phone || "",
                 DeliveryFeeType: 3,
-                PaymentType: "",
+                PaymentType: paymentMethod || "",
                 Currency: "TRY",
                 CurrencyRate: 1.0,
                 TotalPaidTaxExcluding: Number(totalExclTax.toFixed(2)),
@@ -132,7 +132,7 @@ export const birFaturaAPI = {
 
             const responseData = response.data;
             if (responseData && (responseData.Success || responseData.success)) {
-                return { success: true, data: responseData };
+                return { success: true, data: responseData, ettn };
             } else {
                 return { success: false, message: `BirFatura Hatası: ${responseData?.Message || responseData?.message || "Bilinmeyen API hatası."}` };
             }
@@ -140,6 +140,158 @@ export const birFaturaAPI = {
             console.error("[BirFaturaService] SendBasicInvoice Hatası:", error);
             const errorMsg = error.response?.data?.Message || error.response?.data?.message || error.message || "Ağ Hatası";
             return { success: false, message: `Fatura Hatası: ${errorMsg}` };
+        }
+    },
+
+    /**
+     * Vergi numarası ile e-fatura mükellefini sorgula (GetUserPK endpoint).
+     * 10 haneli VKN veya 11 haneli TCKN ile kullanılır.
+     * @param {string} taxNumber - VKN veya TCKN
+     * @returns {Object} { success, data: { title, identifier, name } } veya { success: false, message }
+     */
+    queryTaxPayer: async (taxNumber) => {
+        const configStr = localStorage.getItem('birfatura_config');
+        if (!configStr) {
+            return { success: false, message: "BirFatura ayarları bulunamadı." };
+        }
+        let config;
+        try { config = JSON.parse(configStr); }
+        catch (e) { return { success: false, message: "Ayar dosyası bozuk." }; }
+
+        if (!config.api_key || !config.secret_key || !config.integration_key) {
+            return { success: false, message: "API anahtarları eksik." };
+        }
+
+        const cleanTaxNo = String(taxNumber || "").trim();
+        if (cleanTaxNo.length < 10) {
+            return { success: false, message: "Geçersiz vergi numarası." };
+        }
+
+        try {
+            console.log(`[BirFaturaService] Mükellef sorgulanıyor: ${cleanTaxNo}`);
+            const response = await axios.post(`${LOCAL_BACKEND_URL}/api/birfatura-proxy`, {
+                endpoint: "OutEBelgeV2/GetUserPK",
+                apiKey: config.api_key,
+                secretKey: config.secret_key,
+                integrationKey: config.integration_key,
+                payload: { kn: cleanTaxNo }
+            }, { headers: { 'Content-Type': 'application/json' } });
+
+            const responseData = response.data;
+            if (responseData && (responseData.Success || responseData.success)) {
+                const results = responseData.Result || responseData.result || [];
+                if (results.length > 0) {
+                    return { success: true, data: results[0], isEFatura: true };
+                } else {
+                    return { success: true, data: null, isEFatura: false, message: "Bu numara e-fatura mükellefi değil." };
+                }
+            } else {
+                return { success: false, message: responseData?.Message || responseData?.message || "Sorgulama başarısız." };
+            }
+        } catch (error) {
+            console.error("[BirFaturaService] Mükellef Sorgulama Hatası:", error);
+            const errorMsg = error.response?.data?.Message || error.response?.data?.message || error.message || "Ağ Hatası";
+            return { success: false, message: `Sorgulama Hatası: ${errorMsg}` };
+        }
+    },
+
+    /**
+     * UUID ile fatura PDF linkini getir (GetPDFLinkByUUID endpoint).
+     * @param {string} uuid - Fatura UUID (ETTN)
+     * @returns {Object} { success, pdfUrl }
+     */
+    getPdfLink: async (uuid) => {
+        const configStr = localStorage.getItem('birfatura_config');
+        if (!configStr) return { success: false, message: "Ayarlar bulunamadı." };
+        let config;
+        try { config = JSON.parse(configStr); }
+        catch (e) { return { success: false, message: "Ayar dosyası bozuk." }; }
+
+        if (!config.api_key || !config.secret_key || !config.integration_key) {
+            return { success: false, message: "API anahtarları eksik." };
+        }
+
+        const extractPdfUrl = (responseData) => {
+            // Response bir array olarak dönebilir: [{ uuid, pdfLink, success, message }]
+            if (Array.isArray(responseData) && responseData.length > 0) {
+                const item = responseData[0];
+                if (item.pdfLink) return item.pdfLink;
+                if (item.PdfLink) return item.PdfLink;
+            }
+            // Result alanında array olarak dönebilir
+            if (responseData && (responseData.Success || responseData.success)) {
+                const results = responseData.Result || responseData.result;
+                if (Array.isArray(results) && results.length > 0) {
+                    if (results[0].pdfLink) return results[0].pdfLink;
+                    if (results[0].PdfLink) return results[0].PdfLink;
+                }
+                if (typeof results === 'string' && results.length > 0) return results;
+            }
+            return null;
+        };
+
+        // Önce EARSIV, sonra EFATURA dene
+        for (const systemType of ["EARSIV", "EFATURA"]) {
+            try {
+                console.log(`[BirFaturaService] PDF link sorgulanıyor (${systemType}), UUID:`, uuid);
+                const response = await axios.post(`${LOCAL_BACKEND_URL}/api/birfatura-proxy`, {
+                    endpoint: "OutEBelgeV2/GetPDFLinkByUUID",
+                    apiKey: config.api_key,
+                    secretKey: config.secret_key,
+                    integrationKey: config.integration_key,
+                    payload: { uuids: [uuid], systemType }
+                }, { headers: { 'Content-Type': 'application/json' } });
+
+                console.log(`[BirFaturaService] PDF link response (${systemType}):`, JSON.stringify(response.data, null, 2));
+
+                const pdfUrl = extractPdfUrl(response.data);
+                if (pdfUrl) {
+                    return { success: true, pdfUrl };
+                }
+            } catch (error) {
+                console.warn(`[BirFaturaService] PDF Link (${systemType}) hatası:`, error.message);
+            }
+        }
+
+        return { success: false, message: "PDF linki alınamadı." };
+    },
+
+    /**
+     * Tüm vergi dairesi bilgilerini getir (GetTaxOfficesAndCodes endpoint).
+     * @returns {Object} { success, data: [{ TaxOfficeName, TaxOfficeCode }] }
+     */
+    getTaxOffices: async () => {
+        const configStr = localStorage.getItem('birfatura_config');
+        if (!configStr) {
+            return { success: false, message: "BirFatura ayarları bulunamadı." };
+        }
+        let config;
+        try { config = JSON.parse(configStr); }
+        catch (e) { return { success: false, message: "Ayar dosyası bozuk." }; }
+
+        if (!config.api_key || !config.secret_key || !config.integration_key) {
+            return { success: false, message: "API anahtarları eksik." };
+        }
+
+        try {
+            const response = await axios.post(`${LOCAL_BACKEND_URL}/api/birfatura-proxy`, {
+                endpoint: "OutEBelgeV2/GetTaxOfficesAndCodes",
+                apiKey: config.api_key,
+                secretKey: config.secret_key,
+                integrationKey: config.integration_key,
+                payload: {}
+            }, { headers: { 'Content-Type': 'application/json' } });
+
+            const responseData = response.data;
+            if (responseData && (responseData.Success || responseData.success)) {
+                const results = responseData.Result || responseData.result || [];
+                return { success: true, data: results };
+            } else {
+                return { success: false, message: responseData?.Message || "Vergi daireleri alınamadı." };
+            }
+        } catch (error) {
+            console.error("[BirFaturaService] Vergi Dairesi Hatası:", error);
+            return { success: false, message: error.message || "Ağ Hatası" };
         }
     },
 
