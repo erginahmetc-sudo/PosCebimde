@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const birFaturaService = require('./birfatura.service');
 
 dotenv.config();
 
@@ -135,23 +136,14 @@ function parseDate(dateStr) {
 }
 
 // --- HELPER: Format Date to BirFatura format ---
-function formatDateForBirFatura(date) {
-    const d = new Date(date);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    const seconds = String(d.getSeconds()).padStart(2, '0');
-    return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
-}
+// Note: formatDateForBirFatura is now handled by birFaturaService.formatDate
 
 // --- ENDPOINT: BirFatura Order Statuses (r4: sadece token varlığı) ---
 app.post('/api/orderStatus/', async (req, res) => {
     const receivedToken = req.headers['token'];
     if (!receivedToken) return res.status(401).json({ error: "Yetkisiz Erişim" });
     res.json({
-        OrderStatus: [{ Id: 1, Value: "Onaylandı" }, { Id: 2, Value: "Kargolandı" }, { Id: 3, Value: "İptal Edildi" }]
+        OrderStatus: birFaturaService.getOrderStatuses()
     });
 });
 
@@ -160,13 +152,7 @@ app.post('/api/paymentMethods/', async (req, res) => {
     const receivedToken = req.headers['token'];
     if (!receivedToken) return res.status(401).json({ error: "Yetkisiz Erişim" });
     res.json({
-        PaymentMethods: [
-            { Id: 1, Value: "Kredi Kartı" },
-            { Id: 2, Value: "Banka EFT-Havale" },
-            { Id: 3, Value: "Kapıda Ödeme Nakit" },
-            { Id: 4, Value: "Kapıda Ödeme Kredi Kartı" },
-            { Id: 5, Value: "Nakit" }
-        ]
+        PaymentMethods: birFaturaService.getPaymentMethods()
     });
 });
 
@@ -343,108 +329,19 @@ app.post('/api/orders/', async (req, res) => {
             }
         }
 
-        // --- Customer & Tax Logic (Flask'tan kopyalandı) ---
-        const customerName = sale.customer_name || sale.customer || 'Misafir Müşteri';
-
-        let ssnTcNo = "";
-        let taxNo = "";
-        let rawTax = sale.tax_number || "";
-
-        if (rawTax.length === 11) {
-            ssnTcNo = rawTax;
-        } else if (rawTax.length > 0) {
-            taxNo = rawTax;
+        // Fetch customer details if sale has a customer_id
+        let customer = null;
+        if (sale.customer_id) {
+            const { data: customerData } = await client
+                .from('customers')
+                .select('*')
+                .eq('id', sale.customer_id)
+                .single();
+            customer = customerData;
         }
 
-        // Toptan Satış veya Misafir için varsayılan TC
-        if (!ssnTcNo && !taxNo && (customerName === 'Misafir Müşteri' || customerName === 'Toptan Satış')) {
-            ssnTcNo = '11111111111';
-        }
-
-        const shippingTaxNumber = taxNo ? taxNo : ssnTcNo;
-
-        let address = sale.address || "Fatih Mh.";
-        let phone = sale.phone || "";
-        let city = "Adana";
-        let district = "Seyhan";
-
-        // --- Items Logic ---
-        let calculatedTotal = 0;
-        const orderDetails = [];
-
-        let items = sale.items;
-        if (typeof items === 'string') {
-            try { items = JSON.parse(items); } catch (e) { items = []; }
-        }
-
-        if (Array.isArray(items)) {
-            items.forEach(item => {
-                const unitPriceInclTax = parseFloat(item.final_price || item.price || 0);
-                const quantity = parseFloat(item.quantity || 1);
-                const unitPriceExclTax = unitPriceInclTax / 1.20;
-
-                calculatedTotal += unitPriceInclTax * quantity;
-
-                orderDetails.push({
-                    "ProductId": 0,
-                    "ProductCode": item.stock_code || "URUN01",
-                    "Barcode": item.stock_code || "",
-                    "ProductName": item.name || "Ürün",
-                    "ProductQuantityType": "Adet",
-                    "ProductQuantity": quantity,
-                    "VatRate": 20.0,
-                    "ProductUnitPriceTaxExcluding": Number(unitPriceExclTax.toFixed(4)),
-                    "ProductUnitPriceTaxIncluding": Number(unitPriceInclTax.toFixed(4)),
-                    "Variants": []
-                });
-            });
-        }
-
-        const calculatedTotalExclTax = calculatedTotal / 1.20;
-
-        const saleDateObj = new Date(sale.date || sale.created_at);
-        const formattedDate = formatDateForBirFatura(saleDateObj);
-
-        let orderId = 0;
-        try {
-            const codeWithoutPrefix = sale.sale_code.split('-')[1] || sale.sale_code;
-            orderId = parseInt(codeWithoutPrefix.substring(0, 18)) || sale.id || 0;
-        } catch (e) {
-            orderId = sale.id || 0;
-        }
-
-        ordersToSend.push({
-            "OrderId": orderId,
-            "OrderCode": sale.sale_code || `S-${orderId}`,
-            "OrderDate": formattedDate,
-            "CustomerId": 0,
-            "BillingName": customerName,
-            "BillingAddress": address,
-            "BillingTown": district,
-            "BillingCity": city,
-            "BillingMobilePhone": phone, // Dynamic Phone via frontend
-            "BillingTaxOffice": "",
-            "TaxNo": taxNo,
-            "SSNTCNo": ssnTcNo,
-            "ShippingId": 0,
-            "ShippingName": customerName,
-            "ShippingAddress": address,
-            "ShippingTown": district,
-            "ShippingCity": city,
-            "ShippingTaxNumber": shippingTaxNumber,
-            "ShipCompany": "Kargo",
-            "PaymentTypeId": 1,
-            "PaymentType": "Kredi Kartı",
-            "Status": 1, // Onaylandı statüsü
-            "OrderStatusId": 1, // Onaylandı statüsü
-            "Currency": "TRY",
-            "CurrencyRate": 1,
-            "TotalPaidTaxIncluding": Number(calculatedTotal.toFixed(2)),
-            "TotalPaidTaxExcluding": Number(calculatedTotalExclTax.toFixed(2)),
-            "ProductsTotalTaxIncluding": Number(calculatedTotal.toFixed(2)), // Required
-            "ProductsTotalTaxExcluding": Number(calculatedTotalExclTax.toFixed(2)), // Required
-            "OrderDetails": orderDetails
-        });
+        const order = birFaturaService.mapSaleToOrder(sale, customer);
+        ordersToSend.push(order);
     }
 
     console.log(`BirFatura'ya ${ordersToSend.length} sipariş gönderiliyor.`);
