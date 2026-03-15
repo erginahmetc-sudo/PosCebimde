@@ -1,6 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
-import { salesAPI, productsAPI, settingsAPI, customersAPI } from '../services/api';
+import React, { useState, useEffect, useMemo } from 'react';
+import { salesAPI, productsAPI, settingsAPI, customersAPI, logsAPI } from '../services/api';
 import { birFaturaAPI } from '../services/birFaturaService';
+import StatusModal from '../components/modals/StatusModal';
+import ConfirmModal from '../components/modals/ConfirmModal';
+import PasswordModal from '../components/modals/PasswordModal';
 
 export default function SalesPage() {
     const [sales, setSales] = useState([]);
@@ -48,6 +51,12 @@ export default function SalesPage() {
     const [showTotalSales, setShowTotalSales] = useState(true);
     const [showTotalRevenue, setShowTotalRevenue] = useState(true);
 
+    // Modal Notifications State
+    const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'primary', onConfirm: () => { } });
+    const [passwordModal, setPasswordModal] = useState({ isOpen: false, title: '', message: '', correctPassword: '', onConfirm: () => { } });
+    const [passwords, setPasswords] = useState({ edit: '123456', cancel: '123456' });
+
     useEffect(() => {
         loadSales();
         loadSettings();
@@ -55,11 +64,19 @@ export default function SalesPage() {
 
     const loadSettings = async () => {
         try {
-            const sRes = await settingsAPI.get('sales_show_total_sales');
-            const rRes = await settingsAPI.get('sales_show_total_revenue');
+            const [sRes, rRes, editP, cancelP] = await Promise.all([
+                settingsAPI.get('sales_show_total_sales'),
+                settingsAPI.get('sales_show_total_revenue'),
+                settingsAPI.get('sales_edit_password'),
+                settingsAPI.get('sales_cancel_password')
+            ]);
 
             if (sRes.data !== undefined) setShowTotalSales(sRes.data === 'true' || sRes.data === true);
             if (rRes.data !== undefined) setShowTotalRevenue(rRes.data === 'true' || rRes.data === true);
+            setPasswords({
+                edit: editP.data || '123456',
+                cancel: cancelP.data || '123456'
+            });
         } catch (e) {
             console.error("Error loading sales settings", e);
         }
@@ -99,7 +116,12 @@ export default function SalesPage() {
 
         const configStr = localStorage.getItem('birfatura_config');
         if (!configStr) {
-            alert('BirFatura ayarları bulunamadı. Ayarlar sayfasından API anahtarlarını kaydedin.');
+            setStatusModal({
+                isOpen: true,
+                title: 'Ayarlar Eksik',
+                message: 'BirFatura ayarları bulunamadı. Ayarlar sayfasından API anahtarlarını kaydedin.',
+                type: 'warning'
+            });
             return;
         }
 
@@ -166,11 +188,21 @@ export default function SalesPage() {
                 if (pdfUrl) window.open(pdfUrl, '_blank');
                 await loadSales();
             } else {
-                alert('Fatura Hatası: ' + result.message);
+                setStatusModal({
+                    isOpen: true,
+                    title: 'Fatura Hatası',
+                    message: result.message,
+                    type: 'error'
+                });
             }
         } catch (error) {
             console.error('Fatura kesme hatası:', error);
-            alert('Fatura kesme sırasında hata oluştu: ' + error.message);
+            setStatusModal({
+                isOpen: true,
+                title: 'Fatura Kesme Hatası',
+                message: error.message,
+                type: 'error'
+            });
         } finally {
             setInvoiceLoadingSaleId(null);
         }
@@ -178,6 +210,18 @@ export default function SalesPage() {
 
     // Open Modal
     const openDetailModal = (sale) => {
+        // Log viewing details
+        logsAPI.logAction({
+            module: 'SATIŞLAR',
+            action_type: 'VIEW',
+            details: {
+                title: `${sale.sale_code} numaralı Satış Detayı'na girildi.`,
+                sale_code: sale.sale_code,
+                customer: sale.customerName || sale.customer || 'Misafir',
+                total: `${sale.total.toFixed(2)} TL`
+            }
+        });
+
         setSelectedSale(sale);
         // Initialize Edit Form (Deep copy to avoid direct mutation)
         // Ensure items have vat_rate and UI flags
@@ -310,20 +354,48 @@ export default function SalesPage() {
     }, [editForm?.items]);
 
     const handleSaveSale = async () => {
-        if (!window.confirm('Değişiklikleri kaydetmek istiyor musunuz?')) return;
-        try {
-            await salesAPI.update(editForm.sale_code, {
-                items: editForm.items, // Backend expects 'items' or 'products' mapped
-                total: totals.grand,
-                payment_method: editForm.payment_method,
-                customer_name: editForm.customer_name // Simple string update if name changed
-            });
-            alert('Satış güncellendi.');
-            setIsDetailModalOpen(false);
-            loadSales();
-        } catch (error) {
-            alert('Güncelleme hatası: ' + error.message);
-        }
+        setConfirmModal({
+            isOpen: true,
+            title: 'Değişiklikleri Kaydet',
+            message: 'Satış üzerindeki değişiklikleri kaydetmek istiyor musunuz?',
+            type: 'primary',
+            onConfirm: () => {
+                setPasswordModal({
+                    isOpen: true,
+                    title: 'Düzenleme Parolası',
+                    message: 'Satış detaylarını değiştirmek için lütfen parolayı giriniz.',
+                    correctPassword: passwords.edit,
+                    onConfirm: async () => {
+                        try {
+                            await salesAPI.update(editForm.sale_code, {
+                                items: editForm.items,
+                                total: totals.grand,
+                                payment_method: editForm.payment_method,
+                                customer_name: editForm.customer_name
+                            });
+                            setStatusModal({
+                                isOpen: true,
+                                title: 'Başarılı',
+                                message: 'Satış başarıyla güncellendi.',
+                                type: 'success'
+                            });
+                            setIsDetailModalOpen(false);
+                            // Add slight delay to ensure DB propagation before reload
+                            setTimeout(() => {
+                                loadSales();
+                            }, 500);
+                        } catch (error) {
+                            setStatusModal({
+                                isOpen: true,
+                                title: 'Hata',
+                                message: 'Güncelleme sırasında bir hata oluştu: ' + error.message,
+                                type: 'error'
+                            });
+                        }
+                    }
+                });
+            }
+        });
     };
 
     const printReceipt = (saleData) => {
@@ -348,10 +420,10 @@ export default function SalesPage() {
     const printCustomA5Receipt = (saleData, paperSize) => {
         const savedConfig = localStorage.getItem('receipt_design_config');
         let companyInfo = {
-            name: 'Firma Adı',
-            address: '',
-            phone: '',
-            logo_text: 'K',
+            name: 'Firma İsmi Yazınız',
+            address: 'Firma Adresi Yazınız',
+            phone: '0212 XXX XX XX',
+            logo_text: 'F',
             showWatermark: true
         };
 
@@ -565,9 +637,9 @@ export default function SalesPage() {
 
     const printA5Receipt = (saleData, paperSize) => {
         const isA4 = paperSize === 'A4 (210x297mm)';
-        const companyName = localStorage.getItem('receipt_company_name') || 'FIRMA ADI';
-        const companyAddress = localStorage.getItem('receipt_company_address') || 'Adres Bilgisi';
-        const companyPhone = localStorage.getItem('receipt_company_phone') || 'Tel: 0XXX XXX XX XX';
+        const companyName = localStorage.getItem('receipt_company_name') || 'Firma İsmi Yazınız';
+        const companyAddress = localStorage.getItem('receipt_company_address') || 'Firma Adresi Yazınız';
+        const companyPhone = localStorage.getItem('receipt_company_phone') || '0212 XXX XX XX';
 
         const dateObj = saleData.created_at ? new Date(saleData.created_at) : new Date();
 
@@ -646,15 +718,43 @@ export default function SalesPage() {
     };
 
     const handleDeleteSale = async () => {
-        if (!window.confirm('Bu satışı silmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) return;
-        try {
-            await salesAPI.delete(editForm.sale_code);
-            alert('Satış silindi.');
-            setIsDetailModalOpen(false);
-            loadSales();
-        } catch (error) {
-            alert('Silme hatası: ' + error.message);
-        }
+        setConfirmModal({
+            isOpen: true,
+            title: 'Satışı Sil',
+            message: 'Bu satışı silmek istediğinize emin misiniz? Bu işlem geri alınamaz!',
+            type: 'danger',
+            onConfirm: () => {
+                setPasswordModal({
+                    isOpen: true,
+                    title: 'İptal Parolası',
+                    message: 'Satışı iptal etmek için lütfen parolayı giriniz.',
+                    correctPassword: passwords.cancel,
+                    onConfirm: async () => {
+                        try {
+                            await salesAPI.delete(editForm.sale_code);
+                            setStatusModal({
+                                isOpen: true,
+                                title: 'Silindi',
+                                message: 'Satış kaydı başarıyla silindi.',
+                                type: 'success'
+                            });
+                            setIsDetailModalOpen(false);
+                            // Add slight delay to ensure DB propagation before reload
+                            setTimeout(() => {
+                                loadSales();
+                            }, 500);
+                        } catch (error) {
+                            setStatusModal({
+                                isOpen: true,
+                                title: 'Hata',
+                                message: 'Silme işlemi sırasında bir hata oluştu: ' + error.message,
+                                type: 'error'
+                            });
+                        }
+                    }
+                });
+            }
+        });
     };
 
     // Filter Logic
@@ -842,6 +942,7 @@ export default function SalesPage() {
                                 value={filters.searchTerm}
                                 onChange={handleFilterChange}
                                 placeholder="Satış No, Müşteri..."
+                                autoComplete="off"
                                 className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                             />
                         </div>
@@ -856,6 +957,7 @@ export default function SalesPage() {
                             value={filters.productName}
                             onChange={handleFilterChange}
                             placeholder="Ürün Adı"
+                            autoComplete="off"
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                         <input
@@ -864,6 +966,7 @@ export default function SalesPage() {
                             value={filters.stockCode}
                             onChange={handleFilterChange}
                             placeholder="Stok Kodu"
+                            autoComplete="off"
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                         <input
@@ -872,6 +975,7 @@ export default function SalesPage() {
                             value={filters.barcode}
                             onChange={handleFilterChange}
                             placeholder="Barkod"
+                            autoComplete="off"
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                     </div>
@@ -1352,6 +1456,33 @@ export default function SalesPage() {
                     </div>
                 )
             }
-        </div >
+
+            {/* Notification Modals */}
+            <StatusModal
+                isOpen={statusModal.isOpen}
+                onClose={() => setStatusModal(prev => ({ ...prev, isOpen: false }))}
+                title={statusModal.title}
+                message={statusModal.message}
+                type={statusModal.type}
+            />
+
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmModal.onConfirm}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                type={confirmModal.type}
+            />
+
+            <PasswordModal
+                isOpen={passwordModal.isOpen}
+                onClose={() => setPasswordModal(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={passwordModal.onConfirm}
+                title={passwordModal.title}
+                message={passwordModal.message}
+                correctPassword={passwordModal.correctPassword}
+            />
+        </div>
     );
 }

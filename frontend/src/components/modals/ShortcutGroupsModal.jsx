@@ -50,8 +50,9 @@ export default function ShortcutGroupsModal({ isOpen, onClose }) {
             setNewGroupName('');
             await loadGroups();
         } catch (error) {
-            console.error(error);
-            alert("Grup eklenirken hata oluştu.");
+            console.error("Grup ekleme hatası:", error);
+            const msg = error.response?.data?.message || error.message || "Bilinmeyen hata";
+            alert("Grup eklenirken hata oluştu: " + msg);
         } finally {
             setAdding(false);
         }

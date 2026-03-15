@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import XLSX from 'xlsx-js-style';
-import { customersAPI, salesAPI, productsAPI } from '../services/api';
+import { customersAPI, salesAPI, productsAPI, logsAPI } from '../services/api';
 import { supabase } from '../lib/supabaseClient';
 import SaleDetailModal from '../components/modals/SaleDetailModal';
+import StatusModal from '../components/modals/StatusModal';
+import ConfirmModal from '../components/modals/ConfirmModal';
 
 export default function CustomerDetailPage() {
     const { customerName } = useParams();
@@ -16,6 +18,23 @@ export default function CustomerDetailPage() {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [products, setProducts] = useState([]);
     const [reportFilters, setReportFilters] = useState({ productName: '', stockCode: '', barcode: '' });
+    const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'primary', onConfirm: () => { } });
+
+    const openSaleDetail = (sale) => {
+        // Log viewing details
+        logsAPI.logAction({
+            module: 'SATIŞLAR',
+            action_type: 'VIEW',
+            details: {
+                title: `${sale.sale_code} numaralı Satış Detayı'na girildi.`,
+                sale_code: sale.sale_code,
+                customer: sale.customer || customer?.name || 'Müşteri',
+                total: `${parseFloat(sale.total || 0).toFixed(2)} TL`
+            }
+        });
+        setSelectedSale(sale);
+    };
 
     const handleTransactionClick = (tx) => {
         // Only open modal for sales (where we have products or items)
@@ -64,7 +83,7 @@ export default function CustomerDetailPage() {
                 items: tx.items || tx.products || [],
                 is_deleted: false
             };
-            setSelectedSale(saleObj);
+            openSaleDetail(saleObj);
         }
         // If it's a PAYMENT
         else if (tx.transactionType?.includes('Ödeme')) {
@@ -79,34 +98,70 @@ export default function CustomerDetailPage() {
 
         const newAmount = parseFloat(editAmount);
         if (isNaN(newAmount) || newAmount <= 0) {
-            alert('Geçerli bir tutar giriniz.');
+            setStatusModal({
+                isOpen: true,
+                title: 'Geçersiz Tutar',
+                message: 'Lütfen geçerli bir tutar giriniz.',
+                type: 'warning'
+            });
             return;
         }
 
         try {
             await customersAPI.updatePayment(editingPayment.id, customer.id, editingPayment.total, newAmount);
+            setStatusModal({
+                isOpen: true,
+                title: 'Güncellendi',
+                message: 'Ödeme tutarı başarıyla güncellendi.',
+                type: 'success'
+            });
             setEditingPayment(null);
             setEditAmount('');
             loadCustomerData();
         } catch (error) {
             console.error(error);
-            alert('Hata: ' + (error.message || 'Ödeme güncellenemedi'));
+            setStatusModal({
+                isOpen: true,
+                title: 'Hata',
+                message: 'Ödeme güncellenirken bir sorun oluştu: ' + (error.message || 'Hata'),
+                type: 'error'
+            });
         }
     };
 
     const handleDeletePayment = async (e, tx) => {
         e.stopPropagation(); // Prevent row click
 
-        if (!confirm('Bu ödemeyi silmek müşterinin borcunu artıracaktır. Emin misiniz?')) return;
-
-        try {
-            await customersAPI.deletePayment(tx.id, customer.id, tx.total); // tx.total is amount for payment
-            alert('Ödeme silindi.');
-            loadCustomerData();
-        } catch (error) {
-            console.error(error);
-            alert('Hata: ' + (error.message || 'Ödeme silinemedi'));
-        }
+        setConfirmModal({
+            isOpen: true,
+            title: 'Ödemeyi Sil',
+            message: 'Bu ödemeyi silmek müşterinin borcunu artıracaktır. Emin misiniz?',
+            type: 'danger',
+            confirmText: 'Evet, Sil',
+            onConfirm: async () => {
+                try {
+                    await customersAPI.deletePayment(tx.id, customer.id, tx.total);
+                    setStatusModal({
+                        isOpen: true,
+                        title: 'Silindi',
+                        message: 'Ödeme başarıyla silindi.',
+                        type: 'success'
+                    });
+                    loadCustomerData();
+                    if (editingPayment && editingPayment.id === tx.id) {
+                        setEditingPayment(null);
+                    }
+                } catch (error) {
+                    console.error(error);
+                    setStatusModal({
+                        isOpen: true,
+                        title: 'Hata',
+                        message: 'Ödeme silinirken bir sorun oluştu: ' + (error.message || 'Hata'),
+                        type: 'error'
+                    });
+                }
+            }
+        });
     };
 
     useEffect(() => {
@@ -644,17 +699,36 @@ export default function CustomerDetailPage() {
                                 </button>
                             </div>
                             <button
-                                onClick={async () => {
-                                    if (!confirm('Bu ödemeyi silmek müşterinin borcunu artıracaktır. Emin misiniz?')) return;
-                                    try {
-                                        await customersAPI.deletePayment(editingPayment.id, customer.id, editingPayment.total);
-                                        setEditingPayment(null);
-                                        setEditAmount('');
-                                        loadCustomerData();
-                                    } catch (error) {
-                                        console.error(error);
-                                        alert('Hata: ' + (error.message || 'Ödeme silinemedi'));
-                                    }
+                                onClick={() => {
+                                    setConfirmModal({
+                                        isOpen: true,
+                                        title: 'Ödemeyi Sil',
+                                        message: 'Bu ödemeyi silmek müşterinin borcunu artıracaktır. Emin misiniz?',
+                                        type: 'danger',
+                                        confirmText: 'Evet, Sil',
+                                        onConfirm: async () => {
+                                            try {
+                                                await customersAPI.deletePayment(editingPayment.id, customer.id, editingPayment.total);
+                                                setStatusModal({
+                                                    isOpen: true,
+                                                    title: 'Silindi',
+                                                    message: 'Ödeme başarıyla silindi.',
+                                                    type: 'success'
+                                                });
+                                                setEditingPayment(null);
+                                                setEditAmount('');
+                                                loadCustomerData();
+                                            } catch (error) {
+                                                console.error(error);
+                                                setStatusModal({
+                                                    isOpen: true,
+                                                    title: 'Hata',
+                                                    message: 'Ödeme silinirken bir sorun oluştu: ' + (error.message || 'Hata'),
+                                                    type: 'error'
+                                                });
+                                            }
+                                        }
+                                    });
                                 }}
                                 className="w-full px-4 py-3 text-red-600 bg-red-50 border border-red-200 rounded-xl font-medium hover:bg-red-100 transition-colors"
                             >
@@ -869,6 +943,24 @@ export default function CustomerDetailPage() {
                     </div>
                 );
             })()}
+
+            <StatusModal
+                isOpen={statusModal.isOpen}
+                onClose={() => setStatusModal(prev => ({ ...prev, isOpen: false }))}
+                title={statusModal.title}
+                message={statusModal.message}
+                type={statusModal.type}
+            />
+
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmModal.onConfirm}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                type={confirmModal.type}
+                confirmText={confirmModal.confirmText}
+            />
         </div>
     );
 }

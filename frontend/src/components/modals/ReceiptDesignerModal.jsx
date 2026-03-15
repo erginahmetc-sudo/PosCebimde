@@ -9,10 +9,10 @@ import StatusModal from './StatusModal';
 
 export default function ReceiptDesignerModal({ isOpen, onClose }) {
     const [companyInfo, setCompanyInfo] = useState({
-        name: 'Firma Adı',
-        address: '',
-        phone: '',
-        logo_text: 'K'
+        name: 'Firma İsmi Yazınız',
+        address: 'Firma Adresi Yazınız',
+        phone: '0212 XXX XX XX',
+        logo_text: 'F'
     });
 
     const [showWatermark, setShowWatermark] = useState(true);

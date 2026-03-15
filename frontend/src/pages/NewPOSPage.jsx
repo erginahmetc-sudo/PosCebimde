@@ -1798,12 +1798,12 @@ export default function NewPOSPage() {
                 <main className="flex-1 flex flex-col bg-slate-50 overflow-hidden relative">
 
                     {/* Categories */}
-                    <div className="px-6 py-2 flex gap-2 overflow-x-auto no-scrollbar border-b border-slate-200 bg-white flex-none z-10">
+                    <div className="px-6 py-1.5 flex lg:flex-wrap flex-nowrap overflow-x-auto lg:overflow-x-visible gap-2 lg:gap-3 border-b border-slate-200 bg-white flex-none z-10 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
                         {categories.map(cat => (
                             <button
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
-                                className={`px-6 py-4 rounded-2xl text-sm font-bold whitespace-nowrap transition-all shadow-sm active:scale-95 ${selectedCategory === cat
+                                className={`flex-shrink-0 px-6 py-1.5 rounded-2xl text-sm font-bold whitespace-nowrap transition-all shadow-sm active:scale-95 ${selectedCategory === cat
                                     ? 'bg-slate-900 text-white shadow-md hover:bg-slate-800 ring-2 ring-slate-900 ring-offset-2'
                                     : 'bg-white border-2 border-slate-200 text-slate-600 hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50'
                                     }`}
