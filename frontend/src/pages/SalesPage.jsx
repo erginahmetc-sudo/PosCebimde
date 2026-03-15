@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { salesAPI, productsAPI, settingsAPI, customersAPI, logsAPI } from '../services/api';
 import { birFaturaAPI } from '../services/birFaturaService';
+import StatusModal from '../components/modals/StatusModal';
+import ConfirmModal from '../components/modals/ConfirmModal';
 
 export default function SalesPage() {
     const [sales, setSales] = useState([]);
@@ -47,6 +49,10 @@ export default function SalesPage() {
     // Visibility Settings
     const [showTotalSales, setShowTotalSales] = useState(true);
     const [showTotalRevenue, setShowTotalRevenue] = useState(true);
+
+    // Modal Notifications State
+    const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'primary', onConfirm: () => { } });
 
     useEffect(() => {
         loadSales();
@@ -99,7 +105,12 @@ export default function SalesPage() {
 
         const configStr = localStorage.getItem('birfatura_config');
         if (!configStr) {
-            alert('BirFatura ayarları bulunamadı. Ayarlar sayfasından API anahtarlarını kaydedin.');
+            setStatusModal({
+                isOpen: true,
+                title: 'Ayarlar Eksik',
+                message: 'BirFatura ayarları bulunamadı. Ayarlar sayfasından API anahtarlarını kaydedin.',
+                type: 'warning'
+            });
             return;
         }
 
@@ -166,11 +177,21 @@ export default function SalesPage() {
                 if (pdfUrl) window.open(pdfUrl, '_blank');
                 await loadSales();
             } else {
-                alert('Fatura Hatası: ' + result.message);
+                setStatusModal({
+                    isOpen: true,
+                    title: 'Fatura Hatası',
+                    message: result.message,
+                    type: 'error'
+                });
             }
         } catch (error) {
             console.error('Fatura kesme hatası:', error);
-            alert('Fatura kesme sırasında hata oluştu: ' + error.message);
+            setStatusModal({
+                isOpen: true,
+                title: 'Fatura Kesme Hatası',
+                message: error.message,
+                type: 'error'
+            });
         } finally {
             setInvoiceLoadingSaleId(null);
         }
@@ -322,20 +343,37 @@ export default function SalesPage() {
     }, [editForm?.items]);
 
     const handleSaveSale = async () => {
-        if (!window.confirm('Değişiklikleri kaydetmek istiyor musunuz?')) return;
-        try {
-            await salesAPI.update(editForm.sale_code, {
-                items: editForm.items, // Backend expects 'items' or 'products' mapped
-                total: totals.grand,
-                payment_method: editForm.payment_method,
-                customer_name: editForm.customer_name // Simple string update if name changed
-            });
-            alert('Satış güncellendi.');
-            setIsDetailModalOpen(false);
-            loadSales();
-        } catch (error) {
-            alert('Güncelleme hatası: ' + error.message);
-        }
+        setConfirmModal({
+            isOpen: true,
+            title: 'Değişiklikleri Kaydet',
+            message: 'Satış üzerindeki değişiklikleri kaydetmek istiyor musunuz?',
+            type: 'primary',
+            onConfirm: async () => {
+                try {
+                    await salesAPI.update(editForm.sale_code, {
+                        items: editForm.items,
+                        total: totals.grand,
+                        payment_method: editForm.payment_method,
+                        customer_name: editForm.customer_name
+                    });
+                    setStatusModal({
+                        isOpen: true,
+                        title: 'Başarılı',
+                        message: 'Satış başarıyla güncellendi.',
+                        type: 'success'
+                    });
+                    setIsDetailModalOpen(false);
+                    loadSales();
+                } catch (error) {
+                    setStatusModal({
+                        isOpen: true,
+                        title: 'Hata',
+                        message: 'Güncelleme sırasında bir hata oluştu: ' + error.message,
+                        type: 'error'
+                    });
+                }
+            }
+        });
     };
 
     const printReceipt = (saleData) => {
@@ -658,15 +696,32 @@ export default function SalesPage() {
     };
 
     const handleDeleteSale = async () => {
-        if (!window.confirm('Bu satışı silmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) return;
-        try {
-            await salesAPI.delete(editForm.sale_code);
-            alert('Satış silindi.');
-            setIsDetailModalOpen(false);
-            loadSales();
-        } catch (error) {
-            alert('Silme hatası: ' + error.message);
-        }
+        setConfirmModal({
+            isOpen: true,
+            title: 'Satışı Sil',
+            message: 'Bu satışı silmek istediğinize emin misiniz? Bu işlem geri alınamaz!',
+            type: 'danger',
+            onConfirm: async () => {
+                try {
+                    await salesAPI.delete(editForm.sale_code);
+                    setStatusModal({
+                        isOpen: true,
+                        title: 'Silindi',
+                        message: 'Satış kaydı başarıyla silindi.',
+                        type: 'success'
+                    });
+                    setIsDetailModalOpen(false);
+                    loadSales();
+                } catch (error) {
+                    setStatusModal({
+                        isOpen: true,
+                        title: 'Hata',
+                        message: 'Silme işlemi sırasında bir hata oluştu: ' + error.message,
+                        type: 'error'
+                    });
+                }
+            }
+        });
     };
 
     // Filter Logic
@@ -1364,6 +1419,24 @@ export default function SalesPage() {
                     </div>
                 )
             }
-        </div >
+
+            {/* Notification Modals */}
+            <StatusModal
+                isOpen={statusModal.isOpen}
+                onClose={() => setStatusModal(prev => ({ ...prev, isOpen: false }))}
+                title={statusModal.title}
+                message={statusModal.message}
+                type={statusModal.type}
+            />
+
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmModal.onConfirm}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                type={confirmModal.type}
+            />
+        </div>
     );
 }
