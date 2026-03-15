@@ -8,6 +8,7 @@ import PasswordModal from '../components/modals/PasswordModal';
 export default function SalesPage() {
     const [sales, setSales] = useState([]);
     const [invoiceLoadingSaleId, setInvoiceLoadingSaleId] = useState(null);
+    const [orderSendLoadingSaleId, setOrderSendLoadingSaleId] = useState(null);
     const [loading, setLoading] = useState(true);
 
     // Default Date: Last 7 Days
@@ -205,6 +206,58 @@ export default function SalesPage() {
             });
         } finally {
             setInvoiceLoadingSaleId(null);
+        }
+    };
+
+    // Sipariş olarak BirFatura'ya gönder (özel entegrasyon: BirFatura /api/orders/ ile çeker)
+    const handleSendOrderToBirFatura = async (sale) => {
+        const configStr = localStorage.getItem('birfatura_config');
+        if (!configStr) {
+            setStatusModal({
+                isOpen: true,
+                title: 'Ayarlar Eksik',
+                message: 'BirFatura ayarları bulunamadı. Ayarlar sayfasından API anahtarlarını ve Entegrasyon > "Satışları BirFatura\'ya gönder" seçeneğini kontrol edin.',
+                type: 'warning'
+            });
+            return;
+        }
+        setOrderSendLoadingSaleId(sale.id);
+        try {
+            const result = await birFaturaAPI.createOrder({ sale_code: sale.sale_code, ...sale });
+            if (result.success) {
+                const uuid = result.data?.Result?.UUID || result.data?.Result?.ETTN;
+                if (uuid) {
+                    try {
+                        await salesAPI.update(sale.sale_code, { birfatura_uuid: uuid });
+                    } catch (e) {
+                        console.error('birfatura_uuid güncellenemedi:', e);
+                    }
+                }
+                setStatusModal({
+                    isOpen: true,
+                    title: 'Sipariş İletildi',
+                    message: 'Sipariş BirFatura\'ya iletildi. birfatura.com > Onaylanmış siparişler sayfasından kontrol edebilirsiniz.',
+                    type: 'success'
+                });
+                await loadSales();
+            } else {
+                setStatusModal({
+                    isOpen: true,
+                    title: 'Gönderim Hatası',
+                    message: result.message || 'Sipariş BirFatura\'ya gönderilemedi.',
+                    type: 'error'
+                });
+            }
+        } catch (error) {
+            console.error('Sipariş gönderme hatası:', error);
+            setStatusModal({
+                isOpen: true,
+                title: 'Gönderim Hatası',
+                message: error.message || 'Bir hata oluştu.',
+                type: 'error'
+            });
+        } finally {
+            setOrderSendLoadingSaleId(null);
         }
     };
 
@@ -1136,17 +1189,31 @@ export default function SalesPage() {
                                                                 );
                                                             }
                                                             return (
-                                                                <button
-                                                                    onClick={() => handleInvoiceForSale(sale)}
-                                                                    disabled={invoiceLoadingSaleId === sale.id}
-                                                                    className="px-3 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
-                                                                >
-                                                                    {invoiceLoadingSaleId === sale.id ? (
-                                                                        <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Kesiliyor</>
-                                                                    ) : (
-                                                                        <><span className="material-symbols-outlined text-sm">receipt_long</span> Fatura Kes</>
-                                                                    )}
-                                                                </button>
+                                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                                    <button
+                                                                        onClick={() => handleInvoiceForSale(sale)}
+                                                                        disabled={invoiceLoadingSaleId === sale.id}
+                                                                        className="px-3 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                                                                    >
+                                                                        {invoiceLoadingSaleId === sale.id ? (
+                                                                            <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Kesiliyor</>
+                                                                        ) : (
+                                                                            <><span className="material-symbols-outlined text-sm">receipt_long</span> Fatura Kes</>
+                                                                        )}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleSendOrderToBirFatura(sale)}
+                                                                        disabled={orderSendLoadingSaleId === sale.id}
+                                                                        title="BirFatura özel entegrasyon ile sipariş olarak gönderir (birfatura.com siparişler)"
+                                                                        className="px-3 py-1 bg-sky-50 text-sky-700 hover:bg-sky-100 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                                                                    >
+                                                                        {orderSendLoadingSaleId === sale.id ? (
+                                                                            <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Gönderiliyor</>
+                                                                        ) : (
+                                                                            <><span className="material-symbols-outlined text-sm">send</span> Sipariş olarak gönder</>
+                                                                        )}
+                                                                    </button>
+                                                                </div>
                                                             );
                                                         })()}
                                                     </div>
