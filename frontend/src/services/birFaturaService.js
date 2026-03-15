@@ -332,12 +332,14 @@ export const birFaturaAPI = {
         // Just trigger the creation, the real pulling happens when BirFatura servers 
         // call our backend /api/orders endpoint.
         const proxyPayload = {
-            endpoint: "Order/InsertOrder",
+            endpoint: "OutEBelge/CreateEBelgeFromTemplateAndSend",
             apiKey: config.api_key,
             secretKey: config.secret_key,
             integrationKey: config.integration_key,
             payload: {
-                OrderCode: sale.sale_code
+                SystemType: "EFATURA",
+                OrderCode: sale.sale_code,
+                TemplateType: "STANDART"
             }
         };
 
@@ -353,10 +355,19 @@ export const birFaturaAPI = {
 
             const responseData = response.data;
             
-            if (responseData && (responseData.Success || responseData.success)) {
+            if (responseData && responseData.Success) {
+                // Success! Get the UUID and InvoiceNo if available
+                const resultData = responseData.Result || {};
+                const uuid = resultData.UUID;
+                
+                if (!uuid) {
+                     console.warn(`[BirFaturaService] Success true, but no UUID received:`, responseData);
+                     // Still consider it a success if the API said so, but UUID is missing.
+                }
+
                 return { 
                     success: true, 
-                    message: "Sipariş verisi aktarıldı, BirFatura portalında 'Onaylanmış Siparişler' kısmına düşecektir.",
+                    message: "Sipariş verisi aktarıldı, fatura oluşturuluyor.",
                     data: responseData 
                 };
             } else {

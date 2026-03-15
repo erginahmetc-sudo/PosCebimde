@@ -43,7 +43,7 @@ export default function MobileProductsPage() {
         } catch (error) {
             console.error('Ürünler yüklenirken hata:', error);
         } finally {
-            setTimeout(() => setLoading(false), 500);
+            setLoading(false);
         }
     };
 
@@ -200,38 +200,16 @@ export default function MobileProductsPage() {
         setFormData(prev => ({ ...prev, image_url: '' }));
     };
 
-    return (
-        <div className="flex flex-col w-screen h-[100dvh] bg-gray-100 overflow-hidden select-none relative">
-            {/* Modern Loading Screen */}
-            {loading && (
-                <div className="absolute inset-0 z-[2000] bg-gradient-to-b from-white to-slate-50 flex flex-col items-center justify-center overflow-hidden transition-all duration-500">
-                    <div className="relative w-full max-w-[430px] flex flex-col items-center justify-center animate-fade-in-up">
-                        <div className="relative mb-12">
-                            <div className="absolute inset-0 bg-blue-600/10 rounded-full blur-2xl animate-pulse-glow"></div>
-                            <div className="relative w-24 h-24 flex items-center justify-center border border-slate-200 rounded-full bg-white shadow-sm">
-                                <span className="material-symbols-outlined text-4xl text-blue-600 font-extralight scale-125">
-                                    inventory_2
-                                </span>
-                            </div>
-                        </div>
-                        <h1 className="text-2xl font-light tracking-[0.3em] uppercase mb-4 text-center leading-relaxed text-slate-800">
-                            Ürünler <br />
-                            <span className="font-medium">Yükleniyor</span>
-                        </h1>
-                        <p className="text-sm font-light text-slate-400 tracking-wider h-5 typewriter-cursor animate-typewriter">
-                            Lütfen bekleyiniz...
-                        </p>
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-100">
+                <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
+    }
 
-                        <div className="w-full max-w-[280px] mt-12">
-                            <div className="relative h-[2px] w-full bg-slate-200 rounded-full overflow-hidden">
-                                <div className="absolute top-0 h-full bg-blue-600 animate-progress shadow-[0_0_10px_#2563eb]"></div>
-                                <div className="absolute top-[-2px] h-[6px] bg-blue-600/20 blur-sm animate-progress w-full"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-            <div className="min-h-screen bg-gray-100 pb-20">
+    return (
+        <div className="min-h-screen bg-gray-100 pb-20">
             {/* Header */}
             <header className="bg-white shadow-sm sticky top-0 z-10 px-4 py-3">
                 <div className="flex items-center gap-3 mb-3">
@@ -245,7 +223,7 @@ export default function MobileProductsPage() {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Ürün Ara"
+                    placeholder="Ürün ara (ad, barkod, stok kodu)..."
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500"
                 />
             </header>
@@ -266,11 +244,11 @@ export default function MobileProductsPage() {
                             ) : (
                                 <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl text-gray-400">📦</div>
                             )}
-                             <div className="flex-1 min-w-0">
-                                 <h3 className="font-semibold text-gray-800 line-clamp-2 leading-tight mb-1">{product.name}</h3>
-                                 <p className="text-sm text-gray-500">{product.stock_code}</p>
-                                 <p className="text-xs text-gray-400">{product.barcode || '-'}</p>
-                             </div>
+                            <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-gray-800 truncate">{product.name}</h3>
+                                <p className="text-sm text-gray-500">{product.stock_code}</p>
+                                <p className="text-xs text-gray-400">{product.barcode || '-'}</p>
+                            </div>
                             <div className="text-right">
                                 <p className="text-lg font-bold text-green-600">{product.price?.toFixed(2)} TL</p>
                                 <p className="text-xs text-gray-500">Stok: {product.stock || 0}</p>
@@ -282,8 +260,8 @@ export default function MobileProductsPage() {
 
             {/* Edit Product Modal */}
             {showEditModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-start justify-center pt-10">
-                    <div className="bg-white rounded-2xl p-6 w-[90%] max-w-md shadow-2xl overflow-y-auto max-h-[80vh]">
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
+                    <div className="bg-white w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-gray-800">Ürün Düzenle</h2>
                             <button
@@ -528,39 +506,14 @@ export default function MobileProductsPage() {
             )}
 
             <style>{`
+                @keyframes slide-up {
+                    from { transform: translateY(100%); }
+                    to { transform: translateY(0); }
+                }
                 .animate-slide-up {
                     animation: slide-up 0.3s ease-out;
                 }
-                @keyframes fade-in-up {
-                    from { opacity: 0; transform: translateY(20px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-fade-in-up {
-                    animation: fade-in-up 0.8s ease-out;
-                }
-                @keyframes pulse-glow {
-                    0%, 100% { opacity: 0.5; transform: scale(1); }
-                    50% { opacity: 0.8; transform: scale(1.1); }
-                }
-                .animate-pulse-glow {
-                    animation: pulse-glow 3s infinite ease-in-out;
-                }
-                @keyframes progress {
-                    0% { left: -100%; width: 100%; }
-                    100% { left: 100%; width: 100%; }
-                }
-                .animate-progress {
-                    animation: progress 2s infinite linear;
-                }
-                @keyframes typewriter {
-                    0%, 100% { opacity: 0; }
-                    50% { opacity: 1; }
-                }
-                .animate-typewriter {
-                    animation: typewriter 1s infinite;
-                }
             `}</style>
-        </div>
         </div>
     );
 }

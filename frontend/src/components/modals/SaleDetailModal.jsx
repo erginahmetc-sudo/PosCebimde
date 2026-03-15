@@ -1,7 +1,5 @@
-import { salesAPI, productsAPI, settingsAPI } from '../../services/api';
-import StatusModal from './StatusModal';
-import ConfirmModal from './ConfirmModal';
-import PasswordModal from './PasswordModal';
+import React, { useState, useEffect } from 'react';
+import { salesAPI, productsAPI } from '../../services/api';
 
 export default function SaleDetailModal({ sale, onClose, onUpdate, onDelete }) {
     const [editedProducts, setEditedProducts] = useState([]);
@@ -11,33 +9,14 @@ export default function SaleDetailModal({ sale, onClose, onUpdate, onDelete }) {
     // Add Product Modal State
     const [products, setProducts] = useState([]);
     const [productSearch, setProductSearch] = useState('');
-    const [passwords, setPasswords] = useState({ edit: '123456', cancel: '123456' });
-    const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
-    const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'primary', onConfirm: () => { } });
-    const [passwordModal, setPasswordModal] = useState({ isOpen: false, title: '', message: '', correctPassword: '', onConfirm: () => { } });
+    const [passwordPrompt, setPasswordPrompt] = useState({ show: false, action: null }); // 'update' or 'delete'
 
     useEffect(() => {
         if (sale) {
             const productItems = sale.items || sale.products || [];
             setEditedProducts(JSON.parse(JSON.stringify(productItems)));
-            loadPasswords();
         }
     }, [sale]);
-
-    const loadPasswords = async () => {
-        try {
-            const [editP, cancelP] = await Promise.all([
-                settingsAPI.get('sales_edit_password'),
-                settingsAPI.get('sales_cancel_password')
-            ]);
-            setPasswords({
-                edit: editP.data || '123456',
-                cancel: cancelP.data || '123456'
-            });
-        } catch (e) {
-            console.error("Error loading passwords", e);
-        }
-    };
 
     const calculateTotal = () => {
         return editedProducts.reduce((sum, p) => {
@@ -67,16 +46,9 @@ export default function SaleDetailModal({ sale, onClose, onUpdate, onDelete }) {
     };
 
     const handleDeleteProduct = (index) => {
-        setConfirmModal({
-            isOpen: true,
-            title: 'Ürünü Çıkar',
-            message: 'Bu ürünü satıştan kaldırmak istediğinize emin misiniz?',
-            type: 'danger',
-            confirmText: 'Evet, Çıkar',
-            onConfirm: () => {
-                setEditedProducts(prev => prev.filter((_, i) => i !== index));
-            }
-        });
+        if (confirm('Bu ürünü satıştan kaldırmak istediğinize emin misiniz?')) {
+            setEditedProducts(prev => prev.filter((_, i) => i !== index));
+        }
     };
 
     // Add Product Logic
@@ -115,78 +87,54 @@ export default function SaleDetailModal({ sale, onClose, onUpdate, onDelete }) {
         p.barcode?.includes(productSearch)
     );
 
+    // Security & Save Logic
+    const verifyPassword = (passwordKey) => {
+        const storedPassword = localStorage.getItem(passwordKey) || '123456';
+        const password = prompt('İşlem için parolayı girin:');
+        return password === storedPassword;
+    };
+
     const handleSaveChanges = async () => {
-        setPasswordModal({
-            isOpen: true,
-            title: 'Düzenleme Parolası',
-            message: 'Satış detaylarını değiştirmek için lütfen parolayı giriniz.',
-            correctPassword: passwords.edit,
-            onConfirm: async () => {
-                setSaving(true);
-                try {
-                    const newTotal = calculateTotal();
-                    await salesAPI.update(sale.sale_code, {
-                        products: editedProducts,
-                        total: newTotal
-                    });
-                    setStatusModal({
-                        isOpen: true,
-                        title: 'Başarılı',
-                        message: 'Satış başarıyla güncellendi!',
-                        type: 'success'
-                    });
-                    if (onUpdate) onUpdate();
-                    setTimeout(onClose, 1500);
-                } catch (error) {
-                    setStatusModal({
-                        isOpen: true,
-                        title: 'Hata',
-                        message: 'Güncelleme hatası: ' + (error.message || 'Bilinmeyen hata'),
-                        type: 'error'
-                    });
-                } finally {
-                    setSaving(false);
-                }
-            }
-        });
+        // Updated requirement: Use "Satış Detaylarını Değiştirme Parolası" (sales_edit_password)
+        // Fallback to '123456' if not set
+        if (!verifyPassword('sales_edit_password')) {
+            alert('Hatalı parola!');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const newTotal = calculateTotal();
+            await salesAPI.update(sale.sale_code, {
+                products: editedProducts,
+                total: newTotal
+            });
+            alert('Satış başarıyla güncellendi!');
+            if (onUpdate) onUpdate();
+            onClose();
+        } catch (error) {
+            alert('Güncelleme hatası: ' + (error.message || 'Bilinmeyen hata'));
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleDeleteSale = async () => {
-        setConfirmModal({
-            isOpen: true,
-            title: 'Satışı İptal Et',
-            message: 'Bu satışı iptal etmek istediğinize emin misiniz? Bu işlem geri alınamaz!',
-            type: 'danger',
-            confirmText: 'Evet, İptal Et',
-            onConfirm: () => {
-                setPasswordModal({
-                    isOpen: true,
-                    title: 'İptal Parolası',
-                    message: 'Satışı iptal etmek için lütfen parolayı giriniz.',
-                    correctPassword: passwords.cancel,
-                    onConfirm: async () => {
-                        try {
-                            await salesAPI.delete(sale.sale_code);
-                            setStatusModal({
-                                isOpen: true,
-                                title: 'İşlem Başarılı',
-                                message: 'Satış başarıyla iptal edildi.',
-                                type: 'success'
-                            });
-                            if (onDelete) onDelete();
-                            setTimeout(onClose, 1500);
-                        } catch (error) {
-                            setStatusModal({
-                                isOpen: true,
-                                title: 'Hata',
-                                message: 'Bir hata oluştu: ' + (error.response?.data?.message || error.message),
-                                type: 'error'
-                            });
-                        }
-                    }
-                });
+        if (!verifyPassword('sales_cancel_password')) {
+            alert('Hatalı parola!');
+            return;
+        }
+
+        if (confirm('Bu satışı iptal etmek istediğinize emin misiniz?')) {
+            try {
+                await salesAPI.delete(sale.sale_code);
+                alert('Satış başarıyla iptal edildi.');
+                if (onDelete) onDelete();
+                onClose();
+            } catch (error) {
+                alert('Hata: ' + (error.response?.data?.message || error.message));
             }
-        });
+        }
     };
 
     if (!sale) return null;
@@ -481,33 +429,6 @@ export default function SaleDetailModal({ sale, onClose, onUpdate, onDelete }) {
                     </div>
                 </div>
             )}
-
-            <StatusModal
-                isOpen={statusModal.isOpen}
-                onClose={() => setStatusModal(prev => ({ ...prev, isOpen: false }))}
-                title={statusModal.title}
-                message={statusModal.message}
-                type={statusModal.type}
-            />
-
-            <ConfirmModal
-                isOpen={confirmModal.isOpen}
-                onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                onConfirm={confirmModal.onConfirm}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                type={confirmModal.type}
-                confirmText={confirmModal.confirmText}
-            />
-
-            <PasswordModal
-                isOpen={passwordModal.isOpen}
-                onClose={() => setPasswordModal(prev => ({ ...prev, isOpen: false }))}
-                onConfirm={passwordModal.onConfirm}
-                title={passwordModal.title}
-                message={passwordModal.message}
-                correctPassword={passwordModal.correctPassword}
-            />
         </div>
     );
 }

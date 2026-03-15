@@ -28,10 +28,16 @@ export default function CompanyInfoModal({ isOpen, onClose }) {
             setCompanyPhone(phoneRes.data || '');
             setCompanyLogo(logoRes.data || null);
 
-            setCompanyName(nameRes.data || '');
-            setCompanyAddress(addressRes.data || '');
-            setCompanyPhone(phoneRes.data || '');
-            setCompanyLogo(logoRes.data || null);
+            // Also check receipt config for logo if not in settingsAPI (migration/fallback)
+            if (!logoRes.data) {
+                try {
+                    const savedConfig = localStorage.getItem('receipt_design_config');
+                    if (savedConfig) {
+                        const parsed = JSON.parse(savedConfig);
+                        if (parsed.logo_url) setCompanyLogo(parsed.logo_url);
+                    }
+                } catch (e) { }
+            }
 
         } catch (e) {
             console.error("Error loading company settings", e);
@@ -163,7 +169,7 @@ export default function CompanyInfoModal({ isOpen, onClose }) {
                                     type="text"
                                     value={companyName}
                                     onChange={(e) => setCompanyName(e.target.value)}
-                                    placeholder="Firma İsmi Yazınız"
+                                    placeholder="Örn: ABC Ticaret Ltd. Şti."
                                     className="w-full px-5 py-4 bg-white border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all text-gray-800 text-base placeholder:text-gray-400 hover:border-gray-300"
                                 />
                             </div>
@@ -182,7 +188,7 @@ export default function CompanyInfoModal({ isOpen, onClose }) {
                                 <textarea
                                     value={companyAddress}
                                     onChange={(e) => setCompanyAddress(e.target.value)}
-                                    placeholder="Firma Adresi Yazınız"
+                                    placeholder="Örn: Atatürk Cad. No:123, Merkez/İstanbul"
                                     rows={3}
                                     className="w-full px-5 py-4 bg-white border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-gray-800 text-base placeholder:text-gray-400 hover:border-gray-300 resize-none"
                                 />
@@ -202,7 +208,7 @@ export default function CompanyInfoModal({ isOpen, onClose }) {
                                     type="tel"
                                     value={companyPhone}
                                     onChange={(e) => setCompanyPhone(e.target.value)}
-                                    placeholder="0212 XXX XX XX"
+                                    placeholder="Örn: 0212 555 1234"
                                     className="w-full px-5 py-4 bg-white border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-gray-800 text-base placeholder:text-gray-400 hover:border-gray-300"
                                 />
                             </div>

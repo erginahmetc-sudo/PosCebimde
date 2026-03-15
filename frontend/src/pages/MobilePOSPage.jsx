@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
-import { productsAPI, salesAPI, customersAPI, shortcutsAPI, settingsAPI, heldSalesAPI } from '../services/api';
+import { productsAPI, salesAPI, customersAPI, shortcutsAPI, settingsAPI } from '../services/api';
 import { birFaturaAPI } from '../services/birFaturaService';
 import { useAuth } from '../context/AuthContext';
 import StatusModal from '../components/modals/StatusModal';
@@ -37,9 +37,6 @@ export default function MobilePOSPage() {
     const [undefinedStockPrice, setUndefinedStockPrice] = useState('');
     const [undefinedStockQuantity, setUndefinedStockQuantity] = useState(1);
     const [undefinedStockStep, setUndefinedStockStep] = useState(1);
-    const [heldSales, setHeldSales] = useState([]);
-    const [showWaitlistModal, setShowWaitlistModal] = useState(false);
-    const [loading, setLoading] = useState(true);
 
     const [modalValue, setModalValue] = useState('');
     const [productToAdd, setProductToAdd] = useState(null);
@@ -79,17 +76,7 @@ export default function MobilePOSPage() {
         loadProducts();
         loadCustomers();
         loadShortcuts();
-        loadHeldSales();
     }, []);
-
-    const loadHeldSales = async () => {
-        try {
-            const response = await heldSalesAPI.getAll();
-            setHeldSales(response.data?.held_sales || []);
-        } catch (error) {
-            console.error('Bekleyen satışlar yüklenirken hata:', error);
-        }
-    };
 
     const loadProducts = async () => {
         try {
@@ -98,8 +85,6 @@ export default function MobilePOSPage() {
             setProducts(data.products || []);
         } catch (error) {
             console.error('Ürünler yüklenirken hata:', error);
-        } finally {
-            setTimeout(() => setLoading(false), 500);
         }
     };
 
@@ -405,44 +390,6 @@ export default function MobilePOSPage() {
         }
     };
 
-    const holdSale = async () => {
-        if (cart.length === 0) {
-            alert('Sepet boş!');
-            return;
-        }
-        try {
-            await heldSalesAPI.add({ customer: selectedCustomer, items: cart });
-            setSuccessMessage('Satış Beklemeye Alındı');
-            setTimeout(() => setSuccessMessage(''), 2000);
-            setCart([]);
-            setSelectedCustomer('Toptan Satış');
-            loadHeldSales();
-        } catch (error) {
-            alert('Beklemeye alma hatası: ' + (error.response?.data?.message || error.message || 'Bilinmeyen hata'));
-        }
-    };
-
-    const restoreHeldSale = async (sale) => {
-        setCart(sale.items || []);
-        setSelectedCustomer(sale.customer_name || 'Toptan Satış');
-        try {
-            await heldSalesAPI.delete(sale.id);
-            loadHeldSales();
-        } catch (error) {
-            console.error('Bekleyen satış silme hatası:', error);
-        }
-        setShowWaitlistModal(false);
-    };
-
-    const deleteHeldSale = async (saleId) => {
-        try {
-            await heldSalesAPI.delete(saleId);
-            loadHeldSales();
-        } catch (error) {
-            alert('Silme hatası: ' + error.message);
-        }
-    };
-
     // Barcode scanner functions
     const addProductByBarcode = useCallback((barcode) => {
         const product = products.find(p =>
@@ -529,36 +476,7 @@ export default function MobilePOSPage() {
     };
 
     return (
-        <div className="flex flex-col w-screen h-[100dvh] bg-gray-100 overflow-hidden select-none relative">
-            {/* Modern Loading Screen */}
-            {loading && (
-                <div className="absolute inset-0 z-[2000] bg-gradient-to-b from-white to-slate-50 flex flex-col items-center justify-center overflow-hidden transition-all duration-500">
-                    <div className="relative w-full max-w-[430px] flex flex-col items-center justify-center animate-fade-in-up">
-                        <div className="relative mb-12">
-                            <div className="absolute inset-0 bg-blue-600/10 rounded-full blur-2xl animate-pulse-glow"></div>
-                            <div className="relative w-24 h-24 flex items-center justify-center border border-slate-200 rounded-full bg-white shadow-sm">
-                                <span className="material-symbols-outlined text-4xl text-blue-600 font-extralight scale-125">
-                                    shopping_bag
-                                </span>
-                            </div>
-                        </div>
-                        <h1 className="text-2xl font-light tracking-[0.3em] uppercase mb-4 text-center leading-relaxed text-slate-800">
-                            Satış <br />
-                            <span className="font-medium">Yükleniyor</span>
-                        </h1>
-                        <p className="text-sm font-light text-slate-400 tracking-wider h-5 typewriter-cursor animate-typewriter">
-                            Lütfen bekleyiniz...
-                        </p>
-
-                        <div className="w-full max-w-[280px] mt-12">
-                            <div className="relative h-[2px] w-full bg-slate-200 rounded-full overflow-hidden">
-                                <div className="absolute top-0 h-full bg-blue-600 animate-progress shadow-[0_0_10px_#2563eb]"></div>
-                                <div className="absolute top-[-2px] h-[6px] bg-blue-600/20 blur-sm animate-progress w-full"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+        <div className="flex flex-col w-screen h-screen bg-gray-100 overflow-hidden select-none">
             {/* Success Message */}
             {successMessage && (
                 <div className="fixed inset-0 flex items-center justify-center z-[9999] pointer-events-none">
@@ -604,24 +522,12 @@ export default function MobilePOSPage() {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Ürün Ara"
+                    placeholder="Ara..."
                     className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
                 />
                 <button
-                    onClick={holdSale}
-                    className="bg-orange-400 text-white border-none rounded-lg px-2.5 py-2 text-[10px] font-bold cursor-pointer hover:bg-orange-500 transition-colors whitespace-nowrap"
-                >
-                    Beklemeye Al
-                </button>
-                <button
-                    onClick={() => setShowWaitlistModal(true)}
-                    className="bg-slate-500 text-white border-none rounded-lg px-2.5 py-2 text-[10px] font-bold cursor-pointer hover:bg-slate-600 transition-colors whitespace-nowrap"
-                >
-                    Bekleme Listesi
-                </button>
-                <button
                     onClick={() => setShowUndefinedStockModal(true)}
-                    className="bg-orange-500 text-white border-none rounded-lg px-2.5 py-2 text-[10px] font-bold cursor-pointer hover:bg-orange-600 transition-colors whitespace-nowrap"
+                    className="bg-orange-500 text-white border-none rounded-lg px-3 py-2 text-xs font-bold cursor-pointer hover:bg-orange-600 transition-colors whitespace-nowrap"
                 >
                     Tanımsız
                 </button>
@@ -636,7 +542,7 @@ export default function MobilePOSPage() {
             {/* Main Content */}
             <div className="flex-1 flex flex-col p-3 overflow-hidden">
                 {/* Category Buttons */}
-                <div className="flex flex-nowrap gap-2 overflow-x-auto pb-4 mb-2 scroll-smooth no-scrollbar" style={{ WebkitOverflowScrolling: 'touch', minHeight: '60px' }}>
+                <div className="flex gap-2 overflow-x-auto pb-3 mb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
                     {categories.map(cat => (
                         <button
                             key={cat}
@@ -658,21 +564,15 @@ export default function MobilePOSPage() {
                         <div
                             key={product.id || product.stock_code}
                             onClick={() => handleProductClick(product)}
-                            className="bg-white border border-gray-200 rounded-xl px-1.5 pt-1.5 pb-0 text-center cursor-pointer transition-all hover:shadow-lg flex flex-col h-[140px] overflow-hidden"
+                            className="bg-white border border-gray-200 rounded-xl p-3 text-center cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 flex flex-col justify-center min-h-[120px]"
                         >
-                            <div className="flex-1 flex flex-col items-center pt-0.5 overflow-hidden">
-                                {product.image_url ? (
-                                    <img src={product.image_url} alt={product.name} className="w-full h-16 object-contain rounded-md mb-1" />
-                                ) : (
-                                    <div className="w-full h-16 flex items-center justify-center text-3xl text-gray-300 mb-1">📦</div>
-                                )}
-                                <div className="text-[11px] font-bold leading-tight line-clamp-2 px-0.5 text-gray-800">
-                                    {product.name}
-                                </div>
-                            </div>
-                            <div className="text-green-600 text-base font-black py-1 border-t border-gray-100 flex items-center justify-center bg-gray-50/80 -mx-1.5">
-                                {product.price?.toFixed(2)} TL
-                            </div>
+                            {product.image_url ? (
+                                <img src={product.image_url} alt={product.name} className="w-20 h-20 object-cover rounded-md mx-auto mb-2" />
+                            ) : (
+                                <div className="w-20 h-20 flex items-center justify-center text-4xl text-gray-300 mx-auto mb-2">📦</div>
+                            )}
+                            <div className="text-xs font-semibold mb-1 line-clamp-2">{product.name}</div>
+                            <div className="text-green-600 text-base font-bold">{product.price?.toFixed(2)} TL</div>
                         </div>
                     ))}
                 </div>
@@ -861,7 +761,7 @@ export default function MobilePOSPage() {
 
             {/* Add Quantity Modal */}
             {showAddQuantityModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center pt-10 z-[1000]">
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1000]">
                     <div className="bg-white rounded-xl p-6 w-80 shadow-2xl">
                         <span
                             onClick={() => setShowAddQuantityModal(false)}
@@ -869,13 +769,13 @@ export default function MobilePOSPage() {
                         >
                             &times;
                         </span>
-                        <h3 className="text-xl font-bold text-slate-800 mb-2 text-center">Miktar Girin</h3>
-                        <p className="text-gray-600 mb-4 text-center text-lg font-bold text-slate-900 border-b border-slate-100 pb-2">{productToAdd?.name}</p>
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">Miktar Girin</h3>
+                        <p className="text-gray-600 mb-4">{productToAdd?.name}</p>
                         <input
                             type="number"
                             value={addQuantityValue}
                             onChange={(e) => setAddQuantityValue(e.target.value)}
-                            className="w-full p-4 text-4xl font-black text-center border-2 border-blue-500 rounded-xl mb-4 focus:outline-none bg-slate-50"
+                            className="w-full p-4 text-2xl text-center border-2 border-blue-500 rounded-lg mb-4 focus:outline-none"
                             min="1"
                             autoFocus
                             onFocus={(e) => e.target.select()}
@@ -892,7 +792,7 @@ export default function MobilePOSPage() {
 
             {/* Edit Quantity Modal */}
             {showQuantityModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center pt-10 z-[1000]">
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1000]">
                     <div className="bg-white rounded-xl p-6 w-80 shadow-2xl">
                         <span
                             onClick={() => setShowQuantityModal(false)}
@@ -900,13 +800,13 @@ export default function MobilePOSPage() {
                         >
                             &times;
                         </span>
-                        <h3 className="text-xl font-bold text-slate-800 mb-2 text-center">Miktar Düzenle</h3>
-                        <p className="text-gray-600 mb-4 text-center text-lg font-bold text-slate-900 border-b border-slate-100 pb-2">{cart[selectedCartIndex]?.name}</p>
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">Miktar Düzenle</h3>
+                        <p className="text-gray-600 mb-4">{cart[selectedCartIndex]?.name}</p>
                         <input
                             type="number"
                             value={modalValue}
                             onChange={(e) => setModalValue(e.target.value)}
-                            className="w-full p-4 text-4xl font-black text-center border-2 border-blue-500 rounded-xl mb-4 focus:outline-none bg-slate-50"
+                            className="w-full p-4 text-2xl text-center border-2 border-blue-500 rounded-lg mb-4 focus:outline-none"
                             min="1"
                             autoFocus
                             onFocus={(e) => e.target.select()}
@@ -923,7 +823,7 @@ export default function MobilePOSPage() {
 
             {/* Edit Discount Modal */}
             {showDiscountModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center pt-10 z-[1000]">
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1000]">
                     <div className="bg-white rounded-xl p-6 w-80 shadow-2xl">
                         <span
                             onClick={() => setShowDiscountModal(false)}
@@ -1564,81 +1464,9 @@ export default function MobilePOSPage() {
                 </div>
             )}
 
-            {/* Waitlist Modal */}
-            {showWaitlistModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[1000] p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
-                        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                            <h3 className="text-xl font-bold text-slate-800">Bekleme Listesi</h3>
-                            <button
-                                onClick={() => setShowWaitlistModal(false)}
-                                className="text-gray-400 hover:text-gray-600 text-3xl"
-                            >
-                                &times;
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                            {heldSales.length === 0 ? (
-                                <div className="text-center py-10">
-                                    <div className="text-5xl mb-3">📋</div>
-                                    <p className="text-gray-500">Bekleyen satış bulunmuyor.</p>
-                                </div>
-                            ) : (
-                                heldSales.map((sale) => (
-                                    <div
-                                        key={sale.id}
-                                        className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col gap-3"
-                                    >
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <p className="font-bold text-slate-800">{sale.customer_name || 'Toptan Satış'}</p>
-                                                <p className="text-xs text-gray-500">
-                                                    {new Date(sale.created_at).toLocaleString('tr-TR', {
-                                                        day: 'numeric',
-                                                        month: 'short',
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
-                                                    })}
-                                                </p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="font-black text-blue-600">
-                                                    {(sale.items || []).reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)} TL
-                                                </p>
-                                                <p className="text-[10px] text-gray-400">{(sale.items || []).length} Ürün</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => restoreHeldSale(sale)}
-                                                className="flex-1 py-2.5 bg-blue-500 text-white rounded-lg font-bold text-sm shadow-sm hover:bg-blue-600 transition-colors"
-                                            >
-                                                Geri Yükle
-                                            </button>
-                                            <button
-                                                onClick={() => deleteHeldSale(sale.id)}
-                                                className="w-12 py-2.5 bg-white border border-red-200 text-red-500 rounded-lg font-bold hover:bg-red-50 flex items-center justify-center transition-colors"
-                                            >
-                                                🗑️
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                        <div className="p-4 bg-gray-50 border-t border-gray-100">
-                            <button
-                                onClick={() => setShowWaitlistModal(false)}
-                                className="w-full py-3 bg-white border border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-100 transition-colors"
-                            >
-                                Kapat
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Undefined Stock Modal - Step by Step */}
             {showUndefinedStockModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center pt-10 z-[1000]">
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1000]">
                     <div className="bg-white rounded-xl p-6 w-80 shadow-2xl">
                         <span
                             onClick={() => {
@@ -1829,34 +1657,6 @@ export default function MobilePOSPage() {
                 }
                 .animate-slide-down {
                     animation: slide-down 0.3s ease-out;
-                }
-                @keyframes fade-in-up {
-                    from { opacity: 0; transform: translateY(20px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-fade-in-up {
-                    animation: fade-in-up 0.8s ease-out;
-                }
-                @keyframes pulse-glow {
-                    0%, 100% { opacity: 0.5; transform: scale(1); }
-                    50% { opacity: 0.8; transform: scale(1.1); }
-                }
-                .animate-pulse-glow {
-                    animation: pulse-glow 3s infinite ease-in-out;
-                }
-                @keyframes progress {
-                    0% { left: -100%; width: 100%; }
-                    100% { left: 100%; width: 100%; }
-                }
-                .animate-progress {
-                    animation: progress 2s infinite linear;
-                }
-                @keyframes typewriter {
-                    0%, 100% { opacity: 0; }
-                    50% { opacity: 1; }
-                }
-                .animate-typewriter {
-                    animation: typewriter 1s infinite;
                 }
             `}</style>
         </div>
