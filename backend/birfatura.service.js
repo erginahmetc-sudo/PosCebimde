@@ -49,8 +49,13 @@ class BirFaturaService {
      * Maps a Supabase sale and customer to BirFatura Order structure
      */
     mapSaleToOrder(sale, customer = null) {
-        const customerName = customer?.name || sale.customer_name || sale.customer || 'Misafir Müşteri';
+        let customerName = customer?.name || sale.customer_name || sale.customer || 'Misafir Müşteri';
         
+        // Clean customer name for BirFatura (strip "Perakende-" prefix if requested)
+        if (customerName.startsWith('Perakende-')) {
+            customerName = customerName.replace('Perakende-', '').trim();
+        }
+
         let ssnTcNo = "";
         let taxNo = "";
         let taxOffice = customer?.tax_office || "";
