@@ -1601,6 +1601,24 @@ export const settingsAPI = {
         });
 
         return { data: settingsMap };
+    },
+
+    // Eksik şirket kodlu satışları düzelt (Satışlar / BirFatura siparişleri görünmüyorsa)
+    fixSalesCompanyCode: async () => {
+        const companyCode = getCurrentCompanyCode();
+        if (!companyCode) return { data: { success: false, updated: 0, message: 'Şirket kodu bulunamadı. Giriş yapın.' } };
+        const base = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
+        try {
+            const res = await fetch(`${base}/api/admin/fix-sales-company-code`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ company_code: companyCode })
+            });
+            const json = await res.json();
+            return { data: json };
+        } catch (e) {
+            return { data: { success: false, updated: 0, message: e.message || 'Bağlantı hatası' } };
+        }
     }
 };
 

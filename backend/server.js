@@ -260,7 +260,8 @@ app.post('/api/orders/', async (req, res) => {
 
     let isValidToken = false;
     let companyCode = null;
-    const { data: settings, error: tokenError } = await supabase
+    const client = adminSupabase || supabase;
+    const { data: settings, error: tokenError } = await client
         .from('app_settings')
         .select('company_code, value')
         .eq('key', 'secret_token');
@@ -290,9 +291,8 @@ app.post('/api/orders/', async (req, res) => {
         return res.status(401).json({ "Orders": [], "error": "Yetkisiz Erişim / Geçersiz Token" });
     }
 
-    // 3. Fetch Sales
-    // SADECE faturası kesilecek olanları ve silinmemiş olanları al
-    let query = supabase
+    // 3. Fetch Sales (service role = RLS bypass, BirFatura sunucusu kullanıcı oturumu olmadan çağırıyor)
+    let query = client
         .from('sales')
         .select('*')
         .eq('is_deleted', false);
@@ -456,6 +456,31 @@ app.post('/api/orders', async (req, res) => {
     // Aynı handler'ı çağır
     req.url = '/api/orders/';
     app._router.handle(req, res, () => { });
+});
+
+// --- Eksik şirket kodlu satışları düzelt (SQL çalıştırmadan, tek tık) ---
+app.post('/api/admin/fix-sales-company-code', async (req, res) => {
+    const { company_code } = req.body || {};
+    if (!company_code || typeof company_code !== 'string') {
+        return res.status(400).json({ success: false, message: 'company_code gerekli.' });
+    }
+    const client = adminSupabase || supabase;
+    if (!client) {
+        return res.status(503).json({ success: false, message: 'Veritabanı bağlantısı yok.' });
+    }
+    const { data, error } = await client
+        .from('sales')
+        .update({ company_code: company_code.trim() })
+        .is('company_code', null)
+        .eq('is_deleted', false)
+        .select('sale_code');
+    if (error) {
+        console.error('[fix-sales-company-code]', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+    const updated = (data && data.length) ? data.length : 0;
+    console.log(`[fix-sales-company-code] ${updated} satış güncellendi.`);
+    return res.json({ success: true, updated });
 });
 
 // --- SERVE STATIC FRONTEND (Production) ---
