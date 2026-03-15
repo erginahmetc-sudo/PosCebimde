@@ -368,7 +368,7 @@ export default function SalesPage() {
                     onConfirm: async () => {
                         try {
                             await salesAPI.update(editForm.sale_code, {
-                                products: editForm.items,
+                                items: editForm.items,
                                 total: totals.grand,
                                 payment_method: editForm.payment_method,
                                 customer_name: editForm.customer_name
