@@ -7,8 +7,8 @@ async function testOrders() {
                 'token': 'kasapos-2026-secret-api-token'
             },
             body: JSON.stringify({
-                "startDateTime": "10.03.2026 00:00:00",
-                "endDateTime": "10.03.2026 23:59:59"
+                "startDateTime": "15.03.2026 00:00:00",
+                "endDateTime": "15.03.2026 23:59:59"
             })
         });
         const data = await response.json();
