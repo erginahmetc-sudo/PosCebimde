@@ -3,6 +3,7 @@ import { salesAPI, productsAPI, settingsAPI, customersAPI, logsAPI } from '../se
 import { birFaturaAPI } from '../services/birFaturaService';
 import StatusModal from '../components/modals/StatusModal';
 import ConfirmModal from '../components/modals/ConfirmModal';
+import PasswordModal from '../components/modals/PasswordModal';
 
 export default function SalesPage() {
     const [sales, setSales] = useState([]);
@@ -53,6 +54,8 @@ export default function SalesPage() {
     // Modal Notifications State
     const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', type: 'primary', onConfirm: () => { } });
+    const [passwordModal, setPasswordModal] = useState({ isOpen: false, title: '', message: '', correctPassword: '', onConfirm: () => { } });
+    const [passwords, setPasswords] = useState({ edit: '123456', cancel: '123456' });
 
     useEffect(() => {
         loadSales();
@@ -61,11 +64,19 @@ export default function SalesPage() {
 
     const loadSettings = async () => {
         try {
-            const sRes = await settingsAPI.get('sales_show_total_sales');
-            const rRes = await settingsAPI.get('sales_show_total_revenue');
+            const [sRes, rRes, editP, cancelP] = await Promise.all([
+                settingsAPI.get('sales_show_total_sales'),
+                settingsAPI.get('sales_show_total_revenue'),
+                settingsAPI.get('sales_edit_password'),
+                settingsAPI.get('sales_cancel_password')
+            ]);
 
             if (sRes.data !== undefined) setShowTotalSales(sRes.data === 'true' || sRes.data === true);
             if (rRes.data !== undefined) setShowTotalRevenue(rRes.data === 'true' || rRes.data === true);
+            setPasswords({
+                edit: editP.data || '123456',
+                cancel: cancelP.data || '123456'
+            });
         } catch (e) {
             console.error("Error loading sales settings", e);
         }
@@ -348,30 +359,38 @@ export default function SalesPage() {
             title: 'Değişiklikleri Kaydet',
             message: 'Satış üzerindeki değişiklikleri kaydetmek istiyor musunuz?',
             type: 'primary',
-            onConfirm: async () => {
-                try {
-                    await salesAPI.update(editForm.sale_code, {
-                        items: editForm.items,
-                        total: totals.grand,
-                        payment_method: editForm.payment_method,
-                        customer_name: editForm.customer_name
-                    });
-                    setStatusModal({
-                        isOpen: true,
-                        title: 'Başarılı',
-                        message: 'Satış başarıyla güncellendi.',
-                        type: 'success'
-                    });
-                    setIsDetailModalOpen(false);
-                    loadSales();
-                } catch (error) {
-                    setStatusModal({
-                        isOpen: true,
-                        title: 'Hata',
-                        message: 'Güncelleme sırasında bir hata oluştu: ' + error.message,
-                        type: 'error'
-                    });
-                }
+            onConfirm: () => {
+                setPasswordModal({
+                    isOpen: true,
+                    title: 'Düzenleme Parolası',
+                    message: 'Satış detaylarını değiştirmek için lütfen parolayı giriniz.',
+                    correctPassword: passwords.edit,
+                    onConfirm: async () => {
+                        try {
+                            await salesAPI.update(editForm.sale_code, {
+                                items: editForm.items,
+                                total: totals.grand,
+                                payment_method: editForm.payment_method,
+                                customer_name: editForm.customer_name
+                            });
+                            setStatusModal({
+                                isOpen: true,
+                                title: 'Başarılı',
+                                message: 'Satış başarıyla güncellendi.',
+                                type: 'success'
+                            });
+                            setIsDetailModalOpen(false);
+                            loadSales();
+                        } catch (error) {
+                            setStatusModal({
+                                isOpen: true,
+                                title: 'Hata',
+                                message: 'Güncelleme sırasında bir hata oluştu: ' + error.message,
+                                type: 'error'
+                            });
+                        }
+                    }
+                });
             }
         });
     };
@@ -701,25 +720,33 @@ export default function SalesPage() {
             title: 'Satışı Sil',
             message: 'Bu satışı silmek istediğinize emin misiniz? Bu işlem geri alınamaz!',
             type: 'danger',
-            onConfirm: async () => {
-                try {
-                    await salesAPI.delete(editForm.sale_code);
-                    setStatusModal({
-                        isOpen: true,
-                        title: 'Silindi',
-                        message: 'Satış kaydı başarıyla silindi.',
-                        type: 'success'
-                    });
-                    setIsDetailModalOpen(false);
-                    loadSales();
-                } catch (error) {
-                    setStatusModal({
-                        isOpen: true,
-                        title: 'Hata',
-                        message: 'Silme işlemi sırasında bir hata oluştu: ' + error.message,
-                        type: 'error'
-                    });
-                }
+            onConfirm: () => {
+                setPasswordModal({
+                    isOpen: true,
+                    title: 'İptal Parolası',
+                    message: 'Satışı iptal etmek için lütfen parolayı giriniz.',
+                    correctPassword: passwords.cancel,
+                    onConfirm: async () => {
+                        try {
+                            await salesAPI.delete(editForm.sale_code);
+                            setStatusModal({
+                                isOpen: true,
+                                title: 'Silindi',
+                                message: 'Satış kaydı başarıyla silindi.',
+                                type: 'success'
+                            });
+                            setIsDetailModalOpen(false);
+                            loadSales();
+                        } catch (error) {
+                            setStatusModal({
+                                isOpen: true,
+                                title: 'Hata',
+                                message: 'Silme işlemi sırasında bir hata oluştu: ' + error.message,
+                                type: 'error'
+                            });
+                        }
+                    }
+                });
             }
         });
     };
@@ -1436,6 +1463,15 @@ export default function SalesPage() {
                 title={confirmModal.title}
                 message={confirmModal.message}
                 type={confirmModal.type}
+            />
+
+            <PasswordModal
+                isOpen={passwordModal.isOpen}
+                onClose={() => setPasswordModal(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={passwordModal.onConfirm}
+                title={passwordModal.title}
+                message={passwordModal.message}
+                correctPassword={passwordModal.correctPassword}
             />
         </div>
     );
