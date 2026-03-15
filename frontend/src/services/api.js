@@ -1417,7 +1417,7 @@ export const usersAPI = {
             email: userData.email,
             password: userData.password,
             options: {
-                emailRedirectTo: `${window.location.origin}/email-success`,
+                emailRedirectTo: `https://poscebimde.com/email-success`,
                 data: {
                     username: userData.username,
                     role: 'kurucu',
@@ -1427,58 +1427,6 @@ export const usersAPI = {
         });
 
         if (error) return response(null, error);
-
-        // Supabase security: If email exists, it might return a user with empty identities
-        if (data.user && data.user.identities && data.user.identities.length === 0) {
-            return response(null, { message: 'Bu e-posta adresi ile zaten kayıtlı bir kullanıcı var.' });
-        }
-
-        if (data.user) {
-            // 2. Create Profile with Company Code
-            const { error: profileError } = await supabase.from('user_profiles').upsert({
-                id: data.user.id,
-                username: userData.username,
-                role: 'kurucu',
-                company_code: userData.company_code,
-                permissions: {
-                    // Founders get full access by default logic, but we can be explicit
-                    can_view_products: true,
-                    can_view_customers: true,
-                    can_view_sales: true,
-                    can_view_invoices: true,
-                    can_view_pos: true,
-                    can_view_users: true,
-                    can_view_balances: true,
-                    can_view_prices: true
-                }
-            });
-
-            if (profileError) {
-                console.error('Tenant profile error:', profileError);
-                return response({ success: true, message: 'Kayıt oldu ancak profil hatası: ' + profileError.message }, null);
-            }
-
-            // 3. Generate Secret Token for Integrations
-            // We do this manually here because the user is not logged in yet (no localStorage), 
-            // so we can't use settingsAPI.set() which relies on getCurrentCompanyCode().
-            try {
-                const secretToken = crypto.randomUUID();
-                const { error: settingsError } = await supabase
-                    .from('app_settings')
-                    .insert({
-                        key: 'secret_token',
-                        value: secretToken,
-                        company_code: userData.company_code
-                    });
-
-                if (settingsError) {
-                    console.error('Secret token generation error:', settingsError);
-                    // Don't fail the registration for this, but log it
-                }
-            } catch (tokenError) {
-                console.error('Secret token generation exception:', tokenError);
-            }
-        }
 
         return response({ success: true, message: 'Şirket kaydı başarıyla oluşturuldu.' }, null);
     }
