@@ -146,53 +146,19 @@ function formatDateForBirFatura(date) {
     return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
 }
 
-// --- HELPER: BirFatura token doğrulama (orderStatus, paymentMethods, orders aynı token ile çalışsın) ---
-const BIRFATURA_FALLBACK_TOKEN = process.env.BIRFATURA_ORDERS_TOKEN || 'kasapos-2026-secret-api-token';
-
-async function validateBirFaturaToken(receivedToken) {
-    if (!receivedToken) return { valid: false, companyCode: null };
-    // A) app_settings'teki secret_token (çoklu şirket)
-    let settings = null, tokenError = null;
-    if (supabase) {
-        const result = await supabase.from('app_settings').select('company_code, value').eq('key', 'secret_token');
-        settings = result.data;
-        tokenError = result.error;
-    }
-    if (!tokenError && settings && settings.length > 0) {
-        for (const setting of settings) {
-            if (setting.value) {
-                let stored = String(setting.value).replace(/^"|"$/g, '');
-                if (stored === receivedToken) {
-                    return { valid: true, companyCode: setting.company_code };
-                }
-            }
-        }
-    }
-    if (receivedToken === BIRFATURA_FALLBACK_TOKEN) {
-        return { valid: true, companyCode: null };
-    }
-    return { valid: false, companyCode: null };
-}
-
-// --- ENDPOINT: BirFatura Order Statuses ---
+// --- ENDPOINT: BirFatura Order Statuses (r4: sadece token varlığı) ---
 app.post('/api/orderStatus/', async (req, res) => {
     const receivedToken = req.headers['token'];
-    const auth = await validateBirFaturaToken(receivedToken);
-    if (!auth.valid) {
-        return res.status(401).json({ OrderStatus: [], error: "Yetkisiz Erişim / Geçersiz Token" });
-    }
+    if (!receivedToken) return res.status(401).json({ error: "Yetkisiz Erişim" });
     res.json({
         OrderStatus: [{ Id: 1, Value: "Onaylandı" }, { Id: 2, Value: "Kargolandı" }, { Id: 3, Value: "İptal Edildi" }]
     });
 });
 
-// --- ENDPOINT: BirFatura Payment Methods ---
+// --- ENDPOINT: BirFatura Payment Methods (r4: sadece token varlığı) ---
 app.post('/api/paymentMethods/', async (req, res) => {
     const receivedToken = req.headers['token'];
-    const auth = await validateBirFaturaToken(receivedToken);
-    if (!auth.valid) {
-        return res.status(401).json({ PaymentMethods: [], error: "Yetkisiz Erişim / Geçersiz Token" });
-    }
+    if (!receivedToken) return res.status(401).json({ error: "Yetkisiz Erişim" });
     res.json({
         PaymentMethods: [
             { Id: 1, Value: "Kredi Kartı" },
@@ -277,13 +243,11 @@ app.post('/api/products/force-delete', async (req, res) => {
     }
 });
 
-// --- ENDPOINT: BirFatura Polls This for Orders ---
-// Swagger: https://app.swaggerhub.com/apis-docs/birfatura/orders/1.0.0 — Body: orderStatusId, startDateTime, endDateTime
+// --- ENDPOINT: BirFatura Polls This for Orders (r4 ile aynı mantık) ---
 app.post('/api/orders/', async (req, res) => {
     const receivedToken = req.headers['token'];
-    const filterData = req.body || {};
-    console.log("[BirFatura Orders] İstek body:", JSON.stringify(filterData));
-    console.log("[BirFatura Orders] Token (son 4 karakter):", receivedToken ? receivedToken.slice(-4) : "yok");
+    console.log("BirFatura İsteği Geldi:", req.body);
+    console.log("Alınan Token:", receivedToken);
 
     if (!receivedToken) {
         return res.status(401).json({ "Orders": [], "error": "Token eksik" });
@@ -294,12 +258,37 @@ app.post('/api/orders/', async (req, res) => {
         return res.status(503).json({ "Orders": [], "error": "Veritabanı bağlantısı yok" });
     }
 
-    const auth = await validateBirFaturaToken(receivedToken);
-    if (!auth.valid) {
-        console.warn("[BirFatura Orders] Geçersiz token.");
+    let isValidToken = false;
+    let companyCode = null;
+    const { data: settings, error: tokenError } = await supabase
+        .from('app_settings')
+        .select('company_code, value')
+        .eq('key', 'secret_token');
+
+    if (tokenError) console.error("Token sorgulama hatası:", tokenError);
+
+    if (settings && settings.length > 0) {
+        for (const setting of settings) {
+            if (setting.value) {
+                let storedToken = setting.value;
+                if (typeof storedToken === 'string') storedToken = storedToken.replace(/^"|"$/g, '');
+                if (storedToken === receivedToken) {
+                    isValidToken = true;
+                    companyCode = setting.company_code;
+                    break;
+                }
+            }
+        }
+    }
+    if (!isValidToken && receivedToken === 'kasapos-2026-secret-api-token') {
+        isValidToken = true;
+        console.log("Fallback token accepted (kasapos-2026-secret-api-token).");
+    }
+
+    if (!isValidToken) {
+        console.warn("Invalid token received:", receivedToken);
         return res.status(401).json({ "Orders": [], "error": "Yetkisiz Erişim / Geçersiz Token" });
     }
-    const companyCode = auth.companyCode;
 
     // 3. Fetch Sales
     // SADECE faturası kesilecek olanları ve silinmemiş olanları al
@@ -312,6 +301,7 @@ app.post('/api/orders/', async (req, res) => {
         query = query.eq('company_code', companyCode);
     }
 
+    const filterData = req.body || {};
     const startDateTimeStr = filterData.startDateTime;
     const endDateTimeStr = filterData.endDateTime;
     const orderCodeFilter = filterData.OrderCode;
@@ -327,7 +317,7 @@ app.post('/api/orders/', async (req, res) => {
         return res.status(500).json({ "Orders": [], "error": "Veritabanı Hatası" });
     }
 
-    console.log(`[BirFatura Orders] companyCode: ${companyCode || 'yok'}, satış sayısı (filtre öncesi): ${sales?.length || 0}`);
+    console.log(`Toplam ${sales?.length || 0} faturası kesilecek satış bulundu.`);
 
     // 4. Process and Filter (Date logic etc.)
     const ordersToSend = [];
@@ -457,11 +447,7 @@ app.post('/api/orders/', async (req, res) => {
         });
     }
 
-    if (ordersToSend.length === 0) {
-        console.warn("[BirFatura Orders] Dönen sipariş 0. Kontrol: tarih aralığı, company_code ve secret_token (Ayarlar > Entegrasyon > API şifresi) ile BirFatura mağaza ayarı eşleşmeli.");
-    } else {
-        console.log(`[BirFatura Orders] ${ordersToSend.length} sipariş döndürülüyor.`);
-    }
+    console.log(`BirFatura'ya ${ordersToSend.length} sipariş gönderiliyor.`);
     res.json({ "Orders": ordersToSend });
 });
 

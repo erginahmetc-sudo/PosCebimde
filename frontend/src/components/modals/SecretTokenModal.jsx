@@ -96,6 +96,15 @@ export default function SecretTokenModal({ isOpen, onClose }) {
                         </div>
                     </div>
 
+                    <div className="bg-sky-50 p-5 rounded-xl text-sm text-sky-800 border border-sky-200">
+                        <p className="font-semibold mb-2">BirFatura’da siparişler görünmüyorsa:</p>
+                        <ol className="list-decimal list-inside space-y-1.5">
+                            <li><strong>uygulama.birfatura.com</strong> → Mağaza Ayarları → Özel Entegrasyon: <strong>Site adresi</strong> = <code className="bg-sky-100 px-1 rounded">https://www.poscebimde.com</code>, <strong>API şifresi</strong> = bu token (yukarıdaki Secret Token).</li>
+                            <li>Onaylanmış siparişler sayfasında <strong>“Sipariş getir”</strong> butonuna tıklayıp satışlarınızın olduğu bir <strong>tarih aralığı</strong> seçin.</li>
+                            <li>Test: Tarayıcıda <code className="bg-sky-100 px-1 rounded break-all">https://www.poscebimde.com/api/birfatura-orders-check?token=TOKENINIZ</code> açın; <code className="bg-sky-100 px-1 rounded">ordersCount</code> &gt; 0 ise API sipariş döndürüyor demektir.</li>
+                        </ol>
+                    </div>
+
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
                             <label className="text-base font-semibold text-gray-800">Secret Token</label>
