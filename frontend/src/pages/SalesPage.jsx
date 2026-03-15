@@ -368,7 +368,7 @@ export default function SalesPage() {
                     onConfirm: async () => {
                         try {
                             await salesAPI.update(editForm.sale_code, {
-                                items: editForm.items,
+                                products: editForm.items,
                                 total: totals.grand,
                                 payment_method: editForm.payment_method,
                                 customer_name: editForm.customer_name
@@ -380,7 +380,10 @@ export default function SalesPage() {
                                 type: 'success'
                             });
                             setIsDetailModalOpen(false);
-                            loadSales();
+                            // Add slight delay to ensure DB propagation before reload
+                            setTimeout(() => {
+                                loadSales();
+                            }, 500);
                         } catch (error) {
                             setStatusModal({
                                 isOpen: true,
@@ -736,7 +739,10 @@ export default function SalesPage() {
                                 type: 'success'
                             });
                             setIsDetailModalOpen(false);
-                            loadSales();
+                            // Add slight delay to ensure DB propagation before reload
+                            setTimeout(() => {
+                                loadSales();
+                            }, 500);
                         } catch (error) {
                             setStatusModal({
                                 isOpen: true,
