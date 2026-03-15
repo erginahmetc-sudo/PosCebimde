@@ -360,10 +360,10 @@ export default function SalesPage() {
     const printCustomA5Receipt = (saleData, paperSize) => {
         const savedConfig = localStorage.getItem('receipt_design_config');
         let companyInfo = {
-            name: 'Firma Adı',
-            address: '',
-            phone: '',
-            logo_text: 'K',
+            name: 'Firma İsmi Yazınız',
+            address: 'Firma Adresi Yazınız',
+            phone: '0212 XXX XX XX',
+            logo_text: 'F',
             showWatermark: true
         };
 
@@ -577,9 +577,9 @@ export default function SalesPage() {
 
     const printA5Receipt = (saleData, paperSize) => {
         const isA4 = paperSize === 'A4 (210x297mm)';
-        const companyName = localStorage.getItem('receipt_company_name') || 'FIRMA ADI';
-        const companyAddress = localStorage.getItem('receipt_company_address') || 'Adres Bilgisi';
-        const companyPhone = localStorage.getItem('receipt_company_phone') || 'Tel: 0XXX XXX XX XX';
+        const companyName = localStorage.getItem('receipt_company_name') || 'Firma İsmi Yazınız';
+        const companyAddress = localStorage.getItem('receipt_company_address') || 'Firma Adresi Yazınız';
+        const companyPhone = localStorage.getItem('receipt_company_phone') || '0212 XXX XX XX';
 
         const dateObj = saleData.created_at ? new Date(saleData.created_at) : new Date();
 
