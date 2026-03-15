@@ -111,11 +111,11 @@ export default function NewPOSPage() {
     const [keyboardShortcuts, setKeyboardShortcuts] = useState({});
 
     const [companySettings, setCompanySettings] = useState({
-        name: 'Firma Adı',
-        address: '',
-        phone: '',
+        name: 'ERCAN YAPI MARKET',
+        address: 'Fatih Mh. Mücahitler Cd. 151/C Seyhan/Adana',
+        phone: '0553 878 58 85',
         logo_url: null,
-        logo_text: 'K'
+        logo_text: 'E'
     });
     const [debtLimits, setDebtLimits] = useState({});
     const [showDebtLimitAlert, setShowDebtLimitAlert] = useState(false);
@@ -189,7 +189,6 @@ export default function NewPOSPage() {
         district: 'Seyhan'
     };
     const [retailCustomerForm, setRetailCustomerForm] = useState(defaultRetailForm);
-    const [retailPaymentType, setRetailPaymentType] = useState('Kredi Kartı');
 
     // Ask Quantity Logic
     const [showAskQuantityModal, setShowAskQuantityModal] = useState(false);
@@ -582,69 +581,15 @@ export default function NewPOSPage() {
     const handleRetailCustomerSubmit = (e) => {
         e.preventDefault();
         if (!retailCustomerForm.name.trim()) return alert('İsim Soyisim zorunludur!');
-        setCustomer(`Perakende-${retailCustomerForm.name.trim()}`);
+        setCustomer(`${retailCustomerForm.name.trim()} (Perakende)`);
         setShowRetailCustomerModal(false);
         setShowCustomerModal(false);
     };
 
     const [invoiceLoading, setInvoiceLoading] = useState(false);
-    const [taxPayerLoading, setTaxPayerLoading] = useState(false);
-    const [taxPayerResult, setTaxPayerResult] = useState(null); // null | { isEFatura, title }
-    const [taxOffices, setTaxOffices] = useState([]);
-    const [taxOfficeSearch, setTaxOfficeSearch] = useState('');
-    const [showTaxOfficeDropdown, setShowTaxOfficeDropdown] = useState(false);
-
-    useEffect(() => {
-        const loadTaxOffices = async () => {
-            const cached = sessionStorage.getItem('birfatura_tax_offices');
-            if (cached) {
-                try { setTaxOffices(JSON.parse(cached)); return; } catch (e) {}
-            }
-            const result = await birFaturaAPI.getTaxOffices();
-            if (result.success && result.data) {
-                setTaxOffices(result.data);
-                sessionStorage.setItem('birfatura_tax_offices', JSON.stringify(result.data));
-            }
-        };
-        loadTaxOffices();
-    }, []);
-
-    const filteredTaxOffices = useMemo(() => {
-        const search = (taxOfficeSearch || retailCustomerForm.tax_office || '').toUpperCase().replace(/İ/g, 'I').replace(/Ş/g, 'S').replace(/Ğ/g, 'G').replace(/Ü/g, 'U').replace(/Ö/g, 'O').replace(/Ç/g, 'C');
-        if (!search || search.length < 2) return [];
-        return taxOffices.filter(o => {
-            const name = (o.TaxOfficeName || '').toUpperCase().replace(/İ/g, 'I').replace(/Ş/g, 'S').replace(/Ğ/g, 'G').replace(/Ü/g, 'U').replace(/Ö/g, 'O').replace(/Ç/g, 'C');
-            return name.includes(search);
-        }).slice(0, 10);
-    }, [taxOfficeSearch, retailCustomerForm.tax_office, taxOffices]);
-
-    const handleTaxPayerQuery = async () => {
-        const taxNo = retailCustomerForm.tax_number.trim();
-        if (taxNo.length < 10) return;
-        setTaxPayerLoading(true);
-        setTaxPayerResult(null);
-        const result = await birFaturaAPI.queryTaxPayer(taxNo);
-        setTaxPayerLoading(false);
-        if (result.success && result.data) {
-            const title = result.data.title || result.data.name || '';
-            setRetailCustomerForm(prev => ({
-                ...prev,
-                name: title || prev.name,
-            }));
-            setTaxPayerResult({ isEFatura: true, title });
-        } else if (result.success && !result.data) {
-            setTaxPayerResult({ isEFatura: false, message: result.message });
-        } else {
-            setTaxPayerResult({ isEFatura: false, message: result.message });
-        }
-    };
-
-    // Ödeme tipi → BirFatura açıklama eşlemesi
-    const paymentTypeMap = {
-        'Nakit': 'Nakit olarak Ödendi',
-        'Kredi Kartı': 'Kredi Kartı ile Ödendi',
-        'Havale': 'Havale-EFT ile ödendi'
-    };
+    const [showInvoicePaymentModal, setShowInvoicePaymentModal] = useState(false);
+    const [invoiceSaleCode, setInvoiceSaleCode] = useState('');
+    const [invoicePdfUrl, setInvoicePdfUrl] = useState(null);
 
     const handleDirectInvoice = async () => {
         if (!retailCustomerForm.name.trim()) {
@@ -662,113 +607,73 @@ export default function NewPOSPage() {
         }
         setInvoiceLoading(true);
         const saleCode = 'SLS-' + Date.now();
-        const birFaturaPaymentText = paymentTypeMap[retailPaymentType] || '';
         const result = await birFaturaAPI.sendBasicInvoice({
             retailForm: retailCustomerForm,
             cart,
-            paymentMethod: birFaturaPaymentText,
+            paymentMethod: 'Nakit',
             saleCode
         });
         setInvoiceLoading(false);
         if (result.success) {
-            // Fatura başarılı → satışı tamamla
-            const perakendeCustomerName = `Perakende-${retailCustomerForm.name.trim()}`;
-            setCustomer(perakendeCustomerName);
+            setCustomer(`${retailCustomerForm.name.trim()} (Perakende)`);
             setShowRetailCustomerModal(false);
             setShowCustomerModal(false);
-            const invoiceUuid = result.ettn || result.data?.Result?.ETTN || result.data?.result?.ETTN || result.data?.Result?.UUID || result.data?.result?.UUID || null;
-            let pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
+            const pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
             console.log('[NewPOS] Fatura response:', JSON.stringify(result.data, null, 2));
-            console.log('[NewPOS] Invoice UUID:', invoiceUuid, 'PDF URL:', pdfUrl);
-
-            try {
-                const selectedCust = customers.find(c => c.name === perakendeCustomerName);
-                await salesAPI.complete({
-                    sale_code: saleCode,
-                    customer: selectedCust || null,
-                    customer_name: !selectedCust ? perakendeCustomerName : undefined,
-                    tax_number: retailCustomerForm.tax_number,
-                    address: retailCustomerForm.address,
-                    phone: retailCustomerForm.phone,
-                    payment_method: retailPaymentType,
-                    items: cart.map(item => ({
-                        id: item.id, stock_code: item.stock_code, barcode: item.barcode, name: item.name,
-                        quantity: item.quantity, price: item.price, discount_rate: item.discount_rate || 0,
-                        amount: item.quantity
-                    })),
-                    total: calculateTotal()
-                });
-
-                if (localStorage.getItem('receipt_auto_print') === 'true') {
-                    printReceipt({
-                        customer: perakendeCustomerName, paymentMethod: retailPaymentType, items: cart,
-                        total: calculateTotal(), customerData: selectedCust
-                    });
-                }
-
-                setCart([]);
-                setCustomer('Toptan Satış');
-                setRetailCustomerForm(defaultRetailForm);
-                setRetailPaymentType('Kredi Kartı');
-                loadProducts();
-            } catch (error) {
-                console.error('[NewPOS] Satış kaydetme hatası:', error);
-            }
-
-            setStatusModal({
-                isOpen: true,
-                title: 'Fatura Gönderildi ✓',
-                message: 'E-Fatura/E-Arşiv fatura başarıyla gönderildi ve satış tamamlandı.',
-                type: 'success',
-                details: null,
-                actionButton: (pdfUrl || invoiceUuid) ? {
-                    label: '📄 Kesilen Faturayı Görüntüle',
-                    onClick: async () => {
-                        if (pdfUrl) {
-                            window.open(pdfUrl, '_blank');
-                            return;
-                        }
-                        // UUID ile PDF linkini sorgula
-                        try {
-                            const pdfResult = await birFaturaAPI.getPdfLink(invoiceUuid);
-                            if (pdfResult.success && pdfResult.pdfUrl) {
-                                window.open(pdfResult.pdfUrl, '_blank');
-                            } else {
-                                alert('PDF henüz hazır değil. Lütfen birkaç saniye sonra tekrar deneyin.');
-                            }
-                        } catch (err) {
-                            console.error('[NewPOS] PDF açma hatası:', err);
-                            alert('PDF alınırken hata oluştu.');
-                        }
-                    }
-                } : null
-            });
-            setSuccessMessage('Satış İşlemi Başarılı');
-            setTimeout(() => setSuccessMessage(''), 2000);
+            setInvoiceSaleCode(saleCode);
+            setInvoicePdfUrl(pdfUrl);
+            setShowInvoicePaymentModal(true);
         } else {
             setStatusModal({ isOpen: true, title: 'Fatura Hatası', message: result.message, type: 'error', details: null });
+        }
+    };
+
+    const handleInvoicePaymentComplete = async (paymentMethod) => {
+        setShowInvoicePaymentModal(false);
+        try {
+            const selectedCust = customers.find(c => c.name === customer);
+            const cleanCustomerName = (customer || 'Toptan Satış').replace(/ \(Perakende\)$/i, '').trim();
+            await salesAPI.complete({
+                sale_code: invoiceSaleCode,
+                customer: selectedCust || null,
+                customer_name: !selectedCust ? cleanCustomerName : undefined,
+                tax_number: retailCustomerForm.tax_number,
+                address: retailCustomerForm.address,
+                phone: retailCustomerForm.phone,
+                payment_method: paymentMethod,
+                items: cart.map(item => ({
+                    id: item.id, stock_code: item.stock_code, barcode: item.barcode, name: item.name,
+                    quantity: item.quantity, price: item.price, discount_rate: item.discount_rate || 0,
+                    amount: item.quantity
+                })),
+                total: calculateTotal()
+            });
+
+            if (localStorage.getItem('receipt_auto_print') === 'true') {
+                printReceipt({
+                    customer: customer, paymentMethod: paymentMethod, items: cart,
+                    total: calculateTotal(), customerData: selectedCust
+                });
+            }
+
+            setSuccessMessage('Satış İşlemi Başarılı');
+            setTimeout(() => setSuccessMessage(''), 2000);
+            setCart([]);
+            setCustomer('Toptan Satış');
+            setRetailCustomerForm(defaultRetailForm);
+            loadProducts();
+        } catch (error) {
+            setStatusModal({ isOpen: true, title: 'Satış Hatası', message: error.response?.data?.message || error.message, type: 'error', details: null });
         }
     };
 
     const handleRetailCustomerChange = (e) => {
         const { name, value } = e.target;
         setRetailCustomerForm(prev => ({ ...prev, [name]: value }));
-        if (name === 'tax_number') {
-            setTaxPayerResult(null);
-        }
     };
 
     const completeSale = async (paymentMethod) => {
         if (cart.length === 0) return alert('Sepet boş!');
-
-        // Veresiye sadece kayıtlı müşterilere verilebilir
-        if (paymentMethod === 'Açık Hesap' || paymentMethod === 'Veresiye') {
-            const isRegisteredCustomer = customers.find(c => c.name === customer);
-            if (!isRegisteredCustomer) {
-                setStatusModal({ isOpen: true, title: 'Veresiye Satış Yapılamaz', message: 'Veresiye satış sadece sistemde kayıtlı müşteri veya firmalara yapılabilir. Lütfen önce bir müşteri seçin.', type: 'error', details: null });
-                return;
-            }
-        }
 
         // Debt Limit Check
         if (paymentMethod === 'Açık Hesap' || paymentMethod === 'Veresiye') {
@@ -797,12 +702,12 @@ export default function NewPOSPage() {
         try {
             const saleCode = 'SLS-' + Date.now();
             const selectedCustomer = customers.find(c => c.name === customer);
-            const displayCustomerName = (customer || 'Toptan Satış').trim();
+            const cleanCustomerName = (customer || 'Toptan Satış').replace(/ \(Perakende\)$/i, '').trim();
 
             await salesAPI.complete({
                 sale_code: saleCode,
                 customer: selectedCustomer || null,
-                customer_name: !selectedCustomer ? displayCustomerName : undefined,
+                customer_name: !selectedCustomer ? cleanCustomerName : undefined,
                 tax_number: retailCustomerForm.tax_number,
                 address: retailCustomerForm.address,
                 phone: retailCustomerForm.phone,
@@ -893,10 +798,19 @@ export default function NewPOSPage() {
         // Get selected paper size
         const paperSize = localStorage.getItem('receipt_paper_size') || 'Termal 80mm';
 
-        // Custom A5 HTML Design varsayılan olarak aktif
-        // Sadece açıkça başka bir template seçildiyse devre dışı kalır
+        // Check for Custom A5 HTML Design (Flag or Config Type)
         const templateType = localStorage.getItem('receipt_template_type');
-        let useCustomA5 = templateType === 'custom_html_a5' || !templateType;
+        let useCustomA5 = templateType === 'custom_html_a5';
+
+        // Fallback: Check inside config if flag is missing
+        if (!useCustomA5) {
+            try {
+                const config = JSON.parse(localStorage.getItem('receipt_design_config'));
+                if (config && config.type === 'custom_html_a5') {
+                    useCustomA5 = true;
+                }
+            } catch (e) { }
+        }
 
         if (useCustomA5) {
             printCustomA5Receipt(saleData, paperSize);
@@ -970,7 +884,7 @@ export default function NewPOSPage() {
         const showBalanceSetting = localStorage.getItem('receipt_show_balance') === 'true';
         const isRegisteredCustomer = saleData.customer &&
             saleData.customer !== 'Toptan Satış' &&
-            !saleData.customer.startsWith('Perakende-');
+            !saleData.customer.includes('(Perakende)');
         const shouldShowBalance = showBalanceSetting && isRegisteredCustomer;
 
         // Separate product rows from static items and filter footer items
@@ -1472,7 +1386,7 @@ export default function NewPOSPage() {
         </div>
         <div class="info-line">
             <span class="left">${new Date().toLocaleDateString('tr-TR')} ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
-            <span class="right">${saleData.customer?.startsWith('Perakende-') ? 'Perakende Satış' : 'Toptan Satış'}</span>
+            <span class="right">${saleData.customer?.includes('Perakende') ? 'Perakende Satış' : 'Toptan Satış'}</span>
         </div>
         <table class="items">
             <thead>
@@ -1732,13 +1646,9 @@ export default function NewPOSPage() {
                                 </button>
                                 <button
                                     onClick={() => completeSale('Açık Hesap')}
-                                    disabled={!customers.find(c => c.name === customer)}
-                                    className={`flex items-center justify-center p-2 rounded-xl transition-all ${customers.find(c => c.name === customer)
-                                        ? 'bg-orange-50 border border-orange-200 hover:border-orange-500 hover:bg-orange-100 hover:shadow-md'
-                                        : 'bg-slate-50 border border-slate-200 opacity-50 cursor-not-allowed'
-                                    }`}
+                                    className="flex items-center justify-center p-2 bg-orange-50 border border-orange-200 rounded-xl hover:border-orange-500 hover:bg-orange-100 hover:shadow-md transition-all"
                                 >
-                                    <span className={`text-base font-extrabold whitespace-nowrap ${customers.find(c => c.name === customer) ? 'text-orange-700' : 'text-slate-400'}`}>VERESİYE</span>
+                                    <span className="text-base font-extrabold text-orange-700 whitespace-nowrap">VERESİYE</span>
                                 </button>
                             </div>
 
@@ -1963,7 +1873,7 @@ export default function NewPOSPage() {
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
                             <div
-                                onClick={() => { setShowRetailCustomerModal(true); setTaxPayerResult(null); setRetailCustomerForm(defaultRetailForm); }}
+                                onClick={() => { setShowRetailCustomerModal(true); }}
                                 className="mb-2 p-4 bg-amber-50 border border-amber-200 rounded-xl hover:border-amber-500 hover:bg-amber-100 cursor-pointer flex justify-between items-center group transition-colors"
                             >
                                 <div className="flex items-center gap-3">
@@ -2002,7 +1912,13 @@ export default function NewPOSPage() {
                                     </div>
                                 ))}
                         </div>
-                        <div className="p-4 border-t bg-gray-50">
+                        <div className="p-4 border-t bg-gray-50 flex justify-end">
+                            <button
+                                onClick={() => setShowRetailCustomerModal(true)}
+                                className="px-4 py-2 bg-orange-500 text-white rounded-lg font-bold hover:bg-orange-600 transition-colors"
+                            >
+                                + Perakende Müşteri
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -2499,231 +2415,142 @@ export default function NewPOSPage() {
             {
                 showRetailCustomerModal && (
                     <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[60] p-4">
-                        <div className="bg-white rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-                            {/* Compact Header */}
-                            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-8 py-5">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/30">
-                                        <span className="text-xl">👤</span>
+                        <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+                            {/* Minimalist Header */}
+                            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-10 py-8">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30">
+                                        <span className="text-3xl">👤</span>
                                     </div>
                                     <div>
-                                        <h3 className="text-2xl font-bold text-white tracking-tight">Perakende Müşteri</h3>
-                                        <p className="text-slate-400 text-sm">Hızlı satış için bilgileri doldurun</p>
+                                        <h3 className="text-3xl font-bold text-white tracking-tight">Perakende Müşteri</h3>
+                                        <p className="text-slate-400 text-base mt-1">Hızlı satış için bilgileri doldurun</p>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Form Content - 2 Column Layout */}
-                            <form onSubmit={handleRetailCustomerSubmit} className="p-6 bg-gradient-to-b from-slate-50 to-white">
-                                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                                    {/* Sol Sütun */}
-                                    {/* İsim Soyisim */}
-                                    <div className="space-y-1">
-                                        <label className="block text-sm font-semibold text-slate-700">
-                                            İsim Soyisim <span className="text-rose-500">*</span>
-                                        </label>
+                            {/* Form Content */}
+                            <form onSubmit={handleRetailCustomerSubmit} className="p-10 space-y-6 bg-gradient-to-b from-slate-50 to-white">
+                                {/* İsim Soyisim - En Önemli Alan */}
+                                <div className="space-y-2">
+                                    <label className="block text-base font-semibold text-slate-700">
+                                        İsim Soyisim <span className="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="name"
+                                        value={retailCustomerForm.name}
+                                        onChange={handleRetailCustomerChange}
+                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                        placeholder="Müşteri adını giriniz..."
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
+
+                                {/* TC / Vergi No */}
+                                <div className="space-y-2">
+                                    <label className="block text-base font-semibold text-slate-700">
+                                        TC Kimlik / Vergi Numarası
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="tax_number"
+                                        value={retailCustomerForm.tax_number}
+                                        onChange={handleRetailCustomerChange}
+                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400 font-mono tracking-wider"
+                                        placeholder="11111111111"
+                                    />
+                                </div>
+
+                                {/* Adres */}
+                                <div className="space-y-2">
+                                    <label className="block text-base font-semibold text-slate-700">
+                                        Adres
+                                    </label>
+                                    <textarea
+                                        name="address"
+                                        value={retailCustomerForm.address}
+                                        onChange={handleRetailCustomerChange}
+                                        rows="3"
+                                        className="w-full px-6 py-5 text-lg rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all resize-none placeholder:text-slate-400"
+                                        placeholder="Adres bilgisi..."
+                                    ></textarea>
+                                </div>
+
+                                {/* Telefon */}
+                                <div className="space-y-2">
+                                    <label className="block text-base font-semibold text-slate-700">
+                                        Telefon
+                                    </label>
+                                    <input
+                                        type="tel"
+                                        name="phone"
+                                        value={retailCustomerForm.phone}
+                                        onChange={handleRetailCustomerChange}
+                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                        placeholder="0532 xxx xx xx"
+                                    />
+                                </div>
+
+                                {/* Vergi Dairesi + E-posta */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="block text-base font-semibold text-slate-700">Vergi Dairesi</label>
                                         <input
                                             type="text"
-                                            name="name"
-                                            value={retailCustomerForm.name}
+                                            name="tax_office"
+                                            value={retailCustomerForm.tax_office}
                                             onChange={handleRetailCustomerChange}
-                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
-                                            placeholder="Müşteri adını giriniz..."
-                                            required
-                                            autoFocus
+                                            className="w-full px-5 py-4 text-base rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            placeholder="Vergi dairesi adı..."
                                         />
                                     </div>
-
-                                    {/* TC / Vergi No + Müşteriyi Getir */}
-                                    <div className="space-y-1">
-                                        <label className="block text-sm font-semibold text-slate-700">
-                                            TC Kimlik / Vergi Numarası
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                name="tax_number"
-                                                value={retailCustomerForm.tax_number}
-                                                onChange={(e) => {
-                                                    const val = e.target.value.replace(/\D/g, '').slice(0, 11);
-                                                    setRetailCustomerForm(prev => ({ ...prev, tax_number: val }));
-                                                    setTaxPayerResult(null);
-                                                }}
-                                                maxLength={11}
-                                                className="flex-1 px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400 font-mono tracking-wider"
-                                                placeholder="VKN (10) veya TCKN (11)"
-                                            />
-                                            {retailCustomerForm.tax_number.trim().length >= 10 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={handleTaxPayerQuery}
-                                                    disabled={taxPayerLoading}
-                                                    className="px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl hover:from-blue-600 hover:to-indigo-700 shadow-lg shadow-blue-500/30 transition-all active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap"
-                                                >
-                                                    {taxPayerLoading ? (
-                                                        <><span className="material-symbols-outlined animate-spin text-base">progress_activity</span> Sorgulanıyor</>
-                                                    ) : (
-                                                        <><span className="material-symbols-outlined text-base">person_search</span> Müşteriyi Getir</>
-                                                    )}
-                                                </button>
-                                            )}
-                                        </div>
-                                        {taxPayerResult && (
-                                            <div className={`mt-1 px-3 py-2 rounded-lg text-xs font-medium ${
-                                                taxPayerResult.isEFatura
-                                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                            }`}>
-                                                {taxPayerResult.isEFatura ? (
-                                                    <><span className="material-symbols-outlined text-sm align-middle mr-1">verified</span> e-Fatura Mükellefi: {taxPayerResult.title}</>
-                                                ) : (
-                                                    <><span className="material-symbols-outlined text-sm align-middle mr-1">info</span> {taxPayerResult.message}</>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Telefon */}
-                                    <div className="space-y-1">
-                                        <label className="block text-sm font-semibold text-slate-700">Telefon</label>
-                                        <input
-                                            type="tel"
-                                            name="phone"
-                                            value={retailCustomerForm.phone}
-                                            onChange={handleRetailCustomerChange}
-                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
-                                            placeholder="0532 xxx xx xx"
-                                        />
-                                    </div>
-
-                                    {/* E-posta */}
-                                    <div className="space-y-1">
-                                        <label className="block text-sm font-semibold text-slate-700">E-posta</label>
+                                    <div className="space-y-2">
+                                        <label className="block text-base font-semibold text-slate-700">E-posta</label>
                                         <input
                                             type="email"
                                             name="email"
                                             value={retailCustomerForm.email}
                                             onChange={handleRetailCustomerChange}
-                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            className="w-full px-5 py-4 text-base rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
                                             placeholder="ornek@email.com"
                                         />
                                     </div>
+                                </div>
 
-                                    {/* Vergi Dairesi */}
-                                    <div className="space-y-1 relative">
-                                        <label className="block text-sm font-semibold text-slate-700">
-                                            Vergi Dairesi
-                                            {retailCustomerForm.tax_number.replace(/\D/g, '').length === 11 && (
-                                                <span className="text-xs text-slate-400 font-normal ml-2">(TCKN için gerekli değil)</span>
-                                            )}
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="tax_office"
-                                            value={retailCustomerForm.tax_number.replace(/\D/g, '').length === 11 ? '' : retailCustomerForm.tax_office}
-                                            onChange={(e) => {
-                                                handleRetailCustomerChange(e);
-                                                setTaxOfficeSearch(e.target.value);
-                                                setShowTaxOfficeDropdown(true);
-                                            }}
-                                            onFocus={() => { if (retailCustomerForm.tax_number.replace(/\D/g, '').length !== 11) setShowTaxOfficeDropdown(true); }}
-                                            onBlur={() => setTimeout(() => setShowTaxOfficeDropdown(false), 200)}
-                                            autoComplete="off"
-                                            disabled={retailCustomerForm.tax_number.replace(/\D/g, '').length === 11}
-                                            className={`w-full px-4 py-3 text-base rounded-xl border-2 outline-none transition-all placeholder:text-slate-400 ${
-                                                retailCustomerForm.tax_number.replace(/\D/g, '').length === 11
-                                                    ? 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed'
-                                                    : 'border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500'
-                                            }`}
-                                            placeholder={retailCustomerForm.tax_number.replace(/\D/g, '').length === 11 ? 'TCKN için gerekli değil' : 'Vergi dairesi adı yazın...'}
-                                        />
-                                        {showTaxOfficeDropdown && filteredTaxOffices.length > 0 && retailCustomerForm.tax_number.replace(/\D/g, '').length !== 11 && (
-                                            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border-2 border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto">
-                                                {filteredTaxOffices.map((office, idx) => (
-                                                    <div
-                                                        key={office.TaxOfficeCode || idx}
-                                                        className="px-4 py-2.5 text-sm hover:bg-blue-50 cursor-pointer transition-colors border-b border-slate-100 last:border-b-0"
-                                                        onMouseDown={() => {
-                                                            setRetailCustomerForm(prev => ({ ...prev, tax_office: office.TaxOfficeName }));
-                                                            setShowTaxOfficeDropdown(false);
-                                                            setTaxOfficeSearch('');
-                                                        }}
-                                                    >
-                                                        <span className="font-medium text-slate-700">{office.TaxOfficeName}</span>
-                                                        <span className="text-slate-400 ml-2 text-xs">({office.TaxOfficeCode})</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Adres */}
-                                    <div className="space-y-1">
-                                        <label className="block text-sm font-semibold text-slate-700">Adres</label>
-                                        <input
-                                            type="text"
-                                            name="address"
-                                            value={retailCustomerForm.address}
-                                            onChange={handleRetailCustomerChange}
-                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
-                                            placeholder="Adres bilgisi..."
-                                        />
-                                    </div>
-
-                                    {/* İl */}
-                                    <div className="space-y-1">
-                                        <label className="block text-sm font-semibold text-slate-700">İl</label>
+                                {/* İl / İlçe */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="block text-base font-semibold text-slate-700">İl</label>
                                         <input
                                             type="text"
                                             name="city"
                                             value={retailCustomerForm.city}
                                             onChange={handleRetailCustomerChange}
-                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            className="w-full px-5 py-4 text-base rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
                                             placeholder="Adana"
                                         />
                                     </div>
-
-                                    {/* İlçe */}
-                                    <div className="space-y-1">
-                                        <label className="block text-sm font-semibold text-slate-700">İlçe</label>
+                                    <div className="space-y-2">
+                                        <label className="block text-base font-semibold text-slate-700">İlçe</label>
                                         <input
                                             type="text"
                                             name="district"
                                             value={retailCustomerForm.district}
                                             onChange={handleRetailCustomerChange}
-                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
+                                            className="w-full px-5 py-4 text-base rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
                                             placeholder="Seyhan"
                                         />
                                     </div>
                                 </div>
 
-                                {/* Ödeme Tipi - Full width */}
-                                <div className="mt-4 space-y-1">
-                                    <label className="block text-sm font-semibold text-slate-700">Ödeme Tipi</label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {['Kredi Kartı', 'Havale', 'Nakit'].map(type => (
-                                            <button
-                                                key={type}
-                                                type="button"
-                                                onClick={() => setRetailPaymentType(type)}
-                                                className={`py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95 border-2 ${
-                                                    retailPaymentType === type
-                                                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-md'
-                                                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
-                                                }`}
-                                            >
-                                                {type}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
                                 {/* Buttons */}
-                                <div className="flex gap-3 mt-5">
+                                <div className="flex gap-3 pt-4">
                                     <button
                                         type="button"
                                         onClick={() => setShowRetailCustomerModal(false)}
-                                        className="flex-1 py-4 text-base font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all active:scale-[0.98]"
+                                        className="flex-1 py-5 text-lg font-bold text-slate-600 bg-slate-100 rounded-2xl hover:bg-slate-200 transition-all active:scale-[0.98]"
                                     >
                                         İptal
                                     </button>
@@ -2731,19 +2558,19 @@ export default function NewPOSPage() {
                                         type="button"
                                         onClick={handleDirectInvoice}
                                         disabled={invoiceLoading}
-                                        className="flex-[2] py-4 text-base font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/30 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        className="flex-[2] py-5 text-lg font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/30 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     >
                                         {invoiceLoading ? (
-                                            <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Gönderiliyor...</>
+                                            <><span className="material-symbols-outlined animate-spin text-xl">progress_activity</span> Gönderiliyor...</>
                                         ) : (
-                                            <><span className="material-symbols-outlined text-lg">receipt_long</span> Direkt Fatura Kes</>
+                                            <><span className="material-symbols-outlined text-xl">receipt_long</span> Direkt Fatura Kes</>
                                         )}
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-[2] py-4 text-base font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl hover:from-amber-600 hover:to-orange-600 shadow-xl shadow-orange-500/30 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                                        className="flex-[2] py-5 text-xl font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl hover:from-amber-600 hover:to-orange-600 shadow-xl shadow-orange-500/30 transition-all hover:scale-[1.01] active:scale-[0.99]"
                                     >
-                                        Tamamla
+                                        ✓ Tamamla
                                     </button>
                                 </div>
                             </form>
@@ -2761,6 +2588,52 @@ export default function NewPOSPage() {
                 details={statusModal.details}
                 actionButton={statusModal.actionButton}
             />
+
+            {/* Fatura Sonrası Ödeme Yöntemi Seçimi */}
+            {showInvoicePaymentModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-[2px] animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 flex flex-col items-center text-center bg-emerald-50">
+                            <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-sm mb-4 text-emerald-700">
+                                <span className="material-symbols-outlined text-4xl">check_circle</span>
+                            </div>
+                            <h3 className="text-xl font-black text-emerald-700 mb-2">Fatura Gönderildi ✓</h3>
+                            <p className="text-slate-600 font-medium">Satışı tamamlamak için ödeme yöntemini seçin</p>
+                        </div>
+                        <div className="p-5 space-y-3">
+                            {invoicePdfUrl && (
+                                <button
+                                    onClick={() => window.open(invoicePdfUrl, '_blank')}
+                                    className="w-full py-3 rounded-xl font-bold border-2 border-slate-200 text-slate-700 hover:bg-slate-50 transition-all active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                    <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
+                                    Kesilen Faturayı Görüntüle
+                                </button>
+                            )}
+                            <div className="grid grid-cols-3 gap-3 pt-2">
+                                <button
+                                    onClick={() => handleInvoicePaymentComplete('Nakit')}
+                                    className="py-4 rounded-xl font-extrabold text-emerald-700 bg-emerald-50 border-2 border-emerald-200 hover:border-emerald-500 hover:bg-emerald-100 hover:shadow-md transition-all active:scale-95"
+                                >
+                                    NAKİT
+                                </button>
+                                <button
+                                    onClick={() => handleInvoicePaymentComplete('POS')}
+                                    className="py-4 rounded-xl font-extrabold text-blue-700 bg-blue-50 border-2 border-blue-200 hover:border-blue-500 hover:bg-blue-100 hover:shadow-md transition-all active:scale-95"
+                                >
+                                    KREDİ KARTI
+                                </button>
+                                <button
+                                    onClick={() => handleInvoicePaymentComplete('Açık Hesap')}
+                                    className="py-4 rounded-xl font-extrabold text-orange-700 bg-orange-50 border-2 border-orange-200 hover:border-orange-500 hover:bg-orange-100 hover:shadow-md transition-all active:scale-95"
+                                >
+                                    VERESİYE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Debt Limit Alert Modal */}
             <DebtLimitAlert

@@ -9,10 +9,10 @@ import StatusModal from './StatusModal';
 
 export default function ReceiptDesignerModal({ isOpen, onClose }) {
     const [companyInfo, setCompanyInfo] = useState({
-        name: 'Firma Adı',
-        address: '',
-        phone: '',
-        logo_text: 'K'
+        name: 'ERCAN YAPI MARKET',
+        address: 'Fatih Mh. Mücahitler Cd. 151/C Seyhan/Adana',
+        phone: '0553 878 58 85',
+        logo_text: 'E'
     });
 
     const [showWatermark, setShowWatermark] = useState(true);

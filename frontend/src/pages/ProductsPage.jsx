@@ -446,20 +446,21 @@ export default function ProductsPage() {
 
                     <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/60">
                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Fiyat Aralığı (TL)</label>
-                        <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
                             <input
                                 type="number"
                                 value={filters.priceMin}
                                 onChange={(e) => setFilters({ ...filters, priceMin: e.target.value })}
                                 placeholder="Min"
-                                className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none text-sm transition-all text-center font-medium text-slate-700 placeholder:text-slate-400"
+                                className="flex-1 px-3 py-2 bg-white rounded-lg border border-slate-200 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none text-sm transition-all text-center font-medium text-slate-700 placeholder:text-slate-400"
                             />
+                            <span className="text-slate-400 font-bold">-</span>
                             <input
                                 type="number"
                                 value={filters.priceMax}
                                 onChange={(e) => setFilters({ ...filters, priceMax: e.target.value })}
                                 placeholder="Max"
-                                className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none text-sm transition-all text-center font-medium text-slate-700 placeholder:text-slate-400"
+                                className="flex-1 px-3 py-2 bg-white rounded-lg border border-slate-200 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none text-sm transition-all text-center font-medium text-slate-700 placeholder:text-slate-400"
                             />
                         </div>
                     </div>

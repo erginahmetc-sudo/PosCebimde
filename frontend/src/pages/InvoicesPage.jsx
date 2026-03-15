@@ -6,7 +6,6 @@ import pako from 'pako';
 
 
 import ProductMatchModal from '../components/modals/ProductMatchModal';
-import StatusModal from '../components/modals/StatusModal';
 
 export default function InvoicesPage() {
     const [invoices, setInvoices] = useState([]);
@@ -40,13 +39,6 @@ export default function InvoicesPage() {
     const [matchModalOpen, setMatchModalOpen] = useState(false);
     const [matchModalData, setMatchModalData] = useState(null); // { index, line }
 
-    // New Customer Confirmation Modal State
-    const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
-    const [newCustomerCreating, setNewCustomerCreating] = useState(false);
-
-    // Status Modal State
-    const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'success', details: null });
-
     useEffect(() => {
         loadInvoices();
         loadDataForMatching();
@@ -64,59 +56,6 @@ export default function InvoicesPage() {
             console.error("Eşleştirme verileri yüklenemedi", err);
         }
     };
-    // Generate next customer code based on existing codes (M0001, M0002, etc.)
-    const generateNextCustomerCode = () => {
-        const existingCodes = customers
-            .map(c => c.customer_code)
-            .filter(code => code && /^M\d+$/.test(code))
-            .map(code => parseInt(code.substring(1), 10));
-        const maxNum = existingCodes.length > 0 ? Math.max(...existingCodes) : 0;
-        const nextNum = maxNum + 1;
-        return `M${nextNum.toString().padStart(4, '0')}`;
-    };
-
-    // Handle new customer creation from invoice supplier
-    const handleCreateNewCustomer = async () => {
-        if (!invoiceDetail?.supplier_name) return;
-        setNewCustomerCreating(true);
-        try {
-            const newCustomer = {
-                name: invoiceDetail.supplier_name,
-                tax_number: invoiceDetail.supplier_tax_no,
-                address: '-',
-                phone: '-',
-                balance: 0,
-                group: 'Firmalar',
-                customer_code: generateNextCustomerCode()
-            };
-            const res = await customersAPI.add(newCustomer);
-            if (res.data?.success) {
-                const cRes = await customersAPI.getAll();
-                setCustomers(cRes.data?.customers || []);
-                setSupplierMatch(res.data.id);
-                setShowNewCustomerModal(false);
-                setStatusModal({
-                    isOpen: true,
-                    title: 'Cari Oluşturuldu',
-                    message: `"${invoiceDetail.supplier_name}" başarıyla oluşturuldu ve seçildi.`,
-                    type: 'success',
-                    details: `Müşteri Kodu: ${newCustomer.customer_code}\nGrup: Firmalar`
-                });
-            }
-        } catch (e) {
-            setShowNewCustomerModal(false);
-            setStatusModal({
-                isOpen: true,
-                title: 'Hata',
-                message: 'Cari oluşturulurken bir hata oluştu.',
-                type: 'error',
-                details: e.message
-            });
-        } finally {
-            setNewCustomerCreating(false);
-        }
-    };
-
     // Filter states
     const [filters, setFilters] = useState({
         search: '',
@@ -694,37 +633,11 @@ export default function InvoicesPage() {
                 }
             }
 
-            // B. Add Transaction to Customer (Supplier) - Save with JSON description including items
-            const transactionDescription = JSON.stringify({
-                summary: `Alış Faturası - ${selectedInvoice.invoice_number} - ${invoiceDetail.lines.length} kalem`,
-                supplier: {
-                    name: invoiceDetail.supplier_name,
-                    taxOffice: invoiceDetail.supplier_tax_office || '',
-                    taxNo: invoiceDetail.supplier_tax_no || ''
-                },
-                invoiceDetails: {
-                    serialNo: selectedInvoice.invoice_number,
-                    date: selectedInvoice.date,
-                },
-                items: invoiceDetail.lines.map((line, i) => {
-                    const product = products.find(p => p.id == productMatches[i]);
-                    return {
-                        stockCode: product?.stock_code || '',
-                        name: line.name || product?.name || '',
-                        quantity: line.quantity,
-                        price: line.unit_price,
-                        vatRate: line.vat_rate || 0,
-                    };
-                }),
-                note: invoiceDescription || '',
-                totals: {
-                    grandTotal: invoiceDetail.total_amount
-                }
-            });
+            // B. Add Transaction to Customer (Supplier)
             await customersAPI.addPurchaseTransaction({
                 customer_id: supplierMatch,
                 amount: invoiceDetail.total_amount,
-                description: transactionDescription
+                description: `${invoiceDescription || 'Fatura İşleme'} (${selectedInvoice.invoice_number})`
             });
 
             // C. Update Invoice Status
@@ -1295,7 +1208,31 @@ export default function InvoicesPage() {
 
                                             {!supplierMatch && invoiceDetail?.supplier_name && (
                                                 <button
-                                                    onClick={() => setShowNewCustomerModal(true)}
+                                                    onClick={async () => {
+                                                        if (confirm(`"${invoiceDetail.supplier_name}" adında yeni bir cari oluşturulacak. Onaylıyor musunuz?`)) {
+                                                            setProcessing(true);
+                                                            try {
+                                                                const newCustomer = {
+                                                                    name: invoiceDetail.supplier_name,
+                                                                    tax_number: invoiceDetail.supplier_tax_no,
+                                                                    address: '-',
+                                                                    phone: '-',
+                                                                    balance: 0
+                                                                };
+                                                                const res = await customersAPI.add(newCustomer);
+                                                                if (res.data?.success) {
+                                                                    const cRes = await customersAPI.getAll();
+                                                                    setCustomers(cRes.data?.customers || []);
+                                                                    setSupplierMatch(res.data.id);
+                                                                    alert("Cari başarıyla oluşturuldu ve seçildi.");
+                                                                }
+                                                            } catch (e) {
+                                                                alert("Hata: " + e.message);
+                                                            } finally {
+                                                                setProcessing(false);
+                                                            }
+                                                        }
+                                                    }}
                                                     className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-500/25 transition-all flex items-center gap-2 whitespace-nowrap"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
@@ -1562,97 +1499,6 @@ export default function InvoicesPage() {
                         }
                     }
                 }}
-            />
-            {/* Modern New Customer Confirmation Modal */}
-            {showNewCustomerModal && invoiceDetail?.supplier_name && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-[3px] animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform animate-in zoom-in-95 duration-200">
-                        {/* Header */}
-                        <div className="bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 px-6 py-5">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                                    <span className="material-symbols-outlined text-white text-2xl">person_add</span>
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-white">Yeni Cari Oluştur</h3>
-                                    <p className="text-emerald-100 text-sm">Firmalar grubuna kaydedilecek</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Body */}
-                        <div className="p-6 space-y-4">
-                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                                <div className="flex items-start gap-3">
-                                    <span className="material-symbols-outlined text-emerald-600 text-xl mt-0.5">storefront</span>
-                                    <div>
-                                        <p className="text-sm text-emerald-800 font-semibold mb-1">Oluşturulacak Cari</p>
-                                        <p className="text-lg font-bold text-emerald-900">{invoiceDetail.supplier_name}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                                    <p className="text-xs text-slate-500 font-medium mb-1">Müşteri Kodu</p>
-                                    <p className="text-sm font-bold text-slate-800">{generateNextCustomerCode()}</p>
-                                </div>
-                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                                    <p className="text-xs text-slate-500 font-medium mb-1">Grup</p>
-                                    <p className="text-sm font-bold text-slate-800">Firmalar</p>
-                                </div>
-                                {invoiceDetail.supplier_tax_no && (
-                                    <div className="col-span-2 bg-slate-50 rounded-xl p-3 border border-slate-200">
-                                        <p className="text-xs text-slate-500 font-medium mb-1">Vergi Numarası</p>
-                                        <p className="text-sm font-bold text-slate-800">{invoiceDetail.supplier_tax_no}</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            <p className="text-sm text-slate-500 text-center">
-                                Bu cari <strong className="text-slate-700">Firmalar</strong> grubuna otomatik müşteri kodu ile kaydedilecektir.
-                            </p>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3">
-                            <button
-                                onClick={() => setShowNewCustomerModal(false)}
-                                disabled={newCustomerCreating}
-                                className="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-white border-2 border-slate-200 hover:bg-slate-100 transition-all active:scale-95 disabled:opacity-50"
-                            >
-                                İptal
-                            </button>
-                            <button
-                                onClick={handleCreateNewCustomer}
-                                disabled={newCustomerCreating}
-                                className="flex-1 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 shadow-lg shadow-emerald-500/25 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {newCustomerCreating ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                        Oluşturuluyor...
-                                    </>
-                                ) : (
-                                    <>
-                                        <span className="material-symbols-outlined text-lg">check_circle</span>
-                                        Onayla ve Oluştur
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Status Modal */}
-            <StatusModal
-                isOpen={statusModal.isOpen}
-                onClose={() => setStatusModal({ ...statusModal, isOpen: false })}
-                title={statusModal.title}
-                message={statusModal.message}
-                type={statusModal.type}
-                details={statusModal.details}
             />
         </div>
     );

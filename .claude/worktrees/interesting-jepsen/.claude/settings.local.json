@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat /c/Users/incPa/Desktop/poscebimde1/kasapos/backend/migrations/*.sql)",
+      "Bash(pandoc --track-changes=all \"C:/Users/ifpa/Desktop/SendBasicInvoiceFromModelRequestDataOrnekler.docx\" -o /tmp/docx_output.md)",
+      "Bash(python \"C:/Users/ifpa/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/187b77cb-a1b6-4f57-8c42-e6d68a8153c2/20fc1246-63f2-4b2a-866c-2dacd3e24379/skills/docx/scripts/office/unpack.py\" \"C:/Users/ifpa/Desktop/SendBasicInvoiceFromModelRequestDataOrnekler.docx\")",
+      "Bash(pip install defusedxml)",
+      "Bash(mkdir -p /tmp/docx_unpack)",
+      "Bash(python \"C:/Users/ifpa/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/187b77cb-a1b6-4f57-8c42-e6d68a8153c2/20fc1246-63f2-4b2a-866c-2dacd3e24379/skills/docx/scripts/office/unpack.py\" \"C:/Users/ifpa/Desktop/SendBasicInvoiceFromModelRequestDataOrnekler.docx\" /tmp/docx_unpack)",
+      "Bash(python3 -c \"import os; print\\(os.listdir\\(''C:/tmp/docx_unpack/word/''\\)\\)\")",
+      "Bash(python3 -c \"import os; [print\\(r, f\\) for r,d,files in os.walk\\(''C:/tmp''\\) for f in files]\")",
+      "Bash(mkdir -p \"C:/Users/ifpa/AppData/Local/Temp/docx_unpack\")",
+      "Bash(python \"C:/Users/ifpa/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/187b77cb-a1b6-4f57-8c42-e6d68a8153c2/20fc1246-63f2-4b2a-866c-2dacd3e24379/skills/docx/scripts/office/unpack.py\" \"C:/Users/ifpa/Desktop/SendBasicInvoiceFromModelRequestDataOrnekler.docx\" \"C:/Users/ifpa/AppData/Local/Temp/docx_unpack\")",
+      "Bash(python3:*)",
+      "WebFetch(domain:app.swaggerhub.com)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\(''scripts'',{}\\)\\)\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(where npm)",
+      "Bash(node_modules/.bin/vite build)",
+      "Bash(ls /c/Users/ifpa/Desktop/kasapos/node_modules/.bin/vite*)",
+      "Bash(\"/c/Program Files/nodejs/npm.cmd\" run build)",
+      "Bash(\"/c/Program Files/nodejs/npm.cmd\" install)",
+      "Bash(curl -s http://localhost:3001/api/health)",
+      "Bash(curl -s http://localhost:5000/api/health)",
+      "Bash(curl -s http://localhost:5000/)"
+    ]
+  }
+}

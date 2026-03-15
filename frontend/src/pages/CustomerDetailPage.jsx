@@ -4,6 +4,7 @@ import XLSX from 'xlsx-js-style';
 import { customersAPI, salesAPI, productsAPI } from '../services/api';
 import { supabase } from '../lib/supabaseClient';
 import SaleDetailModal from '../components/modals/SaleDetailModal';
+import PurchaseInvoiceDetailModal from '../components/modals/PurchaseInvoiceDetailModal';
 
 export default function CustomerDetailPage() {
     const { customerName } = useParams();
@@ -665,210 +666,19 @@ export default function CustomerDetailPage() {
                 </div>
             )}
 
-            {/* Purchase Invoice Detail Modal (Read-Only) */}
-            {selectedInvoice && (() => {
-                // Parse invoice data from description (JSON)
-                let invoiceData = null;
-                try {
-                    invoiceData = JSON.parse(selectedInvoice.description);
-                } catch { /* not JSON, legacy entry */ }
-
-                const items = invoiceData?.items || [];
-                const supplierInfo = invoiceData?.supplier || {};
-                const invoiceDetails = invoiceData?.invoiceDetails || {};
-
-                const calcLineTotal = (item) => {
-                    let p = (item.quantity || 0) * (item.price || 0);
-                    if (item.disc1) p -= p * (item.disc1 / 100);
-                    if (item.disc2) p -= p * (item.disc2 / 100);
-                    if (item.disc3) p -= p * (item.disc3 / 100);
-                    if (item.disc4) p -= p * (item.disc4 / 100);
-                    const vat = p * ((item.vatRate || 0) / 100);
-                    return p + vat;
-                };
-
-                const subTotal = items.reduce((sum, it) => {
-                    let p = (it.quantity || 0) * (it.price || 0);
-                    if (it.disc1) p -= p * (it.disc1 / 100);
-                    if (it.disc2) p -= p * (it.disc2 / 100);
-                    if (it.disc3) p -= p * (it.disc3 / 100);
-                    if (it.disc4) p -= p * (it.disc4 / 100);
-                    return sum + p;
-                }, 0);
-                const vatTotal = items.reduce((sum, it) => {
-                    let p = (it.quantity || 0) * (it.price || 0);
-                    if (it.disc1) p -= p * (it.disc1 / 100);
-                    if (it.disc2) p -= p * (it.disc2 / 100);
-                    if (it.disc3) p -= p * (it.disc3 / 100);
-                    if (it.disc4) p -= p * (it.disc4 / 100);
-                    return sum + p * ((it.vatRate || 0) / 100);
-                }, 0);
-                const grandTotal = invoiceData?.totals?.grandTotal || (subTotal + vatTotal);
-
-                return (
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
-                            {/* Header */}
-                            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
-                                <div>
-                                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                        <span className="material-symbols-outlined">receipt_long</span>
-                                        Alış Faturası Detayları
-                                        <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-lg text-xs font-medium">Salt Okunur</span>
-                                    </h2>
-                                    <p className="text-indigo-200 text-sm mt-0.5">
-                                        {customer.name} • {new Date(selectedInvoice.created_at).toLocaleDateString('tr-TR')}
-                                    </p>
-                                </div>
-                                <button onClick={() => setSelectedInvoice(null)} className="text-white/70 hover:text-white transition-colors">
-                                    <span className="material-symbols-outlined text-2xl">close</span>
-                                </button>
-                            </div>
-
-                            {/* Scrollable Content */}
-                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                                {!invoiceData ? (
-                                    /* Legacy Entry */
-                                    <div className="space-y-4">
-                                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                                            <p className="text-amber-700 text-sm font-medium flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-lg">info</span>
-                                                Bu fatura eski formatta kaydedilmiş. Detaylı ürün bilgisi mevcut değil.
-                                            </p>
-                                        </div>
-                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                                            <p className="text-xs text-slate-500 font-medium mb-1">Tutar</p>
-                                            <p className="text-2xl font-bold text-slate-800">{formatCurrency(selectedInvoice.total)} TL</p>
-                                        </div>
-                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                                            <p className="text-xs text-slate-500 font-medium mb-1">Açıklama</p>
-                                            <p className="text-sm text-slate-800">{selectedInvoice.description || '-'}</p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <>
-                                        {/* Supplier & Invoice Info */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
-                                                    <span className="material-symbols-outlined text-sm">business</span>
-                                                    Tedarikçi Bilgileri
-                                                </h3>
-                                                <div className="space-y-1.5 text-sm">
-                                                    <div className="flex justify-between"><span className="text-slate-500">Firma:</span><span className="font-medium text-slate-800">{supplierInfo.name || '-'}</span></div>
-                                                    <div className="flex justify-between"><span className="text-slate-500">Vergi D.:</span><span className="font-medium text-slate-800">{supplierInfo.taxOffice || '-'}</span></div>
-                                                    <div className="flex justify-between"><span className="text-slate-500">Vergi No:</span><span className="font-medium text-slate-800">{supplierInfo.taxNo || '-'}</span></div>
-                                                </div>
-                                            </div>
-                                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
-                                                    <span className="material-symbols-outlined text-sm">description</span>
-                                                    Fatura Bilgileri
-                                                </h3>
-                                                <div className="space-y-1.5 text-sm">
-                                                    <div className="flex justify-between"><span className="text-slate-500">Seri No:</span><span className="font-medium text-slate-800">{invoiceDetails.serialNo || '-'}</span></div>
-                                                    <div className="flex justify-between"><span className="text-slate-500">Tarih:</span><span className="font-medium text-slate-800">{invoiceDetails.date ? new Date(invoiceDetails.date).toLocaleDateString('tr-TR') : '-'}</span></div>
-                                                    {invoiceDetails.dueDate && (
-                                                        <div className="flex justify-between"><span className="text-slate-500">Vade:</span><span className="font-medium text-slate-800">{new Date(invoiceDetails.dueDate).toLocaleDateString('tr-TR')}</span></div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Products Table (Read-Only) */}
-                                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                                            <div className="p-3 border-b border-slate-200 bg-slate-50/50">
-                                                <h3 className="font-semibold flex items-center gap-2 text-slate-900 text-sm">
-                                                    <span className="material-symbols-outlined text-slate-400 text-lg">inventory_2</span>
-                                                    Ürün Kalemleri ({items.length})
-                                                </h3>
-                                            </div>
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-left border-collapse">
-                                                    <thead>
-                                                        <tr className="bg-slate-50 text-[10px] uppercase tracking-wider font-bold text-slate-500">
-                                                            <th className="px-2 py-2 border-b border-slate-200 w-8 text-center">#</th>
-                                                            <th className="px-2 py-2 border-b border-slate-200 w-24 text-left">Stok Kodu</th>
-                                                            <th className="px-2 py-2 border-b border-slate-200 text-left">Ürün Adı</th>
-                                                            <th className="px-2 py-2 border-b border-slate-200 text-center w-14">Miktar</th>
-                                                            <th className="px-2 py-2 border-b border-slate-200 text-right w-20">B. Fiyat</th>
-                                                            <th className="px-2 py-2 border-b border-slate-200 text-center w-14">KDV%</th>
-                                                            <th className="px-2 py-2 border-b border-slate-200 text-right w-24">Toplam</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-200">
-                                                        {items.map((item, index) => {
-                                                            const lineTotal = calcLineTotal(item);
-                                                            return (
-                                                                <tr key={index} className="hover:bg-slate-50 transition-colors">
-                                                                    <td className="px-2 py-2 text-xs text-slate-400 text-center">{index + 1}</td>
-                                                                    <td className="px-2 py-2 text-xs font-mono font-medium text-slate-600">{item.stockCode || '-'}</td>
-                                                                    <td className="px-2 py-2 text-xs font-semibold text-slate-900">{item.name || '-'}</td>
-                                                                    <td className="px-2 py-2 text-xs text-center font-medium text-slate-800">{item.quantity}</td>
-                                                                    <td className="px-2 py-2 text-xs text-right font-medium text-slate-800">{formatCurrency(item.price)}</td>
-                                                                    <td className="px-2 py-2 text-xs text-center text-slate-600">%{item.vatRate || 0}</td>
-                                                                    <td className="px-2 py-2 text-xs text-right font-bold text-slate-700">{formatCurrency(lineTotal)} TL</td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                                {items.length === 0 && (
-                                                    <div className="p-8 text-center">
-                                                        <span className="material-symbols-outlined text-3xl text-slate-300 mb-2 block">inventory_2</span>
-                                                        <p className="text-slate-500 text-sm font-medium">Ürün kalemi bulunamadı</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Note & Totals */}
-                                        {(invoiceData.note || items.length > 0) && (
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                <div className="md:col-span-2">
-                                                    {invoiceData.note && (
-                                                        <>
-                                                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Fatura Notu</label>
-                                                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700">{invoiceData.note}</div>
-                                                        </>
-                                                    )}
-                                                </div>
-                                                <div className="bg-gradient-to-br from-slate-50 to-indigo-50 p-4 rounded-xl border border-slate-200 space-y-2">
-                                                    <div className="flex justify-between items-center text-sm">
-                                                        <span className="text-slate-500">Ara Toplam</span>
-                                                        <span className="font-semibold text-slate-900">{formatCurrency(subTotal)} TL</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center text-sm">
-                                                        <span className="text-slate-500">KDV Toplamı</span>
-                                                        <span className="font-semibold text-slate-900">{formatCurrency(vatTotal)} TL</span>
-                                                    </div>
-                                                    <div className="pt-2 border-t border-slate-300">
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="text-xs font-bold uppercase tracking-widest text-indigo-600">Genel Toplam</span>
-                                                            <span className="text-xl font-extrabold text-slate-900">{formatCurrency(grandTotal)} TL</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-
-                            {/* Footer - Only Close Button (Read-Only) */}
-                            <div className="border-t border-slate-200 px-6 py-4 bg-slate-50 flex items-center justify-end flex-shrink-0">
-                                <button
-                                    onClick={() => setSelectedInvoice(null)}
-                                    className="px-6 py-2.5 text-white bg-indigo-600 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20 text-sm flex items-center gap-1.5"
-                                >
-                                    <span className="material-symbols-outlined text-base">close</span>
-                                    Kapat
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
+            {/* Purchase Invoice Detail Modal */}
+            {selectedInvoice && (
+                <PurchaseInvoiceDetailModal
+                    transaction={selectedInvoice}
+                    customer={customer}
+                    products={products}
+                    onClose={() => setSelectedInvoice(null)}
+                    onUpdate={() => {
+                        setSelectedInvoice(null);
+                        loadCustomerData();
+                    }}
+                />
+            )}
         </div>
     );
 }

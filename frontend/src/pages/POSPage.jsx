@@ -55,11 +55,11 @@ export default function POSPage() {
     const [keyboardShortcuts, setKeyboardShortcuts] = useState({});
 
     const [companySettings, setCompanySettings] = useState({
-        name: 'Firma Adı',
-        address: '',
-        phone: '',
+        name: 'ERCAN YAPI MARKET',
+        address: 'Fatih Mh. Mücahitler Cd. 151/C Seyhan/Adana',
+        phone: '0553 878 58 85',
         logo_url: null,
-        logo_text: 'K'
+        logo_text: 'E'
     });
     const [debtLimits, setDebtLimits] = useState({});
     const [showDebtLimitAlert, setShowDebtLimitAlert] = useState(false);
@@ -537,10 +537,19 @@ export default function POSPage() {
         // Get selected paper size
         const paperSize = localStorage.getItem('receipt_paper_size') || 'Termal 80mm';
 
-        // Custom A5 HTML Design varsayılan olarak aktif
-        // Sadece açıkça başka bir template seçildiyse devre dışı kalır
+        // Check for Custom A5 HTML Design (Flag or Config Type)
         const templateType = localStorage.getItem('receipt_template_type');
-        let useCustomA5 = templateType === 'custom_html_a5' || !templateType;
+        let useCustomA5 = templateType === 'custom_html_a5';
+
+        // Fallback: Check inside config if flag is missing
+        if (!useCustomA5) {
+            try {
+                const config = JSON.parse(localStorage.getItem('receipt_design_config'));
+                if (config && config.type === 'custom_html_a5') {
+                    useCustomA5 = true;
+                }
+            } catch (e) { }
+        }
 
         if (useCustomA5) {
             printCustomA5Receipt(saleData, paperSize);
