@@ -108,12 +108,11 @@ class BirFaturaService {
 
         const calculatedTotalExclTax = calculatedTotal / 1.20; // General fallback if detailed calc not used
 
-        // OrderId should be numeric for BirFatura. If sale_code is SLS-123, try to extract 123.
+        // OrderId should be numeric for BirFatura. Match old logic for consistency.
         let orderId = 0;
         try {
-            const codeParts = (sale.sale_code || '').split('-');
-            const numericPart = codeParts[codeParts.length - 1];
-            orderId = parseInt(numericPart) || sale.id || 0;
+            const codeWithoutPrefix = (sale.sale_code || '').split('-')[1] || sale.sale_code;
+            orderId = parseInt(codeWithoutPrefix.substring(0, 18)) || sale.id || 0;
         } catch (e) {
             orderId = sale.id || 0;
         }
