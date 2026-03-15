@@ -135,22 +135,73 @@ function parseDate(dateStr) {
     return d;
 }
 
+/**
+ * Validates the BirFatura token against DB settings or fallback
+ * Returns { isValid: boolean, companyCode: string|null }
+ */
+async function checkBirFaturaToken(receivedToken, client) {
+    if (!receivedToken) return { isValid: false, companyCode: null };
+
+    // 1. Fallback token check (emergency access)
+    if (receivedToken === 'kasapos-2026-secret-api-token') {
+        console.log("[Auth] Fallback token accepted.");
+        return { isValid: true, companyCode: null };
+    }
+
+    // 2. Query Supabase for settings with this token
+    const { data: settings, error } = await client
+        .from('app_settings')
+        .select('company_code, value')
+        .eq('key', 'secret_token');
+
+    if (error) {
+        console.error("[Auth] Token query error:", error);
+        return { isValid: false, companyCode: null };
+    }
+
+    if (settings && settings.length > 0) {
+        for (const setting of settings) {
+            if (setting.value) {
+                let storedToken = setting.value;
+                if (typeof storedToken === 'string') storedToken = storedToken.replace(/^"|"$/g, '');
+                if (storedToken === receivedToken) {
+                    return { isValid: true, companyCode: setting.company_code };
+                }
+            }
+        }
+    }
+
+    return { isValid: false, companyCode: null };
+}
+
 // --- HELPER: Format Date to BirFatura format ---
 // Note: formatDateForBirFatura is now handled by birFaturaService.formatDate
 
-// --- ENDPOINT: BirFatura Order Statuses (r4: sadece token varlığı) ---
+// --- ENDPOINT: BirFatura Order Statuses ---
 app.post('/api/orderStatus/', async (req, res) => {
     const receivedToken = req.headers['token'];
-    if (!receivedToken) return res.status(401).json({ error: "Yetkisiz Erişim" });
+    const client = adminSupabase || supabase;
+    const auth = await checkBirFaturaToken(receivedToken, client);
+
+    if (!auth.isValid) {
+        return res.status(401).json({ error: "Yetkisiz Erişim / Geçersiz Token" });
+    }
+
     res.json({
         OrderStatus: birFaturaService.getOrderStatuses()
     });
 });
 
-// --- ENDPOINT: BirFatura Payment Methods (r4: sadece token varlığı) ---
+// --- ENDPOINT: BirFatura Payment Methods ---
 app.post('/api/paymentMethods/', async (req, res) => {
     const receivedToken = req.headers['token'];
-    if (!receivedToken) return res.status(401).json({ error: "Yetkisiz Erişim" });
+    const client = adminSupabase || supabase;
+    const auth = await checkBirFaturaToken(receivedToken, client);
+
+    if (!auth.isValid) {
+        return res.status(401).json({ error: "Yetkisiz Erişim / Geçersiz Token" });
+    }
+
     res.json({
         PaymentMethods: birFaturaService.getPaymentMethods()
     });
@@ -244,38 +295,15 @@ app.post('/api/orders/', async (req, res) => {
         return res.status(503).json({ "Orders": [], "error": "Veritabanı bağlantısı yok" });
     }
 
-    let isValidToken = false;
-    let companyCode = null;
     const client = adminSupabase || supabase;
-    const { data: settings, error: tokenError } = await client
-        .from('app_settings')
-        .select('company_code, value')
-        .eq('key', 'secret_token');
+    const auth = await checkBirFaturaToken(receivedToken, client);
 
-    if (tokenError) console.error("Token sorgulama hatası:", tokenError);
-
-    if (settings && settings.length > 0) {
-        for (const setting of settings) {
-            if (setting.value) {
-                let storedToken = setting.value;
-                if (typeof storedToken === 'string') storedToken = storedToken.replace(/^"|"$/g, '');
-                if (storedToken === receivedToken) {
-                    isValidToken = true;
-                    companyCode = setting.company_code;
-                    break;
-                }
-            }
-        }
-    }
-    if (!isValidToken && receivedToken === 'kasapos-2026-secret-api-token') {
-        isValidToken = true;
-        console.log("Fallback token accepted (kasapos-2026-secret-api-token).");
-    }
-
-    if (!isValidToken) {
+    if (!auth.isValid) {
         console.warn("Invalid token received:", receivedToken);
         return res.status(401).json({ "Orders": [], "error": "Yetkisiz Erişim / Geçersiz Token" });
     }
+
+    const companyCode = auth.companyCode;
 
     // 3. Fetch Sales (service role = RLS bypass, BirFatura sunucusu kullanıcı oturumu olmadan çağırıyor)
     let query = client
