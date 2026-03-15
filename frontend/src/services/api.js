@@ -1135,8 +1135,10 @@ export const salesAPI = {
         if (fetchError || !existingSale) throw fetchError || new Error("Satış bulunamadı");
 
         const updateData = {};
-        // Database uses 'items' column for products
-        if (data.products) updateData.items = data.products;
+        // Database uses 'items' column for products. Support both 'products' and 'items' in the request.
+        if (data.products !== undefined) updateData.items = data.products;
+        else if (data.items !== undefined) updateData.items = data.items;
+        
         if (data.total !== undefined) updateData.total = data.total;
         if (data.payment_method !== undefined) updateData.payment_method = data.payment_method;
         if (data.customer_id !== undefined) updateData.customer_id = data.customer_id;
@@ -1157,7 +1159,7 @@ export const salesAPI = {
             const oldTotal = parseFloat(existingSale.total || 0).toFixed(2);
             const newTotal = parseFloat(data.total || existingSale.total || 0).toFixed(2);
             const oldItems = existingSale.items || [];
-            const newProducts = data.products || oldItems;
+            const newProducts = data.products || data.items || oldItems;
             
             // Compare items to find quantity and price changes
             const changeDetails = [];
