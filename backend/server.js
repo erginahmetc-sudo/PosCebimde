@@ -149,8 +149,8 @@ async function checkBirFaturaToken(receivedToken, client) {
         return { isValid: true, companyCode: null };
     }
 
-    const receivedToken = incomingToken || '';
-    console.log(`[Auth] Checking token: "${receivedToken}"`);
+    const token = (receivedToken || '').trim();
+    console.log(`[Auth] Checking token: "${token}"`);
 
     const { data: settings, error } = await client
         .from('app_settings')
@@ -169,7 +169,7 @@ async function checkBirFaturaToken(receivedToken, client) {
                 if (typeof storedToken === 'string') {
                     storedToken = storedToken.replace(/^"|"$/g, '').trim();
                 }
-                if (storedToken === (receivedToken || '').trim()) {
+                if (storedToken === token) {
                     return { isValid: true, companyCode: setting.company_code };
                 }
             }
@@ -306,7 +306,7 @@ app.post('/api/products/force-delete', async (req, res) => {
 
 // --- ENDPOINT: BirFatura Polls This for Orders (r4 ile aynı mantık) ---
 app.post('/api/orders/', async (req, res) => {
-    const receivedToken = req.headers['token'] || req.headers['authorization'] || req.query.token;
+    const receivedToken = req.headers['token'] || req.headers['authorization'] || req.query.token || req.body?.Token || req.body?.token;
     console.log(`[DEBUG] /api/orders/ Request:
       Headers: ${JSON.stringify(req.headers)}
       Body: ${JSON.stringify(req.body)}
@@ -343,9 +343,14 @@ app.post('/api/orders/', async (req, res) => {
     }
 
     const filterData = req.body || {};
-    const startDateTimeStr = filterData.startDateTime;
-    const endDateTimeStr = filterData.endDateTime;
-    const orderCodeFilter = filterData.OrderCode;
+    const startDateTimeStr = filterData.startDateTime || filterData.StartDateTime;
+    const endDateTimeStr = filterData.endDateTime || filterData.EndDateTime;
+    const orderCodeFilter = filterData.OrderCode || filterData.orderCode || filterData.order_code;
+    const requestedStatusId = filterData.orderStatusId || filterData.OrderStatusId;
+
+    if (requestedStatusId && Number(requestedStatusId) !== 1) {
+        return res.json({ "Orders": [] });
+    }
 
     if (orderCodeFilter) {
         query = query.eq('sale_code', orderCodeFilter);

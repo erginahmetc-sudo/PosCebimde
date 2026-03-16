@@ -17,7 +17,7 @@ class BirFaturaService {
         const day = parseInt(dateParts[0], 10);
         const month = parseInt(dateParts[1], 10) - 1;
         const year = parseInt(dateParts[2], 10);
-        if (isNaN(day) || !isNaN(month) && isNaN(year)) return null;
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
         let hour = 0, minute = 0, second = 0;
         if (parts[1]) {
             const timeParts = parts[1].split(':');
@@ -82,31 +82,55 @@ class BirFaturaService {
             try { items = JSON.parse(items); } catch (e) { items = []; }
         }
 
-        let calculatedTotal = 0;
+        let totalGross = 0;
+        let totalNet = 0;
+        let totalDiscountGross = 0;
+        let totalDiscountNet = 0;
+
         const orderDetails = (items || []).map(item => {
             const unitPriceInclTax = parseFloat(item.final_price || item.price || 0);
             const quantity = parseFloat(item.quantity || 1);
             const vatRate = parseFloat(item.vat_rate || 20);
-            const unitPriceExclTax = unitPriceInclTax / (1 + vatRate / 100);
+            const discountRate = parseFloat(item.discount_rate || 0);
 
-            calculatedTotal += unitPriceInclTax * quantity;
+            const unitPriceExclTax = vatRate ? (unitPriceInclTax / (1 + vatRate / 100)) : unitPriceInclTax;
+
+            const lineGross = unitPriceInclTax * quantity;
+            const lineNet = unitPriceExclTax * quantity;
+            const lineDiscountGross = lineGross * (discountRate / 100);
+            const lineDiscountNet = lineNet * (discountRate / 100);
+
+            totalGross += (lineGross - lineDiscountGross);
+            totalNet += (lineNet - lineDiscountNet);
+            totalDiscountGross += lineDiscountGross;
+            totalDiscountNet += lineDiscountNet;
+
+            const discountUnitGross = quantity > 0 ? (lineDiscountGross / quantity) : 0;
+            const discountUnitNet = quantity > 0 ? (lineDiscountNet / quantity) : 0;
 
             return {
-                "ProductId": 0,
-                "ProductCode": item.stock_code || "URUN01",
+                "ProductId": item.id || 0,
+                "ProductCode": item.stock_code || item.code || "URUN01",
                 "Barcode": item.barcode || item.stock_code || "",
                 "ProductBrand": item.brand || "",
-                "ProductName": item.name || "Ürün",
-                "ProductQuantityType": item.unit || "Adet",
+                "ProductName": item.name || "Urun",
+                "ProductNote": item.note || "",
+                "ProductImage": item.image_url || item.image || "",
+                "Variants": Array.isArray(item.variants) ? item.variants : [],
+                "ProductQuantityType": item.unit || item.quantity_type || "Adet",
                 "ProductQuantity": quantity,
                 "VatRate": vatRate,
                 "ProductUnitPriceTaxExcluding": Number(unitPriceExclTax.toFixed(4)),
                 "ProductUnitPriceTaxIncluding": Number(unitPriceInclTax.toFixed(4)),
-                "Variants": []
+                "DiscountUnitTaxExcluding": Number(discountUnitNet.toFixed(4)),
+                "DiscountUnitTaxIncluding": Number(discountUnitGross.toFixed(4))
             };
         });
 
-        const calculatedTotalExclTax = calculatedTotal / 1.20; // General fallback if detailed calc not used
+        if (totalGross === 0 && sale.total) {
+            totalGross = Number(sale.total) || 0;
+            totalNet = totalGross / 1.20;
+        }
 
         // OrderId should be numeric for BirFatura. Match old logic for consistency.
         let orderId = 0;
@@ -146,10 +170,22 @@ class BirFaturaService {
             "OrderStatusId": 1,
             "Currency": "TRY",
             "CurrencyRate": 1,
-            "TotalPaidTaxIncluding": Number(calculatedTotal.toFixed(2)),
-            "TotalPaidTaxExcluding": Number((calculatedTotal / 1.20).toFixed(2)),
-            "ProductsTotalTaxIncluding": Number(calculatedTotal.toFixed(2)),
-            "ProductsTotalTaxExcluding": Number((calculatedTotal / 1.20).toFixed(2)),
+            "TotalPaidTaxIncluding": Number(totalGross.toFixed(2)),
+            "TotalPaidTaxExcluding": Number(totalNet.toFixed(2)),
+            "ProductsTotalTaxIncluding": Number(totalGross.toFixed(2)),
+            "ProductsTotalTaxExcluding": Number(totalNet.toFixed(2)),
+            "CommissionTotalTaxExcluding": 0,
+            "CommissionTotalTaxIncluding": 0,
+            "ShippingChargeTotalTaxExcluding": 0,
+            "ShippingChargeTotalTaxIncluding": 0,
+            "PayingAtTheDoorChargeTotalTaxExcluding": 0,
+            "PayingAtTheDoorChargeTotalTaxIncluding": 0,
+            "DiscountTotalTaxExcluding": Number(totalDiscountNet.toFixed(2)),
+            "DiscountTotalTaxIncluding": Number(totalDiscountGross.toFixed(2)),
+            "InstallmentChargeTotalTaxExcluding": 0,
+            "InstallmentChargeTotalTaxIncluding": 0,
+            "BankTransferDiscountTotalTaxExcluding": 0,
+            "BankTransferDiscountTotalTaxIncluding": 0,
             "OrderDetails": orderDetails,
             "ExtraFees": []
         };
