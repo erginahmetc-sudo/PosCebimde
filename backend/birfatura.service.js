@@ -142,6 +142,8 @@ class BirFaturaService {
             "ShipCompany": "Kargo",
             "PaymentTypeId": this.mapPaymentMethodToId(sale.payment_method),
             "PaymentType": sale.payment_method || "Kredi Kartı",
+            "Status": 1,
+            "OrderStatusId": 1,
             "Currency": "TRY",
             "CurrencyRate": 1,
             "TotalPaidTaxIncluding": Number(calculatedTotal.toFixed(2)),
