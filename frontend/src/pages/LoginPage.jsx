@@ -13,6 +13,9 @@ export default function LoginPage() {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [isResetMode, setIsResetMode] = useState(false);
+    const [resetEmail, setResetEmail] = useState('');
+    const [resetMessage, setResetMessage] = useState('');
     const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
     const navigate = useNavigate();
     const { login } = useAuth();
@@ -30,11 +33,12 @@ export default function LoginPage() {
             await authAPI.sendOtp(formData.email);
             setStep(2);
         } catch (err) {
+            console.error('Login error detail:', err);
             const message = err.response?.data?.message ||
                 err.response?.data?.error ||
                 err.message ||
                 'Giriş başarısız. Bilgilerinizi kontrol edin.';
-            setError(message);
+            setError(message + (err.status ? ` (Hata Kodu: ${err.status})` : ''));
         } finally {
             setLoading(false);
         }
@@ -57,6 +61,23 @@ export default function LoginPage() {
                 err.response?.data?.error ||
                 err.message ||
                 'Doğrulama kodu hatalı.';
+            setError(message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResetPassword = async (e) => {
+        e.preventDefault();
+        setError('');
+        setResetMessage('');
+        setLoading(true);
+
+        try {
+            const res = await authAPI.resetPassword(resetEmail);
+            setResetMessage(res.message);
+        } catch (err) {
+            const message = err.response?.data?.message || err.message || 'Şifre sıfırlama talebi başarısız oldu.';
             setError(message);
         } finally {
             setLoading(false);
@@ -130,10 +151,14 @@ export default function LoginPage() {
                         {/* Form Header */}
                         <div className="mb-10 text-center md:text-left">
                             <h2 className="text-3xl font-bold text-slate-900 mb-2">
-                                {step === 1 ? 'Giriş Yap' : 'Doğrulama'}
+                                {isResetMode ? 'Şifre Sıfırlama' : step === 1 ? 'Giriş Yap' : 'Doğrulama'}
                             </h2>
                             <p className="text-slate-500">
-                                {step === 1 ? 'Tekrar hoş geldiniz! Hesabınıza erişin.' : 'E-posta adresinize gönderilen 8 haneli kodu girin.'}
+                                {isResetMode 
+                                    ? 'Şifre sıfırlama bağlantısı almak için e-posta adresinizi girin.' 
+                                    : step === 1 
+                                        ? 'Tekrar hoş geldiniz! Hesabınıza erişin.' 
+                                        : 'E-posta adresinize gönderilen 8 haneli kodu girin.'}
                             </p>
                         </div>
 
@@ -144,7 +169,53 @@ export default function LoginPage() {
                             </div>
                         )}
 
-                        {step === 1 ? (
+                        {isResetMode ? (
+                            <form onSubmit={handleResetPassword} className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-semibold text-slate-700 ml-1" htmlFor="resetEmail">E-posta</label>
+                                    <div className="relative group">
+                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                            <svg className="h-5 w-5 text-slate-400 group-focus-within:text-teal-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
+                                        </div>
+                                        <input
+                                            className="block w-full pl-11 pr-4 py-4 bg-slate-50 border-0 ring-1 ring-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all outline-none"
+                                            id="resetEmail"
+                                            placeholder="isim@sirket.com"
+                                            type="email"
+                                            value={resetEmail}
+                                            onChange={(e) => setResetEmail(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                {resetMessage && (
+                                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-700 text-sm animate-fadeIn">
+                                        {resetMessage}
+                                    </div>
+                                )}
+
+                                <button
+                                    className="w-full py-4 px-6 teal-gradient text-white font-bold rounded-2xl shadow-lg shadow-teal-500/30 hover:shadow-teal-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2"
+                                    type="submit"
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <span>Bağlantı Gönder</span>
+                                    )}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsResetMode(false); setError(''); setResetMessage(''); }}
+                                    className="w-full mt-2 flex items-center justify-center py-3 px-6 rounded-2xl bg-white text-slate-100 border border-slate-200 hover:bg-slate-50 font-semibold text-sm transition-all duration-200"
+                                >
+                                    Geri Dön
+                                </button>
+                            </form>
+                        ) : step === 1 ? (
                             <form onSubmit={handleLoginSubmit} className="space-y-6">
                                 {/* Email Field */}
                                 <div className="space-y-2">
@@ -169,7 +240,13 @@ export default function LoginPage() {
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center ml-1">
                                         <label className="text-sm font-semibold text-slate-700" htmlFor="password">Şifre</label>
-                                        <a className="text-xs font-medium text-teal-600 hover:text-teal-700 transition-colors" href="#">Şifremi Unuttum</a>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setIsResetMode(true); setError(''); }}
+                                            className="text-xs font-medium text-teal-600 hover:text-teal-700 transition-colors"
+                                        >
+                                            Şifremi Unuttum
+                                        </button>
                                     </div>
                                     <div className="relative group">
                                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -246,7 +323,7 @@ export default function LoginPage() {
                                 <button
                                     type="button"
                                     onClick={() => setStep(1)}
-                                    className="w-full mt-2 flex items-center justify-center py-3 px-6 rounded-2xl bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 font-semibold text-sm transition-all duration-200"
+                                    className="w-full mt-2 flex items-center justify-center py-3 px-6 rounded-2xl bg-white text-slate-100 border border-slate-200 hover:bg-slate-50 font-semibold text-sm transition-all duration-200"
                                 >
                                     Geri Dön
                                 </button>

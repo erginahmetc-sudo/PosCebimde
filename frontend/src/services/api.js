@@ -96,6 +96,14 @@ export const authAPI = {
         localStorage.removeItem('auth_token');
         return { status: 200 };
     },
+
+    resetPassword: async (email) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/login`,
+        });
+        if (error) throw { response: { data: { message: error.message } } };
+        return { status: 200, message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.' };
+    },
 };
 
 // Helper to get current company code
