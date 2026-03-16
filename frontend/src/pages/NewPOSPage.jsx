@@ -139,39 +139,45 @@ export default function NewPOSPage() {
 
     useEffect(() => {
         const loadCompanySettings = async () => {
-            try {
-                // Fetch Company Settings
-                const nameRes = await settingsAPI.get('company_name');
-                const addressRes = await settingsAPI.get('company_address');
-                const phoneRes = await settingsAPI.get('company_phone');
-                const logoRes = await settingsAPI.get('company_logo');
+            // Load from LocalStorage (Synced by AuthContext)
+            const name = localStorage.getItem('company_name');
+            const address = localStorage.getItem('company_address');
+            const phone = localStorage.getItem('company_phone');
+            const logo = localStorage.getItem('company_logo');
 
-                setCompanySettings(prev => ({
-                    ...prev,
-                    name: nameRes.data || prev.name,
-                    address: addressRes.data || prev.address,
-                    phone: phoneRes.data || prev.phone,
-                    logo_url: logoRes.data || prev.logo_url,
-                    logo_text: (nameRes.data || prev.name).charAt(0).toUpperCase()
-                }));
+            if (name) {
+                setCompanySettings({
+                    name,
+                    address: address || '',
+                    phone: phone || '',
+                    logo_url: logo || null,
+                    logo_text: name.charAt(0).toUpperCase()
+                });
+            } else {
+                // Fallback to API if not in localStorage
+                try {
+                    const nameRes = await settingsAPI.get('company_name');
+                    const addressRes = await settingsAPI.get('company_address');
+                    const phoneRes = await settingsAPI.get('company_phone');
+                    const logoRes = await settingsAPI.get('company_logo');
 
-                // Fetch Debt Limits
-                const limitsRes = await settingsAPI.get('customer_debt_limits');
-                if (limitsRes.data) {
-                    setDebtLimits(limitsRes.data);
+                    setCompanySettings({
+                        name: nameRes.data || 'Firma Adı',
+                        address: addressRes.data || '',
+                        phone: phoneRes.data || '',
+                        logo_url: logoRes.data || null,
+                        logo_text: (nameRes.data || 'F').charAt(0).toUpperCase()
+                    });
+                } catch (e) {
+                    console.error("Error fallback loading settings", e);
                 }
-
-            } catch (error) {
-                console.error("Error loading settings", error);
             }
 
-            // Sync auto print setting
+            // Load Debt Limits (not synced in AuthContext yet as it's complex object)
             try {
-                const res = await settingsAPI.get('receipt_auto_print');
-                if (res.data !== undefined) {
-                    localStorage.setItem('receipt_auto_print', res.data);
-                }
-            } catch (e) { console.error("Error syncing auto print", e); }
+                const limitsRes = await settingsAPI.get('customer_debt_limits');
+                if (limitsRes.data) setDebtLimits(limitsRes.data);
+            } catch (e) { console.error("Error loading debt limits", e); }
         };
         loadCompanySettings();
     }, []);
@@ -315,14 +321,16 @@ export default function NewPOSPage() {
     };
 
     const loadSettings = async () => {
-        try {
-            const { data } = await settingsAPI.getAll();
-            if (data && data.pos_settings_ask_quantity !== undefined) {
-                // Update localStorage so addToCart can use it synchronously
-                localStorage.setItem('pos_settings_ask_quantity', data.pos_settings_ask_quantity);
-            }
-        } catch (error) {
-            console.error('Ayarlar yüklenirken hata:', error);
+        // Just ensure localStorage is reflected in state if needed, 
+        // Sync is handled by AuthContext now.
+        const askQty = localStorage.getItem('pos_settings_ask_quantity');
+        if (askQty === null) {
+            try {
+                const { data } = await settingsAPI.getAll();
+                if (data && data.pos_settings_ask_quantity !== undefined) {
+                    localStorage.setItem('pos_settings_ask_quantity', data.pos_settings_ask_quantity);
+                }
+            } catch (e) { console.error("Error loading settings fallback", e); }
         }
     };
 

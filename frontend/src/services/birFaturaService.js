@@ -11,9 +11,8 @@ export const birFaturaAPI = {
      * @param {Object} params - { retailForm, cart, paymentMethod, saleCode }
      */
     sendBasicInvoice: async ({ retailForm, cart, paymentMethod, saleCode }) => {
-        const configStr = localStorage.getItem('birfatura_config');
         if (!configStr) {
-            return { success: false, message: "Ayarlar bulunamadı. Lütfen Ayarlar sayfasından BirFatura API anahtarlarını kaydedin." };
+            return { success: false, message: "Entegrasyon ayarları (BirFatura) bulunamadı. Lütfen yönetici/kurucu hesabıyla ayarların yapıldığından emin olun." };
         }
         let config;
         try { config = JSON.parse(configStr); }
