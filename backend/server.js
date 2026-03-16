@@ -149,7 +149,9 @@ async function checkBirFaturaToken(receivedToken, client) {
         return { isValid: true, companyCode: null };
     }
 
-    // 2. Query Supabase for settings with this token
+    const receivedToken = incomingToken || '';
+    console.log(`[Auth] Checking token: "${receivedToken}"`);
+
     const { data: settings, error } = await client
         .from('app_settings')
         .select('company_code, value')
@@ -180,10 +182,19 @@ async function checkBirFaturaToken(receivedToken, client) {
 // --- HELPER: Format Date to BirFatura format ---
 // Note: formatDateForBirFatura is now handled by birFaturaService.formatDate
 
+// --- DIAGNOSTIC ENDPOINT ---
+app.get('/api/test', (req, res) => {
+    res.json({ message: "Backend is running and accessible!", time: new Date().toISOString() });
+});
+
 // --- ENDPOINT: BirFatura Order Statuses ---
 app.post(['/api/orderStatus', '/api/orderStatus/'], async (req, res) => {
-    const receivedToken = req.headers['token'] || req.headers['authorization'] || req.query.token;
-    console.log(`[DEBUG] /api/orderStatus Request - Token: ${receivedToken}`);
+    const receivedToken = req.headers['token'] || req.headers['authorization'] || req.query.token || req.body?.Token || req.body?.token;
+    console.log(`[DEBUG] /api/orderStatus Request:
+      Headers: ${JSON.stringify(req.headers)}
+      Body: ${JSON.stringify(req.body)}
+      Token found: ${receivedToken}
+    `);
 
     const client = adminSupabase || supabase;
     const auth = await checkBirFaturaToken(receivedToken, client);
@@ -200,8 +211,12 @@ app.post(['/api/orderStatus', '/api/orderStatus/'], async (req, res) => {
 
 // --- ENDPOINT: BirFatura Payment Methods ---
 app.post(['/api/paymentMethods', '/api/paymentMethods/'], async (req, res) => {
-    const receivedToken = req.headers['token'] || req.headers['authorization'] || req.query.token;
-    console.log(`[DEBUG] /api/paymentMethods Request - Token: ${receivedToken}`);
+    const receivedToken = req.headers['token'] || req.headers['authorization'] || req.query.token || req.body?.Token || req.body?.token;
+    console.log(`[DEBUG] /api/paymentMethods Request:
+      Headers: ${JSON.stringify(req.headers)}
+      Body: ${JSON.stringify(req.body)}
+      Token found: ${receivedToken}
+    `);
 
     const client = adminSupabase || supabase;
     const auth = await checkBirFaturaToken(receivedToken, client);
