@@ -47,7 +47,7 @@ export default function RegisterPage() {
 
     return (
         <div className="bg-surface text-text-main min-h-screen flex flex-col font-display antialiased selection:bg-mint-accent selection:text-primary-deep overflow-x-hidden">
-            <div className="flex flex-1 flex-row overflow-hidden h-screen">
+            <div className="flex flex-1 flex-col lg:flex-row lg:overflow-hidden lg:h-screen">
                 {/* Sol Panel: Görsel ve Marka */}
                 <div className="hidden lg:flex lg:w-1/2 relative bg-mint-light items-center justify-center p-12 overflow-hidden">
                     <div className="absolute inset-0 opacity-[0.03] pointer-events-none">

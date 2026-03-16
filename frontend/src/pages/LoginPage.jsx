@@ -71,7 +71,7 @@ export default function LoginPage() {
                 <div className="absolute bottom-[-10%] right-1/4 w-[600px] h-[600px] bg-sky-100/30 rounded-full blur-[100px]"></div>
             </div>
 
-            <main className="relative w-full max-w-6xl aspect-[16/10] max-h-[90vh] glass-card rounded-[2.5rem] soft-shadow flex overflow-hidden border border-white/50 z-10" data-purpose="main-window">
+            <main className="relative w-full max-w-6xl md:aspect-[16/10] md:max-h-[90vh] glass-card rounded-3xl md:rounded-[2.5rem] soft-shadow flex flex-col md:flex-row overflow-hidden border border-white/50 z-10" data-purpose="main-window">
                 {/* BEGIN: LeftHeroSection */}
                 <section className="hidden md:flex w-1/2 bg-[#f0fdfa]/50 p-12 flex-col justify-between relative overflow-hidden" data-purpose="hero-content">
                     {/* Decorative background blur */}
