@@ -79,8 +79,12 @@ export default function LoginPage() {
                     <div className="z-10">
                         {/* Brand Logo */}
                         <div className="flex items-center gap-3 mb-16">
-                            <img src="/logo.png" alt="PosCebimde Logo" className="w-12 h-12 object-contain" />
-                            <span className="text-2xl font-bold text-slate-800 tracking-tight">PosCebimde</span>
+                            <div className="w-10 h-10 teal-gradient rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/20">
+                                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path>
+                                </svg>
+                            </div>
+                            <span className="text-2xl font-bold text-slate-800 tracking-tight">Kasa POS</span>
                         </div>
                         {/* Hero Text */}
                         <div className="space-y-6">
@@ -89,7 +93,7 @@ export default function LoginPage() {
                                 <span className="text-teal-600">Anında</span> Yazdırılsın.
                             </h1>
                             <p className="text-lg text-slate-600 max-w-sm leading-relaxed">
-                                PosCebimde sistemlerine sorunsuz bağlanın, işletmenizin verimliliğini 2026 teknolojisi ile zirveye taşıyın.
+                                Kasa POS sistemlerine sorunsuz bağlanın, işletmenizin verimliliğini 2026 teknolojisi ile zirveye taşıyın.
                             </p>
                         </div>
                     </div>
@@ -252,7 +256,7 @@ export default function LoginPage() {
                         {/* Form Footer */}
                         <div className="mt-12 text-center">
                             <p className="text-slate-500 text-sm">
-                                PosCebimde'de yeni misiniz?
+                                Kasa POS'ta yeni misiniz?
                                 <Link className="text-teal-600 font-bold hover:underline ml-1" to="/register">Hesap Oluşturun</Link>
                             </p>
                         </div>

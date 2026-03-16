@@ -5,7 +5,6 @@ const dotenv = require('dotenv');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
-const birFaturaService = require('./birfatura.service');
 
 dotenv.config();
 
@@ -34,20 +33,19 @@ try {
 // Admin Client for Force Deletes (Bypassing RLS if Service Role Key is available)
 let adminSupabase = null;
 try {
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (serviceRoleKey && SUPABASE_URL) {
-        adminSupabase = createClient(SUPABASE_URL, serviceRoleKey, {
+    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+    if (SERVICE_KEY && SUPABASE_URL) {
+        adminSupabase = createClient(SUPABASE_URL, SERVICE_KEY, {
             auth: {
                 autoRefreshToken: false,
                 persistSession: false
             }
         });
-        console.log("Admin Supabase client initialized (using Service Role Key).");
+        console.log("Admin Supabase client initialized (Service Role).");
     } else {
-        console.warn("SUPABASE_SERVICE_ROLE_KEY not found in .env. Admin operations will use standard client.");
         // Fallback to normal client if no service key
         adminSupabase = supabase;
+        console.log("Service Code not found, falling back to standard client for admin ops.");
     }
 } catch (e) {
     console.error("Admin client init failed", e);
@@ -55,14 +53,6 @@ try {
 
 app.use(cors());
 app.use(express.json());
-
-function extractToken(req) {
-    let token = req.headers['token'] || req.headers['authorization'] || req.query.token || req.body?.Token || req.body?.token;
-    if (typeof token === 'string' && token.toLowerCase().startsWith('bearer ')) {
-        token = token.slice(7);
-    }
-    return token;
-}
 
 // --- BIRFATURA API PROXY ---
 // Frontend'in CORS sorunu olmadan BirFatura API'sine erişmesi için proxy
@@ -120,122 +110,58 @@ app.post('/api/birfatura-proxy', async (req, res) => {
     }
 });
 
-// --- HELPER: Date Parsing (BirFatura format: DD.MM.YYYY HH:mm:ss veya DD.MM.YYYY) ---
+// --- HELPER: Date Parsing (BirFatura format: DD.MM.YYYY HH:mm:ss) ---
 function parseDate(dateStr) {
-    if (!dateStr || typeof dateStr !== 'string') return null;
-    const trimmed = dateStr.trim();
-    if (!trimmed) return null;
-    const parts = trimmed.split(' ');
-    const dateParts = (parts[0] || '').split('.');
-    if (dateParts.length < 3) return null;
-    const day = parseInt(dateParts[0], 10);
-    const month = parseInt(dateParts[1], 10) - 1;
-    const year = parseInt(dateParts[2], 10);
-    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-    let hour = 0, minute = 0, second = 0;
-    if (parts[1]) {
-        const timeParts = parts[1].split(':');
-        hour = parseInt(timeParts[0], 10) || 0;
-        minute = parseInt(timeParts[1], 10) || 0;
-        second = parseInt(timeParts[2], 10) || 0;
-    }
-    const d = new Date(year, month, day, hour, minute, second);
-    if (isNaN(d.getTime())) return null;
-    return d;
-}
-
-/**
- * Validates the BirFatura token against DB settings or fallback
- * Returns { isValid: boolean, companyCode: string|null }
- */
-async function checkBirFaturaToken(receivedToken, client) {
-    if (!receivedToken) return { isValid: false, companyCode: null };
-
-    // 1. Fallback token check (emergency access)
-    if (receivedToken === 'kasapos-2026-secret-api-token') {
-        console.log("[Auth] Fallback token accepted.");
-        return { isValid: true, companyCode: null };
-    }
-
-    const token = (receivedToken || '').trim();
-    console.log(`[Auth] Checking token: "${token}"`);
-
-    const { data: settings, error } = await client
-        .from('app_settings')
-        .select('company_code, value')
-        .eq('key', 'secret_token');
-
-    if (error) {
-        console.error("[Auth] Token query error:", error);
-        return { isValid: false, companyCode: null };
-    }
-
-    if (settings && settings.length > 0) {
-        for (const setting of settings) {
-            if (setting.value) {
-                let storedToken = setting.value;
-                if (typeof storedToken === 'string') {
-                    storedToken = storedToken.replace(/^"|"$/g, '').trim();
-                }
-                if (storedToken === token) {
-                    return { isValid: true, companyCode: setting.company_code };
-                }
-            }
-        }
-    }
-
-    return { isValid: false, companyCode: null };
+    if (!dateStr) return null;
+    // Format: DD.MM.YYYY HH:mm:ss
+    const parts = dateStr.split(' ');
+    const dateParts = parts[0].split('.');
+    const timeParts = parts[1].split(':');
+    return new Date(
+        dateParts[2], dateParts[1] - 1, dateParts[0],
+        timeParts[0], timeParts[1], timeParts[2]
+    );
 }
 
 // --- HELPER: Format Date to BirFatura format ---
-// Note: formatDateForBirFatura is now handled by birFaturaService.formatDate
-
-// --- DIAGNOSTIC ENDPOINT ---
-app.get('/api/test', (req, res) => {
-    res.json({ message: "Backend is running and accessible!", time: new Date().toISOString() });
-});
+function formatDateForBirFatura(date) {
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const seconds = String(d.getSeconds()).padStart(2, '0');
+    return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
+}
 
 // --- ENDPOINT: BirFatura Order Statuses ---
-app.post(['/api/orderStatus', '/api/orderStatus/'], async (req, res) => {
-    const receivedToken = extractToken(req);
-    console.log(`[DEBUG] /api/orderStatus Request:
-      Headers: ${JSON.stringify(req.headers)}
-      Body: ${JSON.stringify(req.body)}
-      Token found: ${receivedToken}
-    `);
-
-    const client = adminSupabase || supabase;
-    const auth = await checkBirFaturaToken(receivedToken, client);
-
-    if (!auth.isValid) {
-        console.warn(`[DEBUG] /api/orderStatus - Invalid Token: ${receivedToken}`);
-        return res.status(401).json({ error: "Yetkisiz Erişim / Geçersiz Token" });
+app.post('/api/orderStatus/', async (req, res) => {
+    const receivedToken = req.headers['token'];
+    if (!receivedToken) {
+        return res.status(401).json({ error: "Yetkisiz Erişim" });
     }
-
+    // Return order statuses
     res.json({
-        OrderStatus: birFaturaService.getOrderStatuses()
+        OrderStatus: [{ Id: 1, Value: "Onaylandı" }, { Id: 2, Value: "Kargolandı" }, { Id: 3, Value: "İptal Edildi" }]
     });
 });
 
 // --- ENDPOINT: BirFatura Payment Methods ---
-app.post(['/api/paymentMethods', '/api/paymentMethods/'], async (req, res) => {
-    const receivedToken = extractToken(req);
-    console.log(`[DEBUG] /api/paymentMethods Request:
-      Headers: ${JSON.stringify(req.headers)}
-      Body: ${JSON.stringify(req.body)}
-      Token found: ${receivedToken}
-    `);
-
-    const client = adminSupabase || supabase;
-    const auth = await checkBirFaturaToken(receivedToken, client);
-
-    if (!auth.isValid) {
-        console.warn(`[DEBUG] /api/paymentMethods - Invalid Token: ${receivedToken}`);
-        return res.status(401).json({ error: "Yetkisiz Erişim / Geçersiz Token" });
+app.post('/api/paymentMethods/', async (req, res) => {
+    const receivedToken = req.headers['token'];
+    if (!receivedToken) {
+        return res.status(401).json({ error: "Yetkisiz Erişim" });
     }
-
+    // Return payment methods required by Birfatura
     res.json({
-        PaymentMethods: birFaturaService.getPaymentMethods()
+        PaymentMethods: [
+            { Id: 1, Value: "Kredi Kartı" },
+            { Id: 2, Value: "Banka EFT-Havale" },
+            { Id: 3, Value: "Kapıda Ödeme Nakit" },
+            { Id: 4, Value: "Kapıda Ödeme Kredi Kartı" },
+            { Id: 5, Value: "Nakit" }
+        ]
     });
 });
 
@@ -312,14 +238,12 @@ app.post('/api/products/force-delete', async (req, res) => {
     }
 });
 
-// --- ENDPOINT: BirFatura Polls This for Orders (r4 ile aynı mantık) ---
+// --- ENDPOINT: BirFatura Polls This for Orders ---
+// Flask'ta çalışan /api/orders/ endpoint'i ile BİREBİR aynı mantık
 app.post('/api/orders/', async (req, res) => {
-    const receivedToken = extractToken(req);
-    console.log(`[DEBUG] /api/orders/ Request:
-      Headers: ${JSON.stringify(req.headers)}
-      Body: ${JSON.stringify(req.body)}
-      Token found: ${receivedToken}
-    `);
+    const receivedToken = req.headers['token'];
+    console.log("BirFatura İsteği Geldi:", req.body);
+    console.log("Alınan Token:", receivedToken);
 
     if (!receivedToken) {
         return res.status(401).json({ "Orders": [], "error": "Token eksik" });
@@ -330,18 +254,53 @@ app.post('/api/orders/', async (req, res) => {
         return res.status(503).json({ "Orders": [], "error": "Veritabanı bağlantısı yok" });
     }
 
-    const client = adminSupabase || supabase;
-    const auth = await checkBirFaturaToken(receivedToken, client);
+    // 2. Validate Token
+    let isValidToken = false;
+    let companyCode = null;
 
-    if (!auth.isValid) {
+    // A) Veritabanından secret_token kontrolü (Çoklu kiracı desteği)
+    const { data: settings, error: tokenError } = await supabase
+        .from('app_settings')
+        .select('company_code, value')
+        .eq('key', 'secret_token');
+
+    if (tokenError) {
+        console.error("Token sorgulama hatası:", tokenError);
+    }
+
+    if (settings && settings.length > 0) {
+        // Gelen token'ı veritabanındaki token'lar ile karşılaştır
+        for (const setting of settings) {
+            if (setting.value) {
+                let storedToken = setting.value;
+                // Veritabanında string değerler çift tırnaklı (örn: "token") kayıtlı olabiliyor
+                if (typeof storedToken === 'string') {
+                    storedToken = storedToken.replace(/^"|"$/g, '');
+                }
+
+                if (storedToken === receivedToken) {
+                    isValidToken = true;
+                    companyCode = setting.company_code;
+                    break; // Eşleşen token bulundu, döngüden çık
+                }
+            }
+        }
+    }
+
+    // B) app.py Fallback: Eski python uygulamasındaki varsayılan token (Eğer DB'de eşleşmediyse)
+    if (!isValidToken && receivedToken === 'kasapos-2026-secret-api-token') {
+        isValidToken = true;
+        console.log("Fallback token accepted (kasapos-2026-secret-api-token).");
+    }
+
+    if (!isValidToken) {
         console.warn("Invalid token received:", receivedToken);
         return res.status(401).json({ "Orders": [], "error": "Yetkisiz Erişim / Geçersiz Token" });
     }
 
-    const companyCode = auth.companyCode;
-
-    // 3. Fetch Sales (service role = RLS bypass, BirFatura sunucusu kullanıcı oturumu olmadan çağırıyor)
-    let query = client
+    // 3. Fetch Sales
+    // SADECE faturası kesilecek olanları ve silinmemiş olanları al
+    let query = supabase
         .from('sales')
         .select('*')
         .eq('is_deleted', false);
@@ -350,15 +309,10 @@ app.post('/api/orders/', async (req, res) => {
         query = query.eq('company_code', companyCode);
     }
 
-    const filterData = req.body || {};
-    const startDateTimeStr = filterData.startDateTime || filterData.StartDateTime;
-    const endDateTimeStr = filterData.endDateTime || filterData.EndDateTime;
-    const orderCodeFilter = filterData.OrderCode || filterData.orderCode || filterData.order_code;
-    const requestedStatusId = filterData.orderStatusId || filterData.OrderStatusId;
-
-    if (requestedStatusId && Number(requestedStatusId) !== 1) {
-        return res.json({ "Orders": [] });
-    }
+    const filterData = req.body;
+    const startDateTimeStr = filterData.startDateTime;
+    const endDateTimeStr = filterData.endDateTime;
+    const orderCodeFilter = filterData.OrderCode;
 
     if (orderCodeFilter) {
         query = query.eq('sale_code', orderCodeFilter);
@@ -373,37 +327,132 @@ app.post('/api/orders/', async (req, res) => {
 
     console.log(`Toplam ${sales?.length || 0} faturası kesilecek satış bulundu.`);
 
-    // 4. Optimization: Collect all customer IDs and fetch them in one query
-    const customerIds = [...new Set((sales || []).map(s => s.customer_id).filter(id => id))];
-    const customerMap = {};
-    if (customerIds.length > 0) {
-        const { data: customers } = await client
-            .from('customers')
-            .select('*')
-            .in('id', customerIds);
-        
-        if (customers) {
-            customers.forEach(c => { customerMap[c.id] = c; });
+    // 4. Process and Filter (Date logic etc.)
+    const ordersToSend = [];
+
+    let filterStartDate = null, filterEndDate = null;
+    if (startDateTimeStr && endDateTimeStr) {
+        try {
+            filterStartDate = parseDate(startDateTimeStr);
+            filterEndDate = parseDate(endDateTimeStr);
+        } catch (e) {
+            console.error("Tarih parse hatası:", e);
         }
     }
 
-    // 5. Process and Filter
-    const ordersToSend = [];
-    const filterStartDate = (startDateTimeStr && endDateTimeStr) ? parseDate(startDateTimeStr) : null;
-    const filterEndDate = (startDateTimeStr && endDateTimeStr) ? parseDate(endDateTimeStr) : null;
-
-    if (filterStartDate) console.log("Tarih Filtresi Uygulanıyor:", filterStartDate, "-", filterEndDate);
-
     for (const sale of (sales || [])) {
+        // Tarih filtresi (Sadece OrderCode yoksa tarih filtresi uygula - app.py mantığı)
         if (!orderCodeFilter && filterStartDate && filterEndDate) {
             try {
                 const saleDate = new Date(sale.date || sale.created_at);
                 if (saleDate < filterStartDate || saleDate > filterEndDate) continue;
-            } catch (e) { continue; }
+            } catch (e) {
+                continue;
+            }
         }
 
-        const customer = customerMap[sale.customer_id] || null;
-        ordersToSend.push(birFaturaService.mapSaleToOrder(sale, customer));
+        // --- Customer & Tax Logic (Flask'tan kopyalandı) ---
+        const customerName = sale.customer_name || sale.customer || 'Misafir Müşteri';
+
+        let ssnTcNo = "";
+        let taxNo = "";
+        let rawTax = sale.tax_number || "";
+
+        if (rawTax.length === 11) {
+            ssnTcNo = rawTax;
+        } else if (rawTax.length > 0) {
+            taxNo = rawTax;
+        }
+
+        // Toptan Satış veya Misafir için varsayılan TC
+        if (!ssnTcNo && !taxNo && (customerName === 'Misafir Müşteri' || customerName === 'Toptan Satış')) {
+            ssnTcNo = '11111111111';
+        }
+
+        const shippingTaxNumber = taxNo ? taxNo : ssnTcNo;
+
+        let address = sale.address || "Fatih Mh.";
+        let phone = sale.phone || "";
+        let city = "Adana";
+        let district = "Seyhan";
+
+        // --- Items Logic ---
+        let calculatedTotal = 0;
+        const orderDetails = [];
+
+        let items = sale.items;
+        if (typeof items === 'string') {
+            try { items = JSON.parse(items); } catch (e) { items = []; }
+        }
+
+        if (Array.isArray(items)) {
+            items.forEach(item => {
+                const unitPriceInclTax = parseFloat(item.final_price || item.price || 0);
+                const quantity = parseFloat(item.quantity || 1);
+                const unitPriceExclTax = unitPriceInclTax / 1.20;
+
+                calculatedTotal += unitPriceInclTax * quantity;
+
+                orderDetails.push({
+                    "ProductId": 0,
+                    "ProductCode": item.stock_code || "URUN01",
+                    "Barcode": item.stock_code || "",
+                    "ProductName": item.name || "Ürün",
+                    "ProductQuantityType": "Adet",
+                    "ProductQuantity": quantity,
+                    "VatRate": 20.0,
+                    "ProductUnitPriceTaxExcluding": Number(unitPriceExclTax.toFixed(4)),
+                    "ProductUnitPriceTaxIncluding": Number(unitPriceInclTax.toFixed(4)),
+                    "Variants": []
+                });
+            });
+        }
+
+        const calculatedTotalExclTax = calculatedTotal / 1.20;
+
+        const saleDateObj = new Date(sale.date || sale.created_at);
+        const formattedDate = formatDateForBirFatura(saleDateObj);
+
+        let orderId = 0;
+        try {
+            const codeWithoutPrefix = sale.sale_code.split('-')[1] || sale.sale_code;
+            orderId = parseInt(codeWithoutPrefix.substring(0, 18)) || sale.id || 0;
+        } catch (e) {
+            orderId = sale.id || 0;
+        }
+
+        ordersToSend.push({
+            "OrderId": orderId,
+            "OrderCode": sale.sale_code || `S-${orderId}`,
+            "OrderDate": formattedDate,
+            "CustomerId": 0,
+            "BillingName": customerName,
+            "BillingAddress": address,
+            "BillingTown": district,
+            "BillingCity": city,
+            "BillingMobilePhone": phone, // Dynamic Phone via frontend
+            "BillingTaxOffice": "",
+            "TaxNo": taxNo,
+            "SSNTCNo": ssnTcNo,
+            "ShippingId": 0,
+            "ShippingName": customerName,
+            "ShippingAddress": address,
+            "ShippingTown": district,
+            "ShippingCity": city,
+            "ShippingTaxNumber": shippingTaxNumber,
+            "ShipCompany": "Kargo",
+            "PaymentTypeId": 1,
+            "PaymentType": "Kredi Kartı",
+            "Status": 1, // Onaylandı statüsü
+            "OrderStatusId": 1, // Onaylandı statüsü
+            "Currency": "TRY",
+            "CurrencyRate": 1,
+            "TotalPaidTaxIncluding": Number(calculatedTotal.toFixed(2)),
+            "TotalPaidTaxExcluding": Number(calculatedTotalExclTax.toFixed(2)),
+            "ProductsTotalTaxIncluding": Number(calculatedTotal.toFixed(2)), // Required
+            "ProductsTotalTaxExcluding": Number(calculatedTotalExclTax.toFixed(2)), // Required
+            "OrderDetails": orderDetails
+        });
     }
 
     console.log(`BirFatura'ya ${ordersToSend.length} sipariş gönderiliyor.`);
@@ -415,31 +464,6 @@ app.post('/api/orders', async (req, res) => {
     // Aynı handler'ı çağır
     req.url = '/api/orders/';
     app._router.handle(req, res, () => { });
-});
-
-// --- Eksik şirket kodlu satışları düzelt (SQL çalıştırmadan, tek tık) ---
-app.post('/api/admin/fix-sales-company-code', async (req, res) => {
-    const { company_code } = req.body || {};
-    if (!company_code || typeof company_code !== 'string') {
-        return res.status(400).json({ success: false, message: 'company_code gerekli.' });
-    }
-    const client = adminSupabase || supabase;
-    if (!client) {
-        return res.status(503).json({ success: false, message: 'Veritabanı bağlantısı yok.' });
-    }
-    const { data, error } = await client
-        .from('sales')
-        .update({ company_code: company_code.trim() })
-        .is('company_code', null)
-        .eq('is_deleted', false)
-        .select('sale_code');
-    if (error) {
-        console.error('[fix-sales-company-code]', error);
-        return res.status(500).json({ success: false, message: error.message });
-    }
-    const updated = (data && data.length) ? data.length : 0;
-    console.log(`[fix-sales-company-code] ${updated} satış güncellendi.`);
-    return res.json({ success: true, updated });
 });
 
 // --- SERVE STATIC FRONTEND (Production) ---

@@ -36,7 +36,6 @@ export default function SettingsPage() {
     const [showCompanyInfoModal, setShowCompanyInfoModal] = useState(false);
     const [showDebtLimitModal, setShowDebtLimitModal] = useState(false);
     const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'success' });
-    const [fixSalesLoading, setFixSalesLoading] = useState(false);
 
     useEffect(() => {
         loadSettings();
@@ -165,37 +164,6 @@ export default function SettingsPage() {
         const newValue = !sendSalesToBirFatura;
         setSendSalesToBirFatura(newValue);
         updateSetting('integration_send_sales_to_birfatura', newValue);
-    };
-
-    const handleFixSalesCompanyCode = async () => {
-        setFixSalesLoading(true);
-        try {
-            const { data } = await settingsAPI.fixSalesCompanyCode();
-            if (data && data.success) {
-                setStatusModal({
-                    isOpen: true,
-                    title: 'Tamamlandı',
-                    message: data.updated > 0 ? `${data.updated} satış güncellendi. Satışlar sayfası ve BirFatura siparişleri artık görünebilir.` : 'Düzeltilecek eksik kayıt yok; veriler zaten doğru.',
-                    type: 'success'
-                });
-            } else {
-                setStatusModal({
-                    isOpen: true,
-                    title: 'Düzeltilemedi',
-                    message: data?.message || 'Bir hata oluştu.',
-                    type: 'error'
-                });
-            }
-        } catch (e) {
-            setStatusModal({
-                isOpen: true,
-                title: 'Hata',
-                message: e?.response?.data?.message || e?.message || 'Bağlantı hatası.',
-                type: 'error'
-            });
-        } finally {
-            setFixSalesLoading(false);
-        }
     };
 
     const toggleShowCustomerTotalDebt = () => {
@@ -651,24 +619,6 @@ export default function SettingsPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>
                             Düzenle
-                        </button>
-                    </div>
-
-                    {/* Eksik şirket kodlu satışları düzelt - tek tık */}
-                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-sky-50 to-indigo-50 rounded-lg border border-sky-200">
-                        <div>
-                            <h3 className="font-semibold text-gray-800">Satışlar / Siparişler Görünmüyorsa</h3>
-                            <p className="text-sm text-gray-500 mt-1">
-                                Eksik şirket kodlu satışları kendi şirketinize bağlar. SQL bilgisi gerekmez, tek tık yeterli.
-                            </p>
-                        </div>
-
-                        <button
-                            onClick={handleFixSalesCompanyCode}
-                            disabled={fixSalesLoading}
-                            className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 font-medium text-sm transition-colors shadow-sm flex items-center gap-2 disabled:opacity-60"
-                        >
-                            {fixSalesLoading ? 'Çalışıyor...' : 'Satışları Düzelt'}
                         </button>
                     </div>
                 </div>

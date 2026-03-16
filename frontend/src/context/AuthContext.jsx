@@ -85,18 +85,22 @@ export const AuthProvider = ({ children }) => {
             setLoading(false);
         };
 
-        // Helper: Load company settings from database to localStorage (her girişte DB kaynağı kullanılır)
+        // Helper: Load company settings from database to localStorage
         const loadCompanySettings = async () => {
             try {
+                // Load BirFatura integration settings
                 const apiKeyRes = await settingsAPI.get('birfatura_api_key');
                 const secretKeyRes = await settingsAPI.get('birfatura_secret_key');
                 const integrationKeyRes = await settingsAPI.get('birfatura_integration_key');
-                localStorage.setItem('birfatura_config', JSON.stringify({
-                    api_key: apiKeyRes.data ?? '',
-                    secret_key: secretKeyRes.data ?? '',
-                    integration_key: integrationKeyRes.data ?? ''
-                }));
-                console.log('BirFatura settings loaded from database');
+
+                if (apiKeyRes.data || secretKeyRes.data || integrationKeyRes.data) {
+                    localStorage.setItem('birfatura_config', JSON.stringify({
+                        api_key: apiKeyRes.data || '',
+                        secret_key: secretKeyRes.data || '',
+                        integration_key: integrationKeyRes.data || ''
+                    }));
+                    console.log('BirFatura settings loaded from database');
+                }
             } catch (err) {
                 console.error('Failed to load company settings:', err);
             }

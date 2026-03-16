@@ -185,20 +185,6 @@ export const productsAPI = {
             .single();
 
         if (error) throw error;
-
-        // Log the new product
-        logsAPI.logAction({
-            module: 'ÜRÜNLER',
-            action_type: 'CREATE',
-            details: {
-                title: `Yeni ürün eklendi: ${product.name}`,
-                product_name: product.name,
-                stock_code: product.stock_code,
-                price: `${product.price} TL`,
-                stock: product.stock
-            }
-        });
-
         return { data };
     },
     update: async (stockCode, product) => {
@@ -215,12 +201,6 @@ export const productsAPI = {
             image_url: product.image_url
         };
 
-        // Fetch old product for logging before update
-        const { data: oldProd } = await supabase.from('products').select('sale_price, name, unit').eq('stock_code', stockCode).eq('company_code', companyCode).single();
-        const oldPrice = oldProd?.sale_price || 0;
-        const prodName = oldProd?.name || product.name;
-        const unit = oldProd?.unit || product.unit || 'Adet';
-
         const { data, error } = await supabase
             .from('products')
             .update(dbProduct)
@@ -229,23 +209,6 @@ export const productsAPI = {
             .select();
 
         if (error) throw error;
-
-        // Log the change
-        const unitTag = unit ? `(${unit.toUpperCase()}) ` : '';
-        await logsAPI.logAction({
-            module: 'ÜRÜNLER',
-            action_type: 'UPDATE',
-            details: {
-                title: `Fiyat Güncelleme: ${prodName}`,
-                message: `${unitTag}${prodName} isimli ürünün fiyatı değiştirildi.`,
-                product_name: prodName,
-                old_price: `${oldPrice} TL`,
-                new_price: `${product.price} TL`,
-                change: `${oldPrice} TL → ${product.price} TL`,
-                unit: unit
-            }
-        });
-
         return { data };
     },
     delete: async (stockCode) => {
@@ -273,21 +236,6 @@ export const productsAPI = {
             .select();
 
         if (error) throw error;
-
-        // Log the change
-        if (stockData.stock !== undefined || stockData.buying_price !== undefined) {
-            logsAPI.logAction({
-                module: 'ÜRÜNLER',
-                action_type: 'UPDATE',
-                details: {
-                    title: `Ürün (${stockCode}) stok/maliyet güncellendi.`,
-                    stock_code: stockCode,
-                    new_stock: stockData.stock,
-                    new_buying_price: stockData.buying_price ? `${stockData.buying_price} TL` : undefined
-                }
-            });
-        }
-
         return { data };
     },
     updateImage: async (stockCode, formData) => {
@@ -473,35 +421,6 @@ export const customersAPI = {
 
         console.log('Fetched customer_payments for transactions:', payments.length);
 
-        // Log the view action
-        try {
-            const companyCode = getCurrentCompanyCode();
-            const { data: cust } = await supabase.from('customers').select('name').eq('id', customerId).eq('company_code', companyCode).single();
-            const customerNameString = cust?.name || `Müşteri (ID: ${customerId})`;
-            
-            await logsAPI.logAction({
-                module: 'MÜŞTERİLER',
-                action_type: 'VIEW',
-                details: {
-                    title: `${customerNameString} hareket raporu görüntülendi.`,
-                    customer_id: customerId,
-                    customer_name: customerNameString,
-                    message: `Cari hareket raporu incelendi.`
-                }
-            });
-        } catch (e) { 
-            console.warn('Logging name fetch error', e);
-            // Even more desperate fallback if first logic failed
-            logsAPI.logAction({
-                module: 'MÜŞTERİLER',
-                action_type: 'VIEW',
-                details: {
-                    title: `Müşteri (ID: ${customerId}) hareket raporu görüntülendi.`,
-                    message: `Cari hareket raporu incelendi.`
-                }
-            });
-        }
-
         // Transform payments to transaction format
         const allTransactions = payments.map(p => ({
             ...p,
@@ -555,41 +474,6 @@ export const customersAPI = {
             .eq('id', payment.customer_id);
 
         if (updateError) throw updateError;
-
-        // Log the payment
-        try {
-            const companyCode = getCurrentCompanyCode();
-            const { data: cust } = await supabase.from('customers').select('name').eq('id', payment.customer_id).eq('company_code', companyCode).single();
-            const customerNameString = cust?.name || `Müşteri (ID: ${payment.customer_id})`;
-            
-            await logsAPI.logAction({
-                module: 'MÜŞTERİLER',
-                action_type: 'UPDATE',
-                details: {
-                    title: `${customerNameString} ödeme/tahsilat işlendi.`,
-                    customer_name: customerNameString,
-                    amount: `${payment.amount.toFixed(2)} TL`,
-                    type: payment.payment_type,
-                    message: payment.description,
-                    sale_code: payment.description?.match(/(SLS|RET)-\d+/)?.[0] || undefined
-                }
-            });
-        } catch (e) { 
-            console.warn('Logging name fetch error', e);
-            // Fallback log if name fetch fails
-            logsAPI.logAction({
-                module: 'MÜŞTERİLER',
-                action_type: 'UPDATE',
-                details: {
-                    title: `Müşteri (ID: ${payment.customer_id}) ödeme/tahsilat işlendi.`,
-                    amount: `${payment.amount.toFixed(2)} TL`,
-                    type: payment.payment_type,
-                    message: payment.description,
-                    sale_code: payment.description?.match(/(SLS|RET)-\d+/)?.[0] || undefined
-                }
-            });
-        }
-
         return { data: { success: true, message: 'Ödeme alındı ve bakiye güncellendi.' } };
     },
     // NEW: Add Sale Debit (Borç) - Increases customer balance for a sale
@@ -955,17 +839,6 @@ export const salesAPI = {
             });
         }
 
-        // Log the return
-        logsAPI.logAction({
-            module: 'SATIŞLAR',
-            action_type: 'CREATE',
-            details: {
-                title: `${originalSale.sale_code} numaralı satış için iade oluşturuldu.`,
-                message: `${originalSale.customerName || originalSale.customer_name} müşterisine ${refundTotal.toFixed(2)} TL iade yapıldı.`,
-                new_value: `İade Kodu: ${returnSaleCode}`
-            }
-        });
-
         return response({ success: true, message: 'İade işlemi tamamlandı.' });
     },
     complete: async (sale) => {
@@ -1043,25 +916,6 @@ export const salesAPI = {
             // NOTE: For Veresiye/Açık Hesap - no Alacak is added, so balance stays increased (debt)
         }
 
-        if (error) throw error;
-
-        // Generate item details for log
-        const itemSummary = items.map(it => `${it.quantity} ${it.unit || 'AD.'} ${it.name}`).join(', ');
-
-        // Log the new sale
-        await logsAPI.logAction({
-            module: 'SATIŞLAR',
-            action_type: 'CREATE',
-            details: {
-                title: `${data?.sale_code || 'Satış'} tamamlandı.`,
-                message: `${cleanSale.customer_name} müşterisine ${cleanSale.total.toFixed(2)} TL tutarında satış yapıldı.`,
-                sale_code: data?.sale_code || cleanSale.sale_code,
-                items: itemSummary,
-                total: `${cleanSale.total.toFixed(2)} TL`,
-                payment: cleanSale.payment_method
-            }
-        });
-
         return response({ success: true, message: 'Satış tamamlandı', sale_code: data?.sale_code }, error);
     },
     // Alias for backward compatibility if needed
@@ -1072,7 +926,7 @@ export const salesAPI = {
         // 1. Get Sale Details to find Customer
         const { data: sale, error: fetchError } = await supabase
             .from('sales')
-            .select('customer_id, customer_name')
+            .select('customer_id')
             .eq('sale_code', saleCode)
             .eq('company_code', companyCode) // Ensure fetch respects company code
             .single();
@@ -1081,6 +935,12 @@ export const salesAPI = {
             console.error('Sale fetch error during delete:', fetchError);
         } else if (sale && sale.customer_id) {
             // 2. Remove Financial Records (Double-Entry) from Customer Ledger
+            // We need to delete BOTH the Debit (Borç) and Credit (Alacak) records associated with this sale.
+            // Patterns used in creation:
+            // Debit: `Satış - ${saleCode}`
+            // Credit: `Alacak (Tahsilat) - ${saleCode}` (for Nakit/POS)
+
+            // We can delete both by matching the sale code in the description
             const { error: ledgerError } = await supabase
                 .from('customer_payments')
                 .delete()
@@ -1096,21 +956,7 @@ export const salesAPI = {
         const { error } = await supabase
             .from('sales')
             .update({ is_deleted: true })
-            .eq('sale_code', saleCode)
-            .eq('company_code', companyCode);
-
-        // Log the deletion
-        await logsAPI.logAction({
-            module: 'SATIŞLAR',
-            action_type: 'DELETE',
-            details: {
-                title: `${saleCode} numaralı satış SİLİNDİ / İPTAL EDİLDİ.`,
-                sale_code: saleCode,
-                customer: sale?.customer_name || 'Misafir',
-                message: `Satış kaydı silindi ve müşteri hareketlerinden kaldırıldı.`
-            }
-        });
-
+            .eq('sale_code', saleCode);
         return response({ success: true, message: 'Satış iptal edildi' }, error);
     },
     getByCode: async (saleCode) => {
@@ -1127,7 +973,7 @@ export const salesAPI = {
         // 1. Fetch existing sale for customer_id validation and total check
         const { data: existingSale, error: fetchError } = await supabase
             .from('sales')
-            .select('customer_id, total, items')
+            .select('customer_id, total')
             .eq('sale_code', saleCode)
             .eq('company_code', companyCode)
             .single();
@@ -1135,10 +981,8 @@ export const salesAPI = {
         if (fetchError || !existingSale) throw fetchError || new Error("Satış bulunamadı");
 
         const updateData = {};
-        // Database uses 'items' column for products. Support both 'products' and 'items' in the request.
-        if (data.products !== undefined) updateData.items = data.products;
-        else if (data.items !== undefined) updateData.items = data.items;
-        
+        // Database uses 'items' column for products
+        if (data.products) updateData.items = data.products;
         if (data.total !== undefined) updateData.total = data.total;
         if (data.payment_method !== undefined) updateData.payment_method = data.payment_method;
         if (data.customer_id !== undefined) updateData.customer_id = data.customer_id;
@@ -1153,58 +997,6 @@ export const salesAPI = {
             .eq('company_code', companyCode);
 
         if (error) throw error;
-
-        // Log the update
-        try {
-            const oldTotal = parseFloat(existingSale.total || 0).toFixed(2);
-            const newTotal = parseFloat(data.total || existingSale.total || 0).toFixed(2);
-            const oldItems = existingSale.items || [];
-            const newProducts = data.products || data.items || oldItems;
-            
-            // Compare items to find quantity and price changes
-            const changeDetails = [];
-            newProducts.forEach(newP => {
-                const oldP = oldItems.find(o => o.stock_code === newP.stock_code || o.name === newP.name);
-                if (oldP) {
-                    if (parseFloat(oldP.quantity) !== parseFloat(newP.quantity)) {
-                        changeDetails.push(`${newP.name}: Miktar ${oldP.quantity} -> ${newP.quantity}`);
-                    }
-                    if (parseFloat(oldP.price) !== parseFloat(newP.price)) {
-                        changeDetails.push(`${newP.name}: Fiyat ${oldP.price} TL -> ${newP.price} TL`);
-                    }
-                } else {
-                    changeDetails.push(`Yeni Ürün Eklendi: ${newP.name} (${newP.quantity} ${newP.unit || 'AD.'})`);
-                }
-            });
-
-            // Check for removed items
-            oldItems.forEach(oldP => {
-                const stillExists = newProducts.find(n => n.stock_code === oldP.stock_code || n.name === oldP.name);
-                if (!stillExists) {
-                    changeDetails.push(`Ürün Çıkarıldı: ${oldP.name}`);
-                }
-            });
-
-            const detailedMessage = changeDetails.length > 0 ? changeDetails.join(' | ') : 'Ürün detayları değişmedi';
-            const itemSummary = newProducts.map(it => `${it.quantity} ${it.unit || 'AD.'} ${it.name}`).join(', ');
-
-            await logsAPI.logAction({
-                module: 'SATIŞLAR',
-                action_type: 'UPDATE',
-                details: {
-                    title: `${saleCode} numaralı satış GÜNCELLENDİ.`,
-                    message: detailedMessage,
-                    sale_code: saleCode,
-                    old_total: `${oldTotal} TL`,
-                    new_total: `${newTotal} TL`,
-                    change: `${oldTotal} TL → ${newTotal} TL`,
-                    items: itemSummary,
-                    detailed_changes: detailedMessage
-                }
-            });
-        } catch (e) {
-            console.warn('Logging sale update error', e);
-        }
 
         // 3. Sync Customer Ledger (Only if total changed and customer exists)
         // We use the existing customer_id from the sale (or the new one if updated)
@@ -1419,7 +1211,7 @@ export const usersAPI = {
             email: userData.email,
             password: userData.password,
             options: {
-                emailRedirectTo: `https://poscebimde.com/email-success`,
+                emailRedirectTo: `${window.location.origin}/email-success`,
                 data: {
                     username: userData.username,
                     role: 'kurucu',
@@ -1429,6 +1221,58 @@ export const usersAPI = {
         });
 
         if (error) return response(null, error);
+
+        // Supabase security: If email exists, it might return a user with empty identities
+        if (data.user && data.user.identities && data.user.identities.length === 0) {
+            return response(null, { message: 'Bu e-posta adresi ile zaten kayıtlı bir kullanıcı var.' });
+        }
+
+        if (data.user) {
+            // 2. Create Profile with Company Code
+            const { error: profileError } = await supabase.from('user_profiles').upsert({
+                id: data.user.id,
+                username: userData.username,
+                role: 'kurucu',
+                company_code: userData.company_code,
+                permissions: {
+                    // Founders get full access by default logic, but we can be explicit
+                    can_view_products: true,
+                    can_view_customers: true,
+                    can_view_sales: true,
+                    can_view_invoices: true,
+                    can_view_pos: true,
+                    can_view_users: true,
+                    can_view_balances: true,
+                    can_view_prices: true
+                }
+            });
+
+            if (profileError) {
+                console.error('Tenant profile error:', profileError);
+                return response({ success: true, message: 'Kayıt oldu ancak profil hatası: ' + profileError.message }, null);
+            }
+
+            // 3. Generate Secret Token for Integrations
+            // We do this manually here because the user is not logged in yet (no localStorage), 
+            // so we can't use settingsAPI.set() which relies on getCurrentCompanyCode().
+            try {
+                const secretToken = crypto.randomUUID();
+                const { error: settingsError } = await supabase
+                    .from('app_settings')
+                    .insert({
+                        key: 'secret_token',
+                        value: secretToken,
+                        company_code: userData.company_code
+                    });
+
+                if (settingsError) {
+                    console.error('Secret token generation error:', settingsError);
+                    // Don't fail the registration for this, but log it
+                }
+            } catch (tokenError) {
+                console.error('Secret token generation exception:', tokenError);
+            }
+        }
 
         return response({ success: true, message: 'Şirket kaydı başarıyla oluşturuldu.' }, null);
     }
@@ -1601,98 +1445,6 @@ export const settingsAPI = {
         });
 
         return { data: settingsMap };
-    },
-
-    // Eksik şirket kodlu satışları düzelt (Satışlar / BirFatura siparişleri görünmüyorsa)
-    fixSalesCompanyCode: async () => {
-        const companyCode = getCurrentCompanyCode();
-        if (!companyCode) return { data: { success: false, updated: 0, message: 'Şirket kodu bulunamadı. Giriş yapın.' } };
-        const base = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
-        try {
-            const res = await fetch(`${base}/api/admin/fix-sales-company-code`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ company_code: companyCode })
-            });
-            const json = await res.json();
-            return { data: json };
-        } catch (e) {
-            return { data: { success: false, updated: 0, message: e.message || 'Bağlantı hatası' } };
-        }
-    }
-};
-
-
-// ============ LOGS API ============
-export const logsAPI = {
-    getAll: async (userId) => {
-        const companyCode = getCurrentCompanyCode();
-        let query = supabase
-            .from('activity_logs')
-            .select('*')
-            .eq('company_code', companyCode);
-        
-        if (userId) {
-            query = query.eq('user_id', userId);
-        }
-
-        const { data, error } = await query.order('created_at', { ascending: false });
-        
-        // Standardise and parse details if they arrived as strings
-        const processedLogs = (data || []).map(log => {
-            let details = log.details;
-            if (typeof details === 'string') {
-                try {
-                    details = JSON.parse(details);
-                } catch (e) {
-                    console.warn("Failed to parse log details", e);
-                }
-            }
-            return { ...log, details };
-        });
-
-        // Standardise error format for frontend
-        if (error) {
-            console.error('Supabase Error:', error);
-            return { data: { logs: [] }, error: error.message };
-        }
-        return { data: { logs: processedLogs } };
-    },
-    
-    logAction: async (actionData) => {
-        try {
-            const userStr = localStorage.getItem('user');
-            if (!userStr) return;
-            
-            const user = JSON.parse(userStr);
-            const companyCode = user.company_code || getCurrentCompanyCode();
-            
-            if (!companyCode) {
-                console.warn('Logging skipped: No company_code found');
-                return;
-            }
-
-            const logData = {
-                user_id: user.id || user.uid,
-                username: user.username,
-                company_code: companyCode,
-                module: actionData.module,
-                action_type: actionData.action_type,
-                details: actionData.details || {},
-                created_at: new Date().toISOString()
-            };
-
-            // Perform insert
-            const { error } = await supabase.from('activity_logs').insert([logData]);
-            if (error) {
-                console.error('Supabase Logging Error:', error);
-                // Return descriptive error for high-importance logs
-                return { success: false, error };
-            }
-            return { success: true };
-        } catch (e) {
-            console.error('Logging Exception:', e);
-        }
     }
 };
 
