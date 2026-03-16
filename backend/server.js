@@ -194,7 +194,7 @@ app.post(['/api/orderStatus', '/api/orderStatus/'], async (req, res) => {
     }
 
     res.json({
-        OrderStatuses: birFaturaService.getOrderStatuses()
+        OrderStatus: birFaturaService.getOrderStatuses()
     });
 });
 
