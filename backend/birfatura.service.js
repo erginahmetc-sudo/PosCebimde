@@ -49,13 +49,8 @@ class BirFaturaService {
      * Maps a Supabase sale and customer to BirFatura Order structure
      */
     mapSaleToOrder(sale, customer = null) {
-        let customerName = customer?.name || sale.customer_name || sale.customer || 'Misafir Müşteri';
+        const customerName = customer?.name || sale.customer_name || sale.customer || 'Misafir Müşteri';
         
-        // Clean customer name for BirFatura (strip "Perakende-" prefix if requested)
-        if (customerName.startsWith('Perakende-')) {
-            customerName = customerName.replace('Perakende-', '').trim();
-        }
-
         let ssnTcNo = "";
         let taxNo = "";
         let taxOffice = customer?.tax_office || "";
@@ -108,11 +103,12 @@ class BirFaturaService {
 
         const calculatedTotalExclTax = calculatedTotal / 1.20; // General fallback if detailed calc not used
 
-        // OrderId should be numeric for BirFatura. Match old logic for consistency.
+        // OrderId should be numeric for BirFatura. If sale_code is SLS-123, try to extract 123.
         let orderId = 0;
         try {
-            const codeWithoutPrefix = (sale.sale_code || '').split('-')[1] || sale.sale_code;
-            orderId = parseInt(codeWithoutPrefix.substring(0, 18)) || sale.id || 0;
+            const codeParts = (sale.sale_code || '').split('-');
+            const numericPart = codeParts[codeParts.length - 1];
+            orderId = parseInt(numericPart) || sale.id || 0;
         } catch (e) {
             orderId = sale.id || 0;
         }
@@ -142,8 +138,6 @@ class BirFaturaService {
             "ShipCompany": "Kargo",
             "PaymentTypeId": this.mapPaymentMethodToId(sale.payment_method),
             "PaymentType": sale.payment_method || "Kredi Kartı",
-            "Status": 1,
-            "OrderStatusId": 1,
             "Currency": "TRY",
             "CurrencyRate": 1,
             "TotalPaidTaxIncluding": Number(calculatedTotal.toFixed(2)),

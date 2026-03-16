@@ -164,10 +164,8 @@ async function checkBirFaturaToken(receivedToken, client) {
         for (const setting of settings) {
             if (setting.value) {
                 let storedToken = setting.value;
-                if (typeof storedToken === 'string') {
-                    storedToken = storedToken.replace(/^"|"$/g, '').trim();
-                }
-                if (storedToken === (receivedToken || '').trim()) {
+                if (typeof storedToken === 'string') storedToken = storedToken.replace(/^"|"$/g, '');
+                if (storedToken === receivedToken) {
                     return { isValid: true, companyCode: setting.company_code };
                 }
             }
@@ -285,12 +283,9 @@ app.post('/api/products/force-delete', async (req, res) => {
 
 // --- ENDPOINT: BirFatura Polls This for Orders (r4 ile aynı mantık) ---
 app.post('/api/orders/', async (req, res) => {
-    const receivedToken = req.headers['token'] || req.headers['authorization'] || req.query.token;
-    console.log(`[DEBUG] /api/orders/ Request:
-      Headers: ${JSON.stringify(req.headers)}
-      Body: ${JSON.stringify(req.body)}
-      Token found: ${receivedToken}
-    `);
+    const receivedToken = req.headers['token'];
+    console.log("BirFatura İsteği Geldi:", req.body);
+    console.log("Alınan Token:", receivedToken);
 
     if (!receivedToken) {
         return res.status(401).json({ "Orders": [], "error": "Token eksik" });
@@ -339,37 +334,43 @@ app.post('/api/orders/', async (req, res) => {
 
     console.log(`Toplam ${sales?.length || 0} faturası kesilecek satış bulundu.`);
 
-    // 4. Optimization: Collect all customer IDs and fetch them in one query
-    const customerIds = [...new Set((sales || []).map(s => s.customer_id).filter(id => id))];
-    const customerMap = {};
-    if (customerIds.length > 0) {
-        const { data: customers } = await client
-            .from('customers')
-            .select('*')
-            .in('id', customerIds);
-        
-        if (customers) {
-            customers.forEach(c => { customerMap[c.id] = c; });
+    // 4. Process and Filter (Date logic etc.)
+    const ordersToSend = [];
+
+    let filterStartDate = null, filterEndDate = null;
+    if (startDateTimeStr && endDateTimeStr) {
+        try {
+            filterStartDate = parseDate(startDateTimeStr);
+            filterEndDate = parseDate(endDateTimeStr);
+        } catch (e) {
+            console.error("Tarih parse hatası:", e);
         }
     }
 
-    // 5. Process and Filter
-    const ordersToSend = [];
-    const filterStartDate = (startDateTimeStr && endDateTimeStr) ? parseDate(startDateTimeStr) : null;
-    const filterEndDate = (startDateTimeStr && endDateTimeStr) ? parseDate(endDateTimeStr) : null;
-
-    if (filterStartDate) console.log("Tarih Filtresi Uygulanıyor:", filterStartDate, "-", filterEndDate);
-
     for (const sale of (sales || [])) {
+        // Tarih filtresi (Sadece OrderCode yoksa tarih filtresi uygula - app.py mantığı)
         if (!orderCodeFilter && filterStartDate && filterEndDate) {
             try {
                 const saleDate = new Date(sale.date || sale.created_at);
                 if (saleDate < filterStartDate || saleDate > filterEndDate) continue;
-            } catch (e) { continue; }
+            } catch (e) {
+                continue;
+            }
         }
 
-        const customer = customerMap[sale.customer_id] || null;
-        ordersToSend.push(birFaturaService.mapSaleToOrder(sale, customer));
+        // Fetch customer details if sale has a customer_id
+        let customer = null;
+        if (sale.customer_id) {
+            const { data: customerData } = await client
+                .from('customers')
+                .select('*')
+                .eq('id', sale.customer_id)
+                .single();
+            customer = customerData;
+        }
+
+        const order = birFaturaService.mapSaleToOrder(sale, customer);
+        ordersToSend.push(order);
     }
 
     console.log(`BirFatura'ya ${ordersToSend.length} sipariş gönderiliyor.`);
