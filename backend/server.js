@@ -164,8 +164,10 @@ async function checkBirFaturaToken(receivedToken, client) {
         for (const setting of settings) {
             if (setting.value) {
                 let storedToken = setting.value;
-                if (typeof storedToken === 'string') storedToken = storedToken.replace(/^"|"$/g, '');
-                if (storedToken === receivedToken) {
+                if (typeof storedToken === 'string') {
+                    storedToken = storedToken.replace(/^"|"$/g, '').trim();
+                }
+                if (storedToken === (receivedToken || '').trim()) {
                     return { isValid: true, companyCode: setting.company_code };
                 }
             }
@@ -283,9 +285,12 @@ app.post('/api/products/force-delete', async (req, res) => {
 
 // --- ENDPOINT: BirFatura Polls This for Orders (r4 ile aynı mantık) ---
 app.post('/api/orders/', async (req, res) => {
-    const receivedToken = req.headers['token'];
-    console.log("BirFatura İsteği Geldi:", req.body);
-    console.log("Alınan Token:", receivedToken);
+    const receivedToken = req.headers['token'] || req.headers['authorization'] || req.query.token;
+    console.log(`[DEBUG] /api/orders/ Request:
+      Headers: ${JSON.stringify(req.headers)}
+      Body: ${JSON.stringify(req.body)}
+      Token found: ${receivedToken}
+    `);
 
     if (!receivedToken) {
         return res.status(401).json({ "Orders": [], "error": "Token eksik" });
