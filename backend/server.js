@@ -56,6 +56,14 @@ try {
 app.use(cors());
 app.use(express.json());
 
+function extractToken(req) {
+    let token = req.headers['token'] || req.headers['authorization'] || req.query.token || req.body?.Token || req.body?.token;
+    if (typeof token === 'string' && token.toLowerCase().startsWith('bearer ')) {
+        token = token.slice(7);
+    }
+    return token;
+}
+
 // --- BIRFATURA API PROXY ---
 // Frontend'in CORS sorunu olmadan BirFatura API'sine erişmesi için proxy
 app.post('/api/birfatura-proxy', async (req, res) => {
@@ -189,7 +197,7 @@ app.get('/api/test', (req, res) => {
 
 // --- ENDPOINT: BirFatura Order Statuses ---
 app.post(['/api/orderStatus', '/api/orderStatus/'], async (req, res) => {
-    const receivedToken = req.headers['token'] || req.headers['authorization'] || req.query.token || req.body?.Token || req.body?.token;
+    const receivedToken = extractToken(req);
     console.log(`[DEBUG] /api/orderStatus Request:
       Headers: ${JSON.stringify(req.headers)}
       Body: ${JSON.stringify(req.body)}
@@ -211,7 +219,7 @@ app.post(['/api/orderStatus', '/api/orderStatus/'], async (req, res) => {
 
 // --- ENDPOINT: BirFatura Payment Methods ---
 app.post(['/api/paymentMethods', '/api/paymentMethods/'], async (req, res) => {
-    const receivedToken = req.headers['token'] || req.headers['authorization'] || req.query.token || req.body?.Token || req.body?.token;
+    const receivedToken = extractToken(req);
     console.log(`[DEBUG] /api/paymentMethods Request:
       Headers: ${JSON.stringify(req.headers)}
       Body: ${JSON.stringify(req.body)}
@@ -306,7 +314,7 @@ app.post('/api/products/force-delete', async (req, res) => {
 
 // --- ENDPOINT: BirFatura Polls This for Orders (r4 ile aynı mantık) ---
 app.post('/api/orders/', async (req, res) => {
-    const receivedToken = req.headers['token'] || req.headers['authorization'] || req.query.token || req.body?.Token || req.body?.token;
+    const receivedToken = extractToken(req);
     console.log(`[DEBUG] /api/orders/ Request:
       Headers: ${JSON.stringify(req.headers)}
       Body: ${JSON.stringify(req.body)}
