@@ -511,15 +511,23 @@ async function handleBirFaturaOrders(req, res) {
             const unitPriceInclTax = parseFloat(item.price || item.final_price || 0);
             const quantity = parseFloat(item.quantity || 1);
 
-            // KDV oranı: items'da varsa onu kullan, yoksa products tablosundan, fallback %10
-            let vatRateRaw = item.vat_rate || item.kdv;
-            if (!vatRateRaw && item.stock_code) {
+            // KDV oranı: önce products tablosundaki güncel oran, sonra item'daki, fallback %20
+            // NOT: Eski default %18'di, bu yanlış. %18 gelen değerleri %20 olarak düzelt.
+            let vatRateRaw = null;
+            // Öncelik 1: Products tablosundaki güncel KDV oranı
+            if (item.stock_code && productsVatMap[item.stock_code] !== undefined) {
                 vatRateRaw = productsVatMap[item.stock_code];
             }
-            if (!vatRateRaw && item.id) {
+            if (!vatRateRaw && item.id && productsVatMap[String(item.id)] !== undefined) {
                 vatRateRaw = productsVatMap[String(item.id)];
             }
-            const vatRate = parseInt(vatRateRaw || 20, 10);
+            // Öncelik 2: Item'daki oran (eski satışlardan)
+            if (!vatRateRaw) {
+                vatRateRaw = item.vat_rate || item.kdv;
+            }
+            let vatRate = parseInt(vatRateRaw || 20, 10);
+            // Eski yanlış default %18'i %20'ye düzelt
+            if (vatRate === 18) vatRate = 20;
 
             // KDV hariç fiyat = KDV dahil / (1 + oran/100)
             const unitPriceExclTax = vatRate > 0
