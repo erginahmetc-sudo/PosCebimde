@@ -480,14 +480,18 @@ async function handleBirFaturaOrders(req, res) {
                 "ProductBrand": item.brand || "",
                 "ProductName": item.name || "Ürün",
                 "ProductNote": item.note || "",
+                "ProductImage": item.image_url || item.image || "",
                 "ProductQuantityType": item.unit || "Adet",
                 "ProductQuantity": quantity,
                 "VatRate": vatRate,
                 "ProductUnitPriceTaxExcluding": Number(unitPriceExclTax.toFixed(4)),
                 "ProductUnitPriceTaxIncluding": Number(unitPriceInclTax.toFixed(4)),
+                "CommissionUnitTaxExcluding": 0,
+                "CommissionUnitTaxIncluding": 0,
                 "DiscountUnitTaxExcluding": Number(discountUnitExclTax.toFixed(4)),
                 "DiscountUnitTaxIncluding": Number(discountUnitInclTax.toFixed(4)),
-                "Variants": []
+                "Variants": [],
+                "ExtraFeesUnit": []
             });
         });
 
@@ -504,12 +508,17 @@ async function handleBirFaturaOrders(req, res) {
         // *** KRİTİK: OrderId güvenli integer (sale.id kullan, sale_code parse etme) ***
         const orderId = sale.id || 0;
 
-        // BirFatura Swagger Spec'ine TAM UYUMLU sipariş objesi
-        // NOT: Spec'te olmayan alanlar (Status, OrderStatusId, BillingTaxOffice, ShippingTaxNumber) EKLENMEDİ
+        // BirFatura sipariş objesi
+        // NOT: BirFatura .NET backend'i null koleksiyonlarda patlar,
+        // bu yüzden tüm dizi alanları boş bile olsa [] olarak gönderilmeli
+        const shippingTaxNumber = taxNo ? taxNo : ssnTcNo;
+
         ordersToSend.push({
             "OrderId": orderId,
             "OrderCode": sale.sale_code || `S-${orderId}`,
             "OrderDate": formattedDate,
+            "Status": 1,
+            "OrderStatusId": 1,
             "CustomerId": 0,
             "BillingName": customerName,
             "BillingAddress": address,
@@ -517,6 +526,7 @@ async function handleBirFaturaOrders(req, res) {
             "BillingCity": city,
             "BillingMobilePhone": phone,
             "BillingPhone": phone,
+            "BillingTaxOffice": taxOffice,
             "TaxOffice": taxOffice,
             "TaxNo": taxNo,
             "SSNTCNo": ssnTcNo,
@@ -529,8 +539,10 @@ async function handleBirFaturaOrders(req, res) {
             "ShippingCountry": "Türkiye",
             "ShippingZipCode": "",
             "ShippingPhone": phone,
+            "ShippingTaxNumber": shippingTaxNumber,
             "ShipCompany": "",
             "CargoCampaignCode": "",
+            "SalesChannelWebSite": "",
             "PaymentTypeId": payment.id,
             "PaymentType": payment.value,
             "Currency": "TRY",
@@ -551,7 +563,8 @@ async function handleBirFaturaOrders(req, res) {
             "BankTransferDiscountTotalTaxIncluding": 0,
             "PayingAtTheDoorChargeTotalTaxExcluding": 0,
             "PayingAtTheDoorChargeTotalTaxIncluding": 0,
-            "OrderDetails": orderDetails
+            "OrderDetails": orderDetails,
+            "ExtraFees": []
         });
     }
 
