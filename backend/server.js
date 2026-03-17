@@ -504,20 +504,39 @@ async function handleBirFaturaOrders(req, res) {
         const orderDetails = [];
 
         items.forEach(item => {
-            // *** FİYATLAR: DB'deki price zaten KDV DAHİL nihai fiyattır ***
-            // BirFatura siparişe KDV eklemez, fiyatları olduğu gibi gösterir.
-            // TaxExcluding = TaxIncluding = price (VatRate=0)
-            // E-fatura oluşturulurken BirFatura KDV'yi kendisi hesaplar.
-            const unitPrice = parseFloat(item.price || item.final_price || 0);
+            // *** FİYATLAR: DB'deki price KDV DAHİL nihai fiyattır ***
+            // BirFatura TaxExcluding'i baz alıp üzerine VatRate% KDV ekler.
+            // Bu yüzden: TaxIncluding = DB price, TaxExcluding = price / (1 + kdv/100)
+            // Böylece BirFatura KDV eklediğinde doğru tutara (DB price) ulaşır.
+            const unitPriceInclTax = parseFloat(item.price || item.final_price || 0);
             const quantity = parseFloat(item.quantity || 1);
+
+            // KDV oranı: items'da varsa onu kullan, yoksa products tablosundan, fallback %10
+            let vatRateRaw = item.vat_rate || item.kdv;
+            if (!vatRateRaw && item.stock_code) {
+                vatRateRaw = productsVatMap[item.stock_code];
+            }
+            if (!vatRateRaw && item.id) {
+                vatRateRaw = productsVatMap[String(item.id)];
+            }
+            const vatRate = parseInt(vatRateRaw || 10, 10);
+
+            // KDV hariç fiyat = KDV dahil / (1 + oran/100)
+            const unitPriceExclTax = vatRate > 0
+                ? unitPriceInclTax / (1 + vatRate / 100)
+                : unitPriceInclTax;
 
             // İndirim hesaplama
             const discountRate = parseFloat(item.discount_rate || 0);
-            const lineTotal = unitPrice * quantity;
-            const discountAmount = lineTotal * discountRate / 100;
-            const discountPerUnit = quantity > 0 ? discountAmount / quantity : 0;
+            const lineTotal = unitPriceInclTax * quantity;
+            const discountInclTax = lineTotal * discountRate / 100;
+            const discountExclTax = vatRate > 0
+                ? discountInclTax / (1 + vatRate / 100)
+                : discountInclTax;
+            const discountPerUnitIncl = quantity > 0 ? discountInclTax / quantity : 0;
+            const discountPerUnitExcl = quantity > 0 ? discountExclTax / quantity : 0;
 
-            calculatedTotal += lineTotal - discountAmount;
+            calculatedTotal += lineTotal - discountInclTax;
 
             // ProductId: long olmalı - UUID ise hash'le
             let productId = parseInt(item.id, 10);
@@ -539,24 +558,25 @@ async function handleBirFaturaOrders(req, res) {
                 "ProductImage": item.image_url || item.image || "",
                 "ProductQuantityType": item.unit || "Adet",
                 "ProductQuantity": quantity,
-                "VatRate": 0,
-                "ProductUnitPriceTaxExcluding": Number(unitPrice.toFixed(4)),
-                "ProductUnitPriceTaxIncluding": Number(unitPrice.toFixed(4)),
+                "VatRate": vatRate,
+                "ProductUnitPriceTaxExcluding": Number(unitPriceExclTax.toFixed(4)),
+                "ProductUnitPriceTaxIncluding": Number(unitPriceInclTax.toFixed(4)),
                 "CommissionUnitTaxExcluding": 0,
                 "CommissionUnitTaxIncluding": 0,
-                "DiscountUnitTaxExcluding": Number(discountPerUnit.toFixed(4)),
-                "DiscountUnitTaxIncluding": Number(discountPerUnit.toFixed(4)),
+                "DiscountUnitTaxExcluding": Number(discountPerUnitExcl.toFixed(4)),
+                "DiscountUnitTaxIncluding": Number(discountPerUnitIncl.toFixed(4)),
                 "Variants": [],
                 "ExtraFeesUnit": []
             });
         });
 
-        // İndirim toplamları
-        const totalDiscount = orderDetails.reduce((sum, d) => sum + (d.DiscountUnitTaxIncluding * d.ProductQuantity), 0);
+        // Toplam hesaplama
+        const totalDiscountIncl = orderDetails.reduce((sum, d) => sum + (d.DiscountUnitTaxIncluding * d.ProductQuantity), 0);
+        const totalDiscountExcl = orderDetails.reduce((sum, d) => sum + (d.DiscountUnitTaxExcluding * d.ProductQuantity), 0);
 
-        // Genel toplam: sale.total varsa onu kullan (en doğru değer)
-        const finalTotal = parseFloat(sale.total) || calculatedTotal;
-        const calculatedTotalExclTax = finalTotal;
+        // Genel toplam: sale.total varsa onu kullan (en doğru değer, KDV dahil)
+        const finalTotalIncl = parseFloat(sale.total) || calculatedTotal;
+        const finalTotalExcl = orderDetails.reduce((sum, d) => sum + (d.ProductUnitPriceTaxExcluding * d.ProductQuantity), 0) - totalDiscountExcl;
 
         const saleDateObj = new Date(sale.date || sale.created_at);
         const formattedDate = formatDateForBirFatura(saleDateObj);
@@ -627,16 +647,16 @@ async function handleBirFaturaOrders(req, res) {
             "PaymentType": payment.value,
             "Currency": "TRY",
             "CurrencyRate": 1,
-            "TotalPaidTaxIncluding": Number(finalTotal.toFixed(2)),
-            "TotalPaidTaxExcluding": Number(finalTotal.toFixed(2)),
-            "ProductsTotalTaxIncluding": Number(finalTotal.toFixed(2)),
-            "ProductsTotalTaxExcluding": Number(finalTotal.toFixed(2)),
+            "TotalPaidTaxIncluding": Number(finalTotalIncl.toFixed(2)),
+            "TotalPaidTaxExcluding": Number(finalTotalExcl.toFixed(2)),
+            "ProductsTotalTaxIncluding": Number(finalTotalIncl.toFixed(2)),
+            "ProductsTotalTaxExcluding": Number(finalTotalExcl.toFixed(2)),
             "CommissionTotalTaxExcluding": 0,
             "CommissionTotalTaxIncluding": 0,
             "ShippingChargeTotalTaxExcluding": 0,
             "ShippingChargeTotalTaxIncluding": 0,
-            "DiscountTotalTaxExcluding": Number(totalDiscount.toFixed(2)),
-            "DiscountTotalTaxIncluding": Number(totalDiscount.toFixed(2)),
+            "DiscountTotalTaxExcluding": Number(totalDiscountExcl.toFixed(2)),
+            "DiscountTotalTaxIncluding": Number(totalDiscountIncl.toFixed(2)),
             "InstallmentChargeTotalTaxExcluding": 0,
             "InstallmentChargeTotalTaxIncluding": 0,
             "BankTransferDiscountTotalTaxExcluding": 0,
