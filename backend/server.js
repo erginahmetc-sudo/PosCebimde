@@ -360,37 +360,55 @@ async function handleBirFaturaOrders(req, res) {
         return res.json({ "Orders": [] });
     }
 
-    // 3. Fetch Sales - RLS bypass için adminSupabase kullan!
-    const dbClient = adminSupabase || supabase;
-    console.log(`[orders] DB Client: ${adminSupabase ? 'adminSupabase (Service Role)' : 'supabase (Anon Key - RLS aktif!)'}`);
+    // 3. Fetch Sales - RPC fonksiyonu ile (RLS bypass, SECURITY DEFINER)
+    // NOT: Direkt tablo sorgusu anon key ile RLS'ye takılıyor!
+    // Bu yüzden get_birfatura_sales() RPC fonksiyonu kullanılıyor.
+    console.log("[orders] RPC fonksiyonu çağrılıyor: get_birfatura_sales");
 
-    let query = dbClient
-        .from('sales')
-        .select('*')
-        .eq('is_deleted', false);
+    let sales = [];
+    let error = null;
 
-    if (companyCode) {
-        query = query.eq('company_code', companyCode);
+    try {
+        const { data: rpcResult, error: rpcError } = await supabase
+            .rpc('get_birfatura_sales', { p_token: receivedToken });
+
+        if (rpcError) {
+            console.error("[orders] RPC Hatası:", JSON.stringify(rpcError));
+            error = rpcError;
+        } else {
+            // RPC jsonb array döndürür
+            sales = Array.isArray(rpcResult) ? rpcResult : [];
+            console.log(`[orders] RPC'den ${sales.length} satış döndü.`);
+        }
+    } catch (e) {
+        console.error("[orders] RPC çağrı hatası:", e.message);
+        // Fallback: direkt sorgu dene (service role key varsa çalışır)
+        console.log("[orders] Fallback: direkt tablo sorgusu deneniyor...");
+        const dbClient = adminSupabase || supabase;
+        let query = dbClient.from('sales').select('*').eq('is_deleted', false);
+        if (companyCode) query = query.eq('company_code', companyCode);
+        if (orderCodeFilter) query = query.eq('sale_code', orderCodeFilter);
+        const result = await query;
+        sales = result.data || [];
+        error = result.error;
     }
 
-    if (orderCodeFilter) {
-        query = query.eq('sale_code', orderCodeFilter);
+    // OrderCode filtresi (RPC sonrası uygula)
+    if (orderCodeFilter && sales.length > 0) {
+        sales = sales.filter(s => s.sale_code === orderCodeFilter);
     }
 
-    const { data: sales, error } = await query;
-
-    // Ürünlerin vat_rate bilgisini products tablosundan çek
+    // Ürünlerin vat_rate bilgisini RPC ile çek
     let productsVatMap = {};
     try {
-        const { data: products } = await dbClient
-            .from('products')
-            .select('id, stock_code, vat_rate');
-        if (products) {
-            for (const p of products) {
+        const { data: productsData } = await supabase
+            .rpc('get_birfatura_products_vat', { p_token: receivedToken });
+        if (productsData && Array.isArray(productsData)) {
+            for (const p of productsData) {
                 if (p.stock_code) productsVatMap[p.stock_code] = p.vat_rate || 20;
                 if (p.id) productsVatMap[String(p.id)] = p.vat_rate || 20;
             }
-            console.log(`[orders] ${Object.keys(productsVatMap).length} ürün KDV oranı yüklendi.`);
+            console.log(`[orders] ${Object.keys(productsVatMap).length} ürün KDV oranı yüklendi (RPC).`);
         }
     } catch (e) {
         console.warn("[orders] Ürün KDV oranları çekilemedi:", e.message);
@@ -398,14 +416,14 @@ async function handleBirFaturaOrders(req, res) {
 
     if (error) {
         console.error("[orders] Supabase Hatası:", JSON.stringify(error));
-        return res.status(500).json({ "Orders": [], "error": "Veritabanı Hatası: " + error.message });
+        return res.status(500).json({ "Orders": [], "error": "Veritabanı Hatası: " + (error.message || JSON.stringify(error)) });
     }
 
-    console.log(`[orders] DB'den ${sales?.length || 0} satış çekildi.`);
-    if (sales && sales.length > 0) {
-        console.log(`[orders] İlk satış örneği: id=${sales[0].id}, sale_code=${sales[0].sale_code}, date=${sales[0].date}, items_type=${typeof sales[0].items}, items_length=${Array.isArray(sales[0].items) ? sales[0].items.length : 'N/A'}`);
+    console.log(`[orders] Toplam ${sales.length} satış işlenecek.`);
+    if (sales.length > 0) {
+        console.log(`[orders] İlk satış: id=${sales[0].id}, sale_code=${sales[0].sale_code}, date=${sales[0].date}, items_type=${typeof sales[0].items}, items_count=${Array.isArray(sales[0].items) ? sales[0].items.length : 'N/A'}`);
     } else {
-        console.warn("[orders] UYARI: Hiç satış bulunamadı! Kontrol edin: RLS, company_code, is_deleted filtresi");
+        console.warn("[orders] UYARI: Hiç satış bulunamadı! RPC fonksiyonu Supabase'de oluşturulmuş mu?");
     }
 
     // 4. Process and Filter
