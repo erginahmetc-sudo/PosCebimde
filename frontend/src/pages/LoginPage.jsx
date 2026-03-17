@@ -105,7 +105,7 @@ export default function LoginPage() {
                                     <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path>
                                 </svg>
                             </div>
-                            <span className="text-2xl font-bold text-slate-800 tracking-tight">Kasa POS</span>
+                            <span className="text-2xl font-bold text-slate-800 tracking-tight">PosCebimde</span>
                         </div>
                         {/* Hero Text */}
                         <div className="space-y-6">
@@ -114,7 +114,7 @@ export default function LoginPage() {
                                 <span className="text-teal-600">Anında</span> Yazdırılsın.
                             </h1>
                             <p className="text-lg text-slate-600 max-w-sm leading-relaxed">
-                                Kasa POS sistemlerine sorunsuz bağlanın, işletmenizin verimliliğini 2026 teknolojisi ile zirveye taşıyın.
+                                PosCebimde sistemlerine sorunsuz bağlanın, işletmenizin verimliliğini 2026 teknolojisi ile zirveye taşıyın.
                             </p>
                         </div>
                     </div>
@@ -333,7 +333,7 @@ export default function LoginPage() {
                         {/* Form Footer */}
                         <div className="mt-12 text-center">
                             <p className="text-slate-500 text-sm">
-                                Kasa POS'ta yeni misiniz?
+                                PosCebimde'de yeni misiniz?
                                 <Link className="text-teal-600 font-bold hover:underline ml-1" to="/register">Hesap Oluşturun</Link>
                             </p>
                         </div>

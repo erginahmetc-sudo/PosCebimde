@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// Backend proxy URL (must point to KasaPos Node.js backend)
+// Backend proxy URL (must point to PosCebimde Node.js backend)
 // For dev it is typically same host on port 3001, or relative if served together.
 const LOCAL_BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
 
@@ -298,7 +298,7 @@ export const birFaturaAPI = {
     /**
      * Trigger BirFatura to pull the order and create an invoice.
      * Uses 'OutEBelge/CreateEBelgeFromTemplateAndSend' endpoint via backend proxy.
-     * @param {Object} sale - The sale object from KasaPos
+     * @param {Object} sale - The sale object from PosCebimde
      */
     createOrder: async (sale) => {
         // 1. Load Configuration

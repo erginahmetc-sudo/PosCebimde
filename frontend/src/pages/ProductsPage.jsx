@@ -208,6 +208,7 @@ export default function ProductsPage() {
             stock: '',
             group: '',
             brand: '',
+            vat_rate: '20',
         });
         setShowModal(true);
     };
@@ -222,7 +223,7 @@ export default function ProductsPage() {
             stock: product.stock?.toString() || '',
             group: product.group || '',
             brand: product.brand || '',
-            vat_rate: product.vat_rate?.toString() || '20',
+            vat_rate: (product.vat_rate ?? 20).toString(),
         });
         setShowModal(true);
     };
@@ -726,126 +727,124 @@ export default function ProductsPage() {
                                 </div>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto max-h-[calc(90vh-140px)] bg-gradient-to-b from-slate-50 to-white">
-                                {/* Ürün Adı - Full Width */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">Ürün Adı <span className="text-rose-500">*</span></label>
+                            <form onSubmit={handleSubmit} className="p-8 overflow-y-auto max-h-[calc(90vh-140px)] bg-gradient-to-b from-slate-50 to-white">
+                                {/* Satır 1: Ürün Adı (tam genişlik) */}
+                                <div className="space-y-1.5 mb-5">
+                                    <label className="block text-sm font-semibold text-slate-700">Ürün Adı <span className="text-rose-500">*</span></label>
                                     <input
                                         type="text"
                                         value={formData.name}
                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
+                                        className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
                                         placeholder="Ürün adını giriniz..."
                                         required
                                         autoFocus
                                     />
                                 </div>
 
-                                {/* Stok Kodu */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">Stok Kodu <span className="text-rose-500">*</span></label>
-                                    <input
-                                        type="text"
-                                        value={formData.stock_code}
-                                        onChange={(e) => setFormData({ ...formData, stock_code: e.target.value })}
-                                        className={`w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400 font-mono ${editingProduct ? 'opacity-50 cursor-not-allowed bg-slate-100' : ''}`}
-                                        placeholder="STK-001"
-                                        required
-                                        disabled={!!editingProduct}
-                                    />
+                                {/* Satır 2: Stok Kodu + Barkod */}
+                                <div className="grid grid-cols-2 gap-4 mb-5">
+                                    <div className="space-y-1.5">
+                                        <label className="block text-sm font-semibold text-slate-700">Stok Kodu <span className="text-rose-500">*</span></label>
+                                        <input
+                                            type="text"
+                                            value={formData.stock_code}
+                                            onChange={(e) => setFormData({ ...formData, stock_code: e.target.value })}
+                                            className={`w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400 font-mono ${editingProduct ? 'opacity-50 cursor-not-allowed bg-slate-100' : ''}`}
+                                            placeholder="STK-001"
+                                            required
+                                            disabled={!!editingProduct}
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="block text-sm font-semibold text-slate-700">Barkod</label>
+                                        <input
+                                            type="text"
+                                            value={formData.barcode}
+                                            onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400 font-mono"
+                                            placeholder="8690123456789"
+                                        />
+                                    </div>
                                 </div>
 
-                                {/* Barkod */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">Barkod</label>
-                                    <input
-                                        type="text"
-                                        value={formData.barcode}
-                                        onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400 font-mono"
-                                        placeholder="8690123456789"
-                                    />
+                                {/* Satır 3: Fiyat + KDV + Stok */}
+                                <div className="grid grid-cols-3 gap-4 mb-5">
+                                    <div className="space-y-1.5">
+                                        <label className="block text-sm font-semibold text-slate-700">Fiyat (₺) <span className="text-rose-500">*</span></label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={formData.price}
+                                            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                                            className="w-full px-4 py-3 text-lg font-bold rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
+                                            placeholder="0.00"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="block text-sm font-semibold text-slate-700">KDV Oranı</label>
+                                        <select
+                                            value={formData.vat_rate}
+                                            onChange={(e) => setFormData({ ...formData, vat_rate: e.target.value })}
+                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                                        >
+                                            <option value="20">%20</option>
+                                            <option value="18">%18</option>
+                                            <option value="10">%10</option>
+                                            <option value="8">%8</option>
+                                            <option value="1">%1</option>
+                                            <option value="0">%0 (KDV Muaf)</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="block text-sm font-semibold text-slate-700">Stok Miktarı</label>
+                                        <input
+                                            type="number"
+                                            value={formData.stock}
+                                            onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
+                                            placeholder="0"
+                                        />
+                                    </div>
                                 </div>
 
-                                {/* Fiyat */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">Fiyat (₺) <span className="text-rose-500">*</span></label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        value={formData.price}
-                                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                        className="w-full px-6 py-5 text-2xl font-bold rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
-                                        placeholder="0.00"
-                                        required
-                                    />
-                                </div>
-
-                                {/* KDV Oranı */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">KDV Oranı</label>
-                                    <select
-                                        value={formData.vat_rate}
-                                        onChange={(e) => setFormData({ ...formData, vat_rate: e.target.value })}
-                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
-                                    >
-                                        <option value="20">%20</option>
-                                        <option value="18">%18</option>
-                                        <option value="10">%10</option>
-                                        <option value="8">%8</option>
-                                        <option value="1">%1</option>
-                                        <option value="0">%0 (KDV Muaf)</option>
-                                    </select>
-                                </div>
-
-                                {/* Stok Miktarı */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">Stok Miktarı</label>
-                                    <input
-                                        type="number"
-                                        value={formData.stock}
-                                        onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
-                                        placeholder="0"
-                                    />
-                                </div>
-
-                                {/* Marka */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">Marka</label>
-                                    <input
-                                        type="text"
-                                        value={formData.brand}
-                                        onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
-                                        placeholder="Marka adı..."
-                                    />
-                                </div>
-
-                                {/* Grup */}
-                                <div className="space-y-2">
-                                    <label className="block text-base font-semibold text-slate-700">Grup</label>
-                                    <input
-                                        type="text"
-                                        value={formData.group}
-                                        onChange={(e) => setFormData({ ...formData, group: e.target.value })}
-                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
-                                        placeholder="Ürün grubu..."
-                                    />
+                                {/* Satır 4: Marka + Grup */}
+                                <div className="grid grid-cols-2 gap-4 mb-6">
+                                    <div className="space-y-1.5">
+                                        <label className="block text-sm font-semibold text-slate-700">Marka</label>
+                                        <input
+                                            type="text"
+                                            value={formData.brand}
+                                            onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
+                                            placeholder="Marka adı..."
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="block text-sm font-semibold text-slate-700">Grup</label>
+                                        <input
+                                            type="text"
+                                            value={formData.group}
+                                            onChange={(e) => setFormData({ ...formData, group: e.target.value })}
+                                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
+                                            placeholder="Ürün grubu..."
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Buttons */}
-                                <div className="flex gap-4 pt-8">
+                                <div className="flex gap-4 pt-4">
                                     <button
                                         type="button"
                                         onClick={() => setShowModal(false)}
-                                        className="flex-1 py-5 text-lg font-bold text-slate-600 bg-slate-100 rounded-2xl hover:bg-slate-200 transition-all active:scale-[0.98]"
+                                        className="flex-1 py-4 text-base font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all active:scale-[0.98]"
                                     >
                                         İptal
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-[2] py-5 text-xl font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl hover:from-emerald-600 hover:to-teal-600 shadow-xl shadow-emerald-500/30 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                                        className="flex-[2] py-4 text-lg font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl hover:from-emerald-600 hover:to-teal-600 shadow-xl shadow-emerald-500/30 transition-all hover:scale-[1.01] active:scale-[0.99]"
                                     >
                                         ✓ {editingProduct ? 'Güncelle' : 'Kaydet'}
                                     </button>
