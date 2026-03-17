@@ -1,10 +1,15 @@
 -- ============================================================
--- BirFatura Entegrasyonu için RPC Fonksiyonları
+-- BirFatura Entegrasyonu için RPC Fonksiyonları - v2
+-- DÜZELTME: app_settings.value JSONB türünde, TEXT değil!
 -- RLS'yi bypass eder (SECURITY DEFINER)
 -- Anon key ile çağrılabilir
 --
 -- KULLANIM: Bu SQL'i Supabase Dashboard > SQL Editor'da çalıştırın.
 -- ============================================================
+
+-- Önceki versiyonları temizle
+DROP FUNCTION IF EXISTS public.get_birfatura_sales(text);
+DROP FUNCTION IF EXISTS public.get_birfatura_products_vat(text);
 
 -- 1. Satışları döndüren fonksiyon
 CREATE OR REPLACE FUNCTION public.get_birfatura_sales(p_token text)
@@ -18,13 +23,14 @@ DECLARE
     v_result jsonb;
 BEGIN
     -- A) Token'ı app_settings'den doğrula
+    -- NOT: value kolonu JSONB türünde, string değerler "token" şeklinde saklanıyor
     SELECT company_code INTO v_company_code
     FROM app_settings
     WHERE key = 'secret_token'
       AND (
-        value = p_token
-        OR value = '"' || p_token || '"'
-        OR trim(both '"' from value) = p_token
+        value = to_jsonb(p_token)
+        OR value #>> '{}' = p_token
+        OR trim(both '"' from value::text) = p_token
       )
     LIMIT 1;
 
@@ -39,7 +45,7 @@ BEGIN
 
             RETURN v_result;
         ELSE
-            -- Geçersiz token
+            -- Geçersiz token - boş dön
             RETURN '[]'::jsonb;
         END IF;
     END IF;
@@ -66,14 +72,14 @@ DECLARE
     v_company_code text;
     v_result jsonb;
 BEGIN
-    -- Token doğrulama
+    -- Token doğrulama (JSONB uyumlu)
     SELECT company_code INTO v_company_code
     FROM app_settings
     WHERE key = 'secret_token'
       AND (
-        value = p_token
-        OR value = '"' || p_token || '"'
-        OR trim(both '"' from value) = p_token
+        value = to_jsonb(p_token)
+        OR value #>> '{}' = p_token
+        OR trim(both '"' from value::text) = p_token
       )
     LIMIT 1;
 
