@@ -671,6 +671,108 @@ async function handleBirFaturaOrders(req, res) {
 app.post('/api/orders/', handleBirFaturaOrders);
 app.post('/api/orders', handleBirFaturaOrders);
 
+// =====================================================
+// TEŞHİS: Tarayıcıdan GET ile test et
+// URL: https://www.poscebimde.com/api/birfatura-test
+// =====================================================
+app.get('/api/birfatura-test', async (req, res) => {
+    const results = {
+        timestamp: new Date().toISOString(),
+        server: "PosCebimde Bridge Server",
+        supabase_initialized: !!supabase,
+        admin_supabase: adminSupabase !== supabase ? 'Service Role (aktif)' : 'Anon Key (RLS aktif!)',
+        tests: {}
+    };
+
+    // Test 1: RPC fonksiyonu var mı?
+    try {
+        const { data, error } = await supabase
+            .rpc('get_birfatura_sales', { p_token: 'test-diagnostic-token' });
+        if (error) {
+            results.tests.rpc_function = {
+                status: 'HATA',
+                message: error.message,
+                hint: error.hint || 'RPC fonksiyonu Supabase SQL Editor\'da oluşturulmuş mu?'
+            };
+        } else {
+            results.tests.rpc_function = {
+                status: 'OK',
+                message: 'RPC fonksiyonu çalışıyor',
+                sales_count: Array.isArray(data) ? data.length : 0,
+                note: 'test token ile çağrıldı, 0 satış normal'
+            };
+        }
+    } catch (e) {
+        results.tests.rpc_function = { status: 'HATA', message: e.message };
+    }
+
+    // Test 2: Fallback token ile satış çek
+    try {
+        const { data, error } = await supabase
+            .rpc('get_birfatura_sales', { p_token: 'poscebimde-2026-secret-api-token' });
+        if (error) {
+            results.tests.fallback_token_sales = {
+                status: 'HATA',
+                message: error.message
+            };
+        } else {
+            const salesArr = Array.isArray(data) ? data : [];
+            results.tests.fallback_token_sales = {
+                status: 'OK',
+                sales_count: salesArr.length,
+                first_sale: salesArr.length > 0 ? {
+                    id: salesArr[0].id,
+                    id_type: typeof salesArr[0].id,
+                    sale_code: salesArr[0].sale_code,
+                    date: salesArr[0].date,
+                    customer_name: salesArr[0].customer_name,
+                    items_type: typeof salesArr[0].items,
+                    items_is_array: Array.isArray(salesArr[0].items),
+                    items_count: Array.isArray(salesArr[0].items) ? salesArr[0].items.length : 'N/A',
+                    payment_method: salesArr[0].payment_method,
+                    total: salesArr[0].total
+                } : null
+            };
+        }
+    } catch (e) {
+        results.tests.fallback_token_sales = { status: 'HATA', message: e.message };
+    }
+
+    // Test 3: Direkt tablo sorgusu (RLS kontrolü)
+    try {
+        const { data, error, count } = await supabase
+            .from('sales')
+            .select('id', { count: 'exact', head: true })
+            .eq('is_deleted', false);
+        results.tests.direct_query_anon = {
+            status: error ? 'HATA' : 'OK',
+            count: count,
+            message: error ? error.message : `Anon key ile ${count || 0} satış görünüyor`,
+            note: count === 0 ? 'RLS satışları engelliyor - RPC fonksiyonu kullanılmalı' : 'RLS sorun yok'
+        };
+    } catch (e) {
+        results.tests.direct_query_anon = { status: 'HATA', message: e.message };
+    }
+
+    // Test 4: app_settings'den token kontrol
+    try {
+        const { data, error } = await supabase
+            .from('app_settings')
+            .select('company_code, key')
+            .eq('key', 'secret_token');
+        results.tests.app_settings_token = {
+            status: error ? 'HATA' : 'OK',
+            found: data ? data.length : 0,
+            message: error ? error.message : `${data?.length || 0} token kaydı bulundu`,
+            note: (data?.length || 0) === 0 ? 'RLS app_settings\'i de engelliyor olabilir' : ''
+        };
+    } catch (e) {
+        results.tests.app_settings_token = { status: 'HATA', message: e.message };
+    }
+
+    res.json(results);
+});
+
 // --- SERVE STATIC FRONTEND (Production) ---
 const frontendPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendPath)) {
