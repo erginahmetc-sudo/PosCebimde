@@ -1,0 +1,10 @@
+node_modules/
+.env
+*.log
+test_output.txt
+swagger.json
+swagger2.json
+debug*.js
+test_security.js
+test_orders.js
+get_swagger*.js

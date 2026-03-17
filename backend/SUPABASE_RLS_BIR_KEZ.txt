@@ -1,0 +1,18 @@
+Supabase'de sadece BİR KEZ yapılacak işlem (SQL bilgisi gerekmez – bu metni teknik bir arkadaşınıza veya Supabase destek ekibine iletin):
+
+1. Supabase Dashboard'a giriş yapın.
+2. Sol menüden "SQL Editor"ı açın.
+3. "New query" deyip aşağıdaki iki satırı yapıştırın ve "Run"a basın.
+
+--- Başlangıç ---
+
+DROP POLICY IF EXISTS sales_insert ON sales;
+
+CREATE POLICY sales_insert ON sales
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (company_code = get_my_company_code());
+
+--- Bitiş ---
+
+Bu işlem, yeni satışların her zaman doğru şirket koduyla kaydedilmesini sağlar. Mevcut satışları düzeltmek için uygulama içindeki "Satışları Düzelt" butonunu kullanın (Ayarlar > Entegrasyon Ayarları).

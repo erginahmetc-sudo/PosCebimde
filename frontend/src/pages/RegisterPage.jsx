@@ -47,7 +47,7 @@ export default function RegisterPage() {
 
     return (
         <div className="bg-surface text-text-main min-h-screen flex flex-col font-display antialiased selection:bg-mint-accent selection:text-primary-deep overflow-x-hidden">
-            <div className="flex flex-1 flex-row overflow-hidden h-screen">
+            <div className="flex flex-1 flex-col lg:flex-row lg:overflow-hidden lg:h-screen">
                 {/* Sol Panel: Görsel ve Marka */}
                 <div className="hidden lg:flex lg:w-1/2 relative bg-mint-light items-center justify-center p-12 overflow-hidden">
                     <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
@@ -65,8 +65,10 @@ export default function RegisterPage() {
                     <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-mint-accent rounded-full blur-3xl mix-blend-multiply"></div>
 
                     <div className="relative z-10 flex flex-col items-center text-center max-w-md">
-                        <div className="mb-8 p-4 bg-white rounded-[2rem] shadow-xl shadow-teal-100/50">
-                            <img src="/logo.png" alt="PosCebimde Logo" className="w-16 h-16 object-contain" />
+                        <div className="mb-8 p-6 bg-white rounded-[2rem] shadow-xl shadow-teal-100/50">
+                            <svg className="text-primary size-14" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                                <path clipRule="evenodd" d="M24 0.757355L47.2426 24L24 47.2426L0.757355 24L24 0.757355ZM21 35.7574V12.2426L9.24264 24L21 35.7574Z" fill="currentColor" fillRule="evenodd"></path>
+                            </svg>
                         </div>
                         <h2 className="text-primary-deep text-4xl font-extrabold tracking-tight mb-5">İşletmenizi Dijitalleştirin</h2>
                         <p className="text-text-sub text-lg font-medium leading-relaxed">
@@ -92,8 +94,10 @@ export default function RegisterPage() {
                     {/* Mobile Header */}
                     <div className="lg:hidden px-6 py-6 border-b border-gray-50 flex items-center justify-between bg-white/80 backdrop-blur sticky top-0 z-20">
                         <div className="flex items-center gap-2">
-                            <img src="/logo.png" alt="PosCebimde Logo" className="w-8 h-8 object-contain" />
-                            <span className="font-bold text-lg text-primary-deep">PosCebimde</span>
+                            <svg className="text-primary size-7" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                                <path clipRule="evenodd" d="M24 0.757355L47.2426 24L24 47.2426L0.757355 24L24 0.757355ZM21 35.7574V12.2426L9.24264 24L21 35.7574Z" fill="currentColor" fillRule="evenodd"></path>
+                            </svg>
+                            <span className="font-bold text-lg text-primary-deep">Kasa POS</span>
                         </div>
                         <Link className="text-primary font-bold text-sm bg-mint-light px-4 py-2 rounded-full hover:bg-mint-accent transition-colors" to="/login">Giriş Yap</Link>
                     </div>
@@ -102,7 +106,7 @@ export default function RegisterPage() {
                         <div className="w-full max-w-[480px]">
                             <div className="mb-8 text-center lg:text-left">
                                 <h1 className="text-text-main tracking-tight text-3xl lg:text-4xl font-extrabold mb-3">Hesabınızı Oluşturun</h1>
-                                <p className="text-text-sub text-lg">PosCebimde ile işletmenizi büyütmeye başlayın.</p>
+                                <p className="text-text-sub text-lg">Kasa POS ile işletmenizi büyütmeye başlayın.</p>
                             </div>
 
                             {error && (

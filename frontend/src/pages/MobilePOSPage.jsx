@@ -202,80 +202,94 @@ export default function MobilePOSPage() {
             setStatusModal({ isOpen: true, title: 'Entegrasyon Ayarı Yok', message: 'Ayarlar sayfasından BirFatura API anahtarlarını kaydedin.', type: 'error', details: null });
             return;
         }
+
         setInvoiceLoading(true);
-        const saleCode = 'SLS-' + Date.now();
-        const birFaturaPaymentText = paymentTypeMap[retailPaymentType] || '';
-        const result = await birFaturaAPI.sendBasicInvoice({
-            retailForm: retailCustomerForm,
-            cart,
-            paymentMethod: birFaturaPaymentText,
-            saleCode
-        });
-        setInvoiceLoading(false);
-        if (result.success) {
-            const perakendeCustomerName = `Perakende-${retailCustomerForm.name.trim()}`;
-            setSelectedCustomer(perakendeCustomerName);
-            setShowRetailCustomerModal(false);
-            setShowCustomerModal(false);
-            const invoiceUuid = result.ettn || result.data?.Result?.ETTN || result.data?.result?.ETTN || result.data?.Result?.UUID || result.data?.result?.UUID || null;
-            let pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
-
-            try {
-                const selectedCust = customers.find(c => c.name === perakendeCustomerName);
-                await salesAPI.complete({
-                    sale_code: saleCode,
-                    customer: selectedCust || null,
-                    customer_name: !selectedCust ? perakendeCustomerName : undefined,
-                    tax_number: retailCustomerForm.tax_number,
-                    address: retailCustomerForm.address,
-                    phone: retailCustomerForm.phone,
-                    payment_method: retailPaymentType,
-                    items: cart.map(item => ({
-                        id: item.id, stock_code: item.stock_code, barcode: item.barcode, name: item.name,
-                        quantity: item.quantity, price: item.price || item.final_price, discount_rate: item.discount_rate || 0,
-                        amount: item.quantity
-                    })),
-                    total: calculateTotal()
-                });
-
-                setCart([]);
-                setSelectedCustomer('Toptan Satış');
-                setRetailCustomerForm(defaultRetailForm);
-                setRetailPaymentType('Kredi Kartı');
-                setShowCartModal(false);
-                loadProducts();
-            } catch (error) {
-                console.error('[MobilePOS] Satış kaydetme hatası:', error);
-            }
-
-            setStatusModal({
-                isOpen: true,
-                title: 'Fatura Gönderildi ✓',
-                message: 'E-Fatura/E-Arşiv fatura başarıyla gönderildi ve satış tamamlandı.',
-                type: 'success',
-                details: null,
-                actionButton: (pdfUrl || invoiceUuid) ? {
-                    label: '📄 Kesilen Faturayı Görüntüle',
-                    onClick: async () => {
-                        if (pdfUrl) { window.open(pdfUrl, '_blank'); return; }
-                        try {
-                            const pdfResult = await birFaturaAPI.getPdfLink(invoiceUuid);
-                            if (pdfResult.success && pdfResult.pdfUrl) {
-                                window.open(pdfResult.pdfUrl, '_blank');
-                            } else {
-                                alert('PDF henüz hazır değil. Lütfen birkaç saniye sonra tekrar deneyin.');
-                            }
-                        } catch (err) {
-                            console.error('[MobilePOS] PDF açma hatası:', err);
-                            alert('PDF alınırken hata oluştu.');
-                        }
-                    }
-                } : null
+        try {
+            const saleCode = 'SLS-' + Date.now();
+            const birFaturaPaymentText = paymentTypeMap[retailPaymentType] || '';
+            const result = await birFaturaAPI.sendBasicInvoice({
+                retailForm: retailCustomerForm,
+                cart,
+                paymentMethod: birFaturaPaymentText,
+                saleCode
             });
-            setSuccessMessage('Satış İşlemi Başarılı');
-            setTimeout(() => setSuccessMessage(''), 2000);
-        } else {
-            setStatusModal({ isOpen: true, title: 'Fatura Hatası', message: result.message, type: 'error', details: null });
+
+            if (result.success) {
+                const perakendeCustomerName = `Perakende-${retailCustomerForm.name.trim()}`;
+                setSelectedCustomer(perakendeCustomerName);
+                setShowRetailCustomerModal(false);
+                setShowCustomerModal(false);
+                const invoiceUuid = result.ettn || result.data?.Result?.ETTN || result.data?.result?.ETTN || result.data?.Result?.UUID || result.data?.result?.UUID || null;
+                let pdfUrl = result.data?.Result?.PdfUrl || result.data?.result?.pdfUrl || null;
+
+                try {
+                    const selectedCust = customers.find(c => c.name === perakendeCustomerName);
+                    await salesAPI.complete({
+                        sale_code: saleCode,
+                        customer: selectedCust || null,
+                        customer_name: !selectedCust ? perakendeCustomerName : undefined,
+                        tax_number: retailCustomerForm.tax_number,
+                        address: retailCustomerForm.address,
+                        phone: retailCustomerForm.phone,
+                        payment_method: retailPaymentType,
+                        items: cart.map(item => ({
+                            id: item.id, stock_code: item.stock_code, barcode: item.barcode, name: item.name,
+                            quantity: item.quantity, price: item.price || item.final_price, discount_rate: item.discount_rate || 0,
+                            amount: item.quantity
+                        })),
+                        total: calculateTotal()
+                    });
+
+                    setCart([]);
+                    setSelectedCustomer('Toptan Satış');
+                    setRetailCustomerForm(defaultRetailForm);
+                    setRetailPaymentType('Kredi Kartı');
+                    setShowCartModal(false);
+                    loadProducts();
+                } catch (error) {
+                    console.error('[MobilePOS] Satış kaydetme hatası:', error);
+                }
+
+                setStatusModal({
+                    isOpen: true,
+                    title: 'Fatura Gönderildi ✓',
+                    message: 'E-Fatura/E-Arşiv fatura başarıyla gönderildi ve satış tamamlandı.',
+                    type: 'success',
+                    details: null,
+                    actionButton: (pdfUrl || invoiceUuid) ? {
+                        label: '📄 Kesilen Faturayı Görüntüle',
+                        onClick: async () => {
+                            if (pdfUrl) { window.open(pdfUrl, '_blank'); return; }
+                            try {
+                                const pdfResult = await birFaturaAPI.getPdfLink(invoiceUuid);
+                                if (pdfResult.success && pdfResult.pdfUrl) {
+                                    window.open(pdfResult.pdfUrl, '_blank');
+                                } else {
+                                    alert('PDF henüz hazır değil. Lütfen birkaç saniye sonra tekrar deneyin.');
+                                }
+                            } catch (err) {
+                                console.error('[MobilePOS] PDF açma hatası:', err);
+                                alert('PDF alınırken hata oluştu.');
+                            }
+                        }
+                    } : null
+                });
+                setSuccessMessage('Satış İşlemi Başarılı');
+                setTimeout(() => setSuccessMessage(''), 2000);
+            } else {
+                setStatusModal({ isOpen: true, title: 'Fatura Hatası', message: result.message, type: 'error', details: null });
+            }
+        } catch (error) {
+            console.error('[MobilePOS] Fatura kesme işlemi başarısız:', error);
+            setStatusModal({ 
+                isOpen: true, 
+                title: 'İşlem Hatası', 
+                message: 'Fatura kesme işlemi sırasında beklenmedik bir hata oluştu: ' + error.message, 
+                type: 'error', 
+                details: null 
+            });
+        } finally {
+            setInvoiceLoading(false);
         }
     };
 
@@ -529,7 +543,7 @@ export default function MobilePOSPage() {
     };
 
     return (
-        <div className="flex flex-col w-screen h-[100dvh] bg-gray-100 overflow-hidden select-none relative">
+        <div className="flex flex-col w-full h-[100dvh] bg-gray-100 overflow-hidden select-none relative">
             {/* Modern Loading Screen */}
             {loading && (
                 <div className="absolute inset-0 z-[2000] bg-gradient-to-b from-white to-slate-50 flex flex-col items-center justify-center overflow-hidden transition-all duration-500">

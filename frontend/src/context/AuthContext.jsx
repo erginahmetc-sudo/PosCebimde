@@ -85,21 +85,46 @@ export const AuthProvider = ({ children }) => {
             setLoading(false);
         };
 
-        // Helper: Load company settings from database to localStorage
         const loadCompanySettings = async () => {
             try {
-                // Load BirFatura integration settings
-                const apiKeyRes = await settingsAPI.get('birfatura_api_key');
-                const secretKeyRes = await settingsAPI.get('birfatura_secret_key');
-                const integrationKeyRes = await settingsAPI.get('birfatura_integration_key');
+                // Fetch all settings at once for efficiency
+                const { data: settings } = await settingsAPI.getAll();
+                
+                if (settings) {
+                    // 1. BirFatura integration settings
+                    if (settings['birfatura_api_key'] || settings['birfatura_secret_key'] || settings['birfatura_integration_key']) {
+                        localStorage.setItem('birfatura_config', JSON.stringify({
+                            api_key: settings['birfatura_api_key'] || '',
+                            secret_key: settings['birfatura_secret_key'] || '',
+                            integration_key: settings['birfatura_integration_key'] || ''
+                        }));
+                    }
 
-                if (apiKeyRes.data || secretKeyRes.data || integrationKeyRes.data) {
-                    localStorage.setItem('birfatura_config', JSON.stringify({
-                        api_key: apiKeyRes.data || '',
-                        secret_key: secretKeyRes.data || '',
-                        integration_key: integrationKeyRes.data || ''
-                    }));
-                    console.log('BirFatura settings loaded from database');
+                    // 2. Receipt settings
+                    if (settings['receipt_auto_print'] !== undefined) {
+                        localStorage.setItem('receipt_auto_print', settings['receipt_auto_print']);
+                    }
+                    if (settings['receipt_paper_size']) {
+                        localStorage.setItem('receipt_paper_size', settings['receipt_paper_size']);
+                    }
+
+                    // 3. Invoice settings
+                    if (settings['invoices_show_total'] !== undefined) {
+                        localStorage.setItem('invoices_show_total', settings['invoices_show_total']);
+                    }
+
+                    // 4. POS settings
+                    if (settings['pos_settings_ask_quantity'] !== undefined) {
+                        localStorage.setItem('pos_settings_ask_quantity', settings['pos_settings_ask_quantity']);
+                    }
+
+                    // 5. Company Info
+                    if (settings['company_name']) localStorage.setItem('company_name', settings['company_name']);
+                    if (settings['company_address']) localStorage.setItem('company_address', settings['company_address']);
+                    if (settings['company_phone']) localStorage.setItem('company_phone', settings['company_phone']);
+                    if (settings['company_logo']) localStorage.setItem('company_logo', settings['company_logo']);
+
+                    console.log('Company settings synchronized to localStorage');
                 }
             } catch (err) {
                 console.error('Failed to load company settings:', err);
@@ -200,6 +225,30 @@ export const AuthProvider = ({ children }) => {
 
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
+        
+        // Sync company settings immediately after login
+        try {
+            const { data: settings } = await settingsAPI.getAll();
+            if (settings) {
+                if (settings['birfatura_api_key'] || settings['birfatura_secret_key'] || settings['birfatura_integration_key']) {
+                    localStorage.setItem('birfatura_config', JSON.stringify({
+                        api_key: settings['birfatura_api_key'] || '',
+                        secret_key: settings['birfatura_secret_key'] || '',
+                        integration_key: settings['birfatura_integration_key'] || ''
+                    }));
+                }
+                if (settings['receipt_auto_print'] !== undefined) localStorage.setItem('receipt_auto_print', settings['receipt_auto_print']);
+                if (settings['receipt_paper_size']) localStorage.setItem('receipt_paper_size', settings['receipt_paper_size']);
+                if (settings['invoices_show_total'] !== undefined) localStorage.setItem('invoices_show_total', settings['invoices_show_total']);
+                if (settings['pos_settings_ask_quantity'] !== undefined) localStorage.setItem('pos_settings_ask_quantity', settings['pos_settings_ask_quantity']);
+                if (settings['company_name']) localStorage.setItem('company_name', settings['company_name']);
+                if (settings['company_address']) localStorage.setItem('company_address', settings['company_address']);
+                if (settings['company_phone']) localStorage.setItem('company_phone', settings['company_phone']);
+                if (settings['company_logo']) localStorage.setItem('company_logo', settings['company_logo']);
+            }
+        } catch (e) {
+            console.error("Login settings sync error", e);
+        }
     };
 
     const logout = async () => {
