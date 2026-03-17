@@ -405,8 +405,8 @@ async function handleBirFaturaOrders(req, res) {
             .rpc('get_birfatura_products_vat', { p_token: receivedToken });
         if (productsData && Array.isArray(productsData)) {
             for (const p of productsData) {
-                if (p.stock_code) productsVatMap[p.stock_code] = p.vat_rate || 20;
-                if (p.id) productsVatMap[String(p.id)] = p.vat_rate || 20;
+                if (p.stock_code) productsVatMap[p.stock_code] = parseInt(p.vat_rate || 20, 10);
+                if (p.id) productsVatMap[String(p.id)] = parseInt(p.vat_rate || 20, 10);
             }
             console.log(`[orders] ${Object.keys(productsVatMap).length} ürün KDV oranı yüklendi (RPC).`);
         }
@@ -519,7 +519,7 @@ async function handleBirFaturaOrders(req, res) {
             if (!vatRateRaw && item.id) {
                 vatRateRaw = productsVatMap[String(item.id)];
             }
-            const vatRate = parseInt(vatRateRaw || 10, 10);
+            const vatRate = parseInt(vatRateRaw || 20, 10);
 
             // KDV hariç fiyat = KDV dahil / (1 + oran/100)
             const unitPriceExclTax = vatRate > 0

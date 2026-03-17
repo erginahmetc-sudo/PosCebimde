@@ -42,6 +42,7 @@ export default function ProductsPage() {
         stock: '',
         group: '',
         brand: '',
+        vat_rate: '20',
     });
 
     // Modal States
@@ -221,6 +222,7 @@ export default function ProductsPage() {
             stock: product.stock?.toString() || '',
             group: product.group || '',
             brand: product.brand || '',
+            vat_rate: product.vat_rate?.toString() || '20',
         });
         setShowModal(true);
     };
@@ -237,6 +239,7 @@ export default function ProductsPage() {
                 ...formData,
                 price: parseFloat(formData.price) || 0,
                 stock: parseInt(formData.stock) || 0,
+                vat_rate: parseInt(formData.vat_rate) || 20,
             };
 
             if (editingProduct) {
@@ -776,6 +779,23 @@ export default function ProductsPage() {
                                         placeholder="0.00"
                                         required
                                     />
+                                </div>
+
+                                {/* KDV Oranı */}
+                                <div className="space-y-2">
+                                    <label className="block text-base font-semibold text-slate-700">KDV Oranı</label>
+                                    <select
+                                        value={formData.vat_rate}
+                                        onChange={(e) => setFormData({ ...formData, vat_rate: e.target.value })}
+                                        className="w-full px-6 py-5 text-xl rounded-2xl border-2 border-slate-200 bg-white focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                                    >
+                                        <option value="20">%20</option>
+                                        <option value="18">%18</option>
+                                        <option value="10">%10</option>
+                                        <option value="8">%8</option>
+                                        <option value="1">%1</option>
+                                        <option value="0">%0 (KDV Muaf)</option>
+                                    </select>
                                 </div>
 
                                 {/* Stok Miktarı */}

@@ -181,7 +181,7 @@ export const productsAPI = {
             sale_price: product.price,
             buying_price: product.buying_price || 0,
             stock: product.stock,
-            vat_rate: product.vat_rate || 18,
+            vat_rate: product.vat_rate || 20,
             image_url: product.image_url,
             company_code: companyCode
         };
