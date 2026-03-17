@@ -9,7 +9,6 @@ const axios = require('axios');
 dotenv.config();
 
 const app = express();
-// app.py varsayılan olarak 5000 portunda çalıştığı için 5000 kullanıyoruz
 const PORT = process.env.PORT || 5000;
 
 
@@ -30,7 +29,7 @@ try {
     console.error("Failed to initialize Supabase client:", error.message);
 }
 
-// Admin Client for Force Deletes (Bypassing RLS if Service Role Key is available)
+// Admin Client (RLS bypass - Service Role Key ile)
 let adminSupabase = null;
 try {
     const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
@@ -43,9 +42,8 @@ try {
         });
         console.log("Admin Supabase client initialized (Service Role).");
     } else {
-        // Fallback to normal client if no service key
         adminSupabase = supabase;
-        console.log("Service Code not found, falling back to standard client for admin ops.");
+        console.log("Service Role Key not found, falling back to standard client for admin ops.");
     }
 } catch (e) {
     console.error("Admin client init failed", e);
@@ -54,8 +52,65 @@ try {
 app.use(cors());
 app.use(express.json());
 
+// --- HELPER: BirFatura Token Doğrulama (Tüm endpointler için ortak) ---
+const FALLBACK_TOKENS = [
+    'poscebimde-2026-secret-api-token',
+    'kasapos-2026-secret-api-token' // Geriye uyumluluk
+];
+
+async function validateBirFaturaToken(receivedToken) {
+    if (!receivedToken) {
+        return { valid: false, companyCode: null, reason: 'Token eksik' };
+    }
+
+    // RLS bypass için adminSupabase kullan
+    const dbClient = adminSupabase || supabase;
+    if (!dbClient) {
+        return { valid: false, companyCode: null, reason: 'Veritabanı bağlantısı yok' };
+    }
+
+    // A) Veritabanından secret_token kontrolü
+    try {
+        const { data: settings, error: tokenError } = await dbClient
+            .from('app_settings')
+            .select('company_code, value')
+            .eq('key', 'secret_token');
+
+        if (tokenError) {
+            console.error("[Token] Sorgulama hatası:", tokenError);
+        }
+
+        if (settings && settings.length > 0) {
+            for (const setting of settings) {
+                if (setting.value) {
+                    let storedToken = setting.value;
+                    if (typeof storedToken === 'string') {
+                        storedToken = storedToken.replace(/^"|"$/g, '');
+                    }
+                    if (storedToken === receivedToken) {
+                        console.log(`[Token] DB token eşleşti (company: ${setting.company_code})`);
+                        return { valid: true, companyCode: setting.company_code };
+                    }
+                }
+            }
+            console.warn(`[Token] DB'de ${settings.length} token bulundu ama hiçbiri eşleşmedi.`);
+        } else {
+            console.warn("[Token] DB'de secret_token kaydı bulunamadı.");
+        }
+    } catch (e) {
+        console.error("[Token] DB sorgu hatası:", e.message);
+    }
+
+    // B) Fallback token kontrolü
+    if (FALLBACK_TOKENS.includes(receivedToken)) {
+        console.log("[Token] Fallback token kabul edildi.");
+        return { valid: true, companyCode: null };
+    }
+
+    return { valid: false, companyCode: null, reason: 'Geçersiz token' };
+}
+
 // --- BIRFATURA API PROXY ---
-// Frontend'in CORS sorunu olmadan BirFatura API'sine erişmesi için proxy
 app.post('/api/birfatura-proxy', async (req, res) => {
     try {
         const { endpoint, payload, apiKey, secretKey, integrationKey } = req.body;
@@ -94,14 +149,12 @@ app.post('/api/birfatura-proxy', async (req, res) => {
         }
 
         if (error.response) {
-            // BirFatura API'den gelen hata - tüm response'u gönder
             res.status(error.response.status).json(error.response.data || {
                 Success: false,
                 Message: error.message,
                 StatusCode: error.response.status
             });
         } else {
-            // Ağ hatası vb.
             res.status(500).json({
                 Success: false,
                 Message: 'BirFatura API\'ye bağlanılamadı: ' + error.message
@@ -112,20 +165,27 @@ app.post('/api/birfatura-proxy', async (req, res) => {
 
 // --- HELPER: Date Parsing (BirFatura format: DD.MM.YYYY HH:mm:ss) ---
 function parseDate(dateStr) {
-    if (!dateStr) return null;
-    // Format: DD.MM.YYYY HH:mm:ss
-    const parts = dateStr.split(' ');
+    if (!dateStr || typeof dateStr !== 'string') return null;
+    const parts = dateStr.trim().split(' ');
+    if (parts.length < 2) return null;
     const dateParts = parts[0].split('.');
     const timeParts = parts[1].split(':');
-    return new Date(
-        dateParts[2], dateParts[1] - 1, dateParts[0],
-        timeParts[0], timeParts[1], timeParts[2]
+    if (dateParts.length < 3) return null;
+    const d = new Date(
+        parseInt(dateParts[2], 10),
+        parseInt(dateParts[1], 10) - 1,
+        parseInt(dateParts[0], 10),
+        parseInt(timeParts[0] || 0, 10),
+        parseInt(timeParts[1] || 0, 10),
+        parseInt(timeParts[2] || 0, 10)
     );
+    return isNaN(d.getTime()) ? null : d;
 }
 
 // --- HELPER: Format Date to BirFatura format ---
 function formatDateForBirFatura(date) {
     const d = new Date(date);
+    if (isNaN(d.getTime())) return "01.01.2026 00:00:00";
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
@@ -135,25 +195,42 @@ function formatDateForBirFatura(date) {
     return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
 }
 
+// --- HELPER: Ödeme yöntemi eşleştirme ---
+function mapPaymentMethodToId(method) {
+    if (!method) return { id: 1, value: "Kredi Kartı" };
+    const m = method.toLowerCase();
+    if (m.includes('nakit')) return { id: 5, value: "Nakit" };
+    if (m.includes('havale') || m.includes('eft')) return { id: 2, value: "Banka EFT-Havale" };
+    if (m.includes('kapıda') && m.includes('nakit')) return { id: 3, value: "Kapıda Ödeme Nakit" };
+    if (m.includes('kapıda')) return { id: 4, value: "Kapıda Ödeme Kredi Kartı" };
+    return { id: 1, value: "Kredi Kartı" };
+}
+
 // --- ENDPOINT: BirFatura Order Statuses ---
 app.post('/api/orderStatus/', async (req, res) => {
     const receivedToken = req.headers['token'];
-    if (!receivedToken) {
-        return res.status(401).json({ error: "Yetkisiz Erişim" });
+    const tokenResult = await validateBirFaturaToken(receivedToken);
+    if (!tokenResult.valid) {
+        console.warn(`[orderStatus] Token doğrulama başarısız: ${tokenResult.reason}`);
+        return res.status(401).json({ error: "Yetkisiz Erişim: " + tokenResult.reason });
     }
-    // Return order statuses
     res.json({
-        OrderStatus: [{ Id: 1, Value: "Onaylandı" }, { Id: 2, Value: "Kargolandı" }, { Id: 3, Value: "İptal Edildi" }]
+        OrderStatus: [
+            { Id: 1, Value: "Onaylandı" },
+            { Id: 2, Value: "Kargolandı" },
+            { Id: 3, Value: "İptal Edildi" }
+        ]
     });
 });
 
 // --- ENDPOINT: BirFatura Payment Methods ---
 app.post('/api/paymentMethods/', async (req, res) => {
     const receivedToken = req.headers['token'];
-    if (!receivedToken) {
-        return res.status(401).json({ error: "Yetkisiz Erişim" });
+    const tokenResult = await validateBirFaturaToken(receivedToken);
+    if (!tokenResult.valid) {
+        console.warn(`[paymentMethods] Token doğrulama başarısız: ${tokenResult.reason}`);
+        return res.status(401).json({ error: "Yetkisiz Erişim: " + tokenResult.reason });
     }
-    // Return payment methods required by Birfatura
     res.json({
         PaymentMethods: [
             { Id: 1, Value: "Kredi Kartı" },
@@ -167,14 +244,26 @@ app.post('/api/paymentMethods/', async (req, res) => {
 
 // --- ENDPOINT: BirFatura Cargo Update ---
 app.post('/api/orderCargoUpdate/', async (req, res) => {
-    // Acknowledge cargo update (stub method)
-    res.status(200).send();
+    const receivedToken = req.headers['token'];
+    const tokenResult = await validateBirFaturaToken(receivedToken);
+    if (!tokenResult.valid) {
+        return res.status(401).json({ error: "Yetkisiz Erişim" });
+    }
+    const { orderId, orderStatusId, cargoTrackingCode } = req.body;
+    console.log(`[orderCargoUpdate] OrderId: ${orderId}, StatusId: ${orderStatusId}, Cargo: ${cargoTrackingCode}`);
+    res.json({ success: true, message: "Kargo bilgisi alındı." });
 });
 
 // --- ENDPOINT: BirFatura Invoice Link Update ---
 app.post('/api/invoiceLinkUpdate/', async (req, res) => {
-    // Acknowledge invoice link generation (stub method)
-    res.status(200).send();
+    const receivedToken = req.headers['token'];
+    const tokenResult = await validateBirFaturaToken(receivedToken);
+    if (!tokenResult.valid) {
+        return res.status(401).json({ error: "Yetkisiz Erişim" });
+    }
+    const { faturaUrl, orderId, faturaNo } = req.body;
+    console.log(`[invoiceLinkUpdate] OrderId: ${orderId}, FaturaNo: ${faturaNo}, URL: ${faturaUrl}`);
+    res.json({ success: true, message: "Fatura linki alındı." });
 });
 
 
@@ -191,7 +280,6 @@ app.post('/api/products/force-delete', async (req, res) => {
 
     const client = adminSupabase || supabase;
 
-    // 1. Try to fetch first
     const { data: existing, error: findError } = await client
         .from('products')
         .select('id, stock_code')
@@ -202,18 +290,13 @@ app.post('/api/products/force-delete', async (req, res) => {
         return res.status(500).json({ success: false, message: findError.message });
     }
 
-    // Even if we don't 'see' it with select (if RLS hides it), we can try to delete blindly if we are admin.
-    // However, delete().eq() behaves same as select for filters usually unless service role.
-
     try {
-        // 2. Delete
         const { error: delError, count } = await client
             .from('products')
             .delete()
             .eq('stock_code', stockCode);
 
         if (delError) {
-            // Attempt Rename if Delete fails (FK constraint)
             console.warn('[Force Delete] Delete failed, trying rename. Error:', delError.message);
 
             const newCode = `${stockCode}_DEL_${Math.floor(Date.now() / 1000)}`;
@@ -229,8 +312,6 @@ app.post('/api/products/force-delete', async (req, res) => {
             return res.json({ success: true, message: `Kayıt silinemedi (bağlı veri) ama ${newCode} olarak yeniden adlandırıldı.` });
         }
 
-        // If count is 0, maybe we didn't find it?
-        // With service role, we should have found it.
         return res.json({ success: true, message: 'Kayıt başarıyla silindi.' });
 
     } catch (err) {
@@ -238,81 +319,54 @@ app.post('/api/products/force-delete', async (req, res) => {
     }
 });
 
-// --- ENDPOINT: BirFatura Polls This for Orders ---
-// Flask'ta çalışan /api/orders/ endpoint'i ile BİREBİR aynı mantık
-app.post('/api/orders/', async (req, res) => {
+// =====================================================
+// BirFatura Sipariş Endpoint - Swagger Spec'e TAM UYUMLU
+// =====================================================
+async function handleBirFaturaOrders(req, res) {
     const receivedToken = req.headers['token'];
-    console.log("BirFatura İsteği Geldi:", req.body);
-    console.log("Alınan Token:", receivedToken);
+    console.log("[orders] ====== BirFatura Sipariş İsteği ======");
+    console.log("[orders] Body:", JSON.stringify(req.body));
+    console.log("[orders] Token:", receivedToken ? receivedToken.substring(0, 8) + '...' : 'YOK');
 
-    if (!receivedToken) {
-        return res.status(401).json({ "Orders": [], "error": "Token eksik" });
+    // 1. Token doğrulama
+    const tokenResult = await validateBirFaturaToken(receivedToken);
+    if (!tokenResult.valid) {
+        console.error(`[orders] Token BAŞARISIZ: ${tokenResult.reason}`);
+        return res.status(401).json({ "Orders": [], "error": "Yetkisiz Erişim: " + tokenResult.reason });
     }
+    console.log(`[orders] Token OK (company: ${tokenResult.companyCode || 'fallback'})`);
 
     if (!supabase) {
-        console.error("Supabase not initialized.");
+        console.error("[orders] Supabase not initialized.");
         return res.status(503).json({ "Orders": [], "error": "Veritabanı bağlantısı yok" });
     }
 
-    // 2. Validate Token
-    let isValidToken = false;
-    let companyCode = null;
+    // 2. Request body parse
+    const filterData = req.body || {};
+    const startDateTimeStr = filterData.startDateTime;
+    const endDateTimeStr = filterData.endDateTime;
+    const orderCodeFilter = filterData.OrderCode;
+    const requestedOrderStatusId = parseInt(filterData.orderStatusId) || 0;
 
-    // A) Veritabanından secret_token kontrolü (Çoklu kiracı desteği)
-    const { data: settings, error: tokenError } = await supabase
-        .from('app_settings')
-        .select('company_code, value')
-        .eq('key', 'secret_token');
+    console.log(`[orders] Filtreler - orderStatusId: ${requestedOrderStatusId}, start: ${startDateTimeStr}, end: ${endDateTimeStr}, OrderCode: ${orderCodeFilter || 'yok'}`);
 
-    if (tokenError) {
-        console.error("Token sorgulama hatası:", tokenError);
+    // Sadece "Onaylandı" (status 1) için sipariş döndür
+    // Diğer statusler (2=Kargolandı, 3=İptal) için boş dön
+    if (requestedOrderStatusId !== 0 && requestedOrderStatusId !== 1) {
+        console.log(`[orders] Status ${requestedOrderStatusId} istendi - boş döndürülüyor (sadece 1=Onaylandı desteklenir)`);
+        return res.json({ "Orders": [] });
     }
 
-    if (settings && settings.length > 0) {
-        // Gelen token'ı veritabanındaki token'lar ile karşılaştır
-        for (const setting of settings) {
-            if (setting.value) {
-                let storedToken = setting.value;
-                // Veritabanında string değerler çift tırnaklı (örn: "token") kayıtlı olabiliyor
-                if (typeof storedToken === 'string') {
-                    storedToken = storedToken.replace(/^"|"$/g, '');
-                }
-
-                if (storedToken === receivedToken) {
-                    isValidToken = true;
-                    companyCode = setting.company_code;
-                    break; // Eşleşen token bulundu, döngüden çık
-                }
-            }
-        }
-    }
-
-    // B) app.py Fallback: Eski python uygulamasındaki varsayılan token (Eğer DB'de eşleşmediyse)
-    if (!isValidToken && receivedToken === 'kasapos-2026-secret-api-token') {
-        isValidToken = true;
-        console.log("Fallback token accepted (kasapos-2026-secret-api-token).");
-    }
-
-    if (!isValidToken) {
-        console.warn("Invalid token received:", receivedToken);
-        return res.status(401).json({ "Orders": [], "error": "Yetkisiz Erişim / Geçersiz Token" });
-    }
-
-    // 3. Fetch Sales
-    // SADECE faturası kesilecek olanları ve silinmemiş olanları al
-    let query = supabase
+    // 3. Fetch Sales - RLS bypass için adminSupabase kullan!
+    const dbClient = adminSupabase || supabase;
+    let query = dbClient
         .from('sales')
         .select('*')
         .eq('is_deleted', false);
 
-    if (companyCode) {
-        query = query.eq('company_code', companyCode);
+    if (tokenResult.companyCode) {
+        query = query.eq('company_code', tokenResult.companyCode);
     }
-
-    const filterData = req.body;
-    const startDateTimeStr = filterData.startDateTime;
-    const endDateTimeStr = filterData.endDateTime;
-    const orderCodeFilter = filterData.OrderCode;
 
     if (orderCodeFilter) {
         query = query.eq('sale_code', orderCodeFilter);
@@ -321,13 +375,13 @@ app.post('/api/orders/', async (req, res) => {
     const { data: sales, error } = await query;
 
     if (error) {
-        console.error("Supabase Error:", error);
-        return res.status(500).json({ "Orders": [], "error": "Veritabanı Hatası" });
+        console.error("[orders] Supabase Hatası:", error);
+        return res.status(500).json({ "Orders": [], "error": "Veritabanı Hatası: " + error.message });
     }
 
-    console.log(`Toplam ${sales?.length || 0} faturası kesilecek satış bulundu.`);
+    console.log(`[orders] DB'den ${sales?.length || 0} satış çekildi.`);
 
-    // 4. Process and Filter (Date logic etc.)
+    // 4. Process and Filter
     const ordersToSend = [];
 
     let filterStartDate = null, filterEndDate = null;
@@ -335,23 +389,41 @@ app.post('/api/orders/', async (req, res) => {
         try {
             filterStartDate = parseDate(startDateTimeStr);
             filterEndDate = parseDate(endDateTimeStr);
+            console.log(`[orders] Tarih filtresi: ${filterStartDate?.toISOString()} - ${filterEndDate?.toISOString()}`);
         } catch (e) {
-            console.error("Tarih parse hatası:", e);
+            console.error("[orders] Tarih parse hatası:", e);
         }
     }
 
     for (const sale of (sales || [])) {
-        // Tarih filtresi (Sadece OrderCode yoksa tarih filtresi uygula - app.py mantığı)
+        // Tarih filtresi
         if (!orderCodeFilter && filterStartDate && filterEndDate) {
             try {
                 const saleDate = new Date(sale.date || sale.created_at);
+                if (isNaN(saleDate.getTime())) {
+                    console.warn(`[orders] Geçersiz tarih, satış atlanıyor: ${sale.sale_code}`);
+                    continue;
+                }
                 if (saleDate < filterStartDate || saleDate > filterEndDate) continue;
             } catch (e) {
+                console.warn(`[orders] Tarih karşılaştırma hatası: ${sale.sale_code}`, e.message);
                 continue;
             }
         }
 
-        // --- Customer & Tax Logic (Flask'tan kopyalandı) ---
+        // --- Items Parse ---
+        let items = sale.items;
+        if (typeof items === 'string') {
+            try { items = JSON.parse(items); } catch (e) { items = []; }
+        }
+
+        // Boş sipariş gönderme - BirFatura OrderDetails zorunlu ve dolu olmalı
+        if (!Array.isArray(items) || items.length === 0) {
+            console.warn(`[orders] Ürünsüz satış atlanıyor: ${sale.sale_code}`);
+            continue;
+        }
+
+        // --- Customer & Tax Logic ---
         const customerName = sale.customer_name || sale.customer || 'Misafir Müşteri';
 
         let ssnTcNo = "";
@@ -364,63 +436,76 @@ app.post('/api/orders/', async (req, res) => {
             taxNo = rawTax;
         }
 
-        // Toptan Satış veya Misafir için varsayılan TC
         if (!ssnTcNo && !taxNo && (customerName === 'Misafir Müşteri' || customerName === 'Toptan Satış')) {
             ssnTcNo = '11111111111';
         }
 
-        const shippingTaxNumber = taxNo ? taxNo : ssnTcNo;
-
         let address = sale.address || "Fatih Mh.";
         let phone = sale.phone || "";
-        let city = "Adana";
-        let district = "Seyhan";
+        let city = sale.city || "Adana";
+        let district = sale.district || "Seyhan";
+        let email = sale.email || "";
+        let taxOffice = sale.tax_office || "";
+
+        // --- Ödeme yöntemi eşleştirme ---
+        const payment = mapPaymentMethodToId(sale.payment_method);
 
         // --- Items Logic ---
         let calculatedTotal = 0;
         const orderDetails = [];
 
-        let items = sale.items;
-        if (typeof items === 'string') {
-            try { items = JSON.parse(items); } catch (e) { items = []; }
-        }
+        items.forEach(item => {
+            // *** KRİTİK: VatRate INTEGER olmalı (Swagger spec: integer) ***
+            const vatRate = parseInt(item.vat_rate || item.kdv || 20, 10);
+            const unitPriceInclTax = parseFloat(item.final_price || item.price || 0);
+            const quantity = parseFloat(item.quantity || 1);
+            const unitPriceExclTax = vatRate > 0 ? unitPriceInclTax / (1 + vatRate / 100) : unitPriceInclTax;
 
-        if (Array.isArray(items)) {
-            items.forEach(item => {
-                const unitPriceInclTax = parseFloat(item.final_price || item.price || 0);
-                const quantity = parseFloat(item.quantity || 1);
-                const unitPriceExclTax = unitPriceInclTax / 1.20;
+            // İndirim hesaplama
+            const discountRate = parseFloat(item.discount_rate || 0);
+            const lineTotal = unitPriceInclTax * quantity;
+            const discountInclTax = lineTotal * discountRate / 100;
+            const discountExclTax = vatRate > 0 ? discountInclTax / (1 + vatRate / 100) : discountInclTax;
 
-                calculatedTotal += unitPriceInclTax * quantity;
+            // Birim başına indirim
+            const discountUnitInclTax = quantity > 0 ? discountInclTax / quantity : 0;
+            const discountUnitExclTax = quantity > 0 ? discountExclTax / quantity : 0;
 
-                orderDetails.push({
-                    "ProductId": 0,
-                    "ProductCode": item.stock_code || "URUN01",
-                    "Barcode": item.stock_code || "",
-                    "ProductName": item.name || "Ürün",
-                    "ProductQuantityType": "Adet",
-                    "ProductQuantity": quantity,
-                    "VatRate": 20.0,
-                    "ProductUnitPriceTaxExcluding": Number(unitPriceExclTax.toFixed(4)),
-                    "ProductUnitPriceTaxIncluding": Number(unitPriceInclTax.toFixed(4)),
-                    "Variants": []
-                });
+            calculatedTotal += lineTotal - discountInclTax;
+
+            orderDetails.push({
+                "ProductId": parseInt(item.id, 10) || 0,
+                "ProductCode": item.stock_code || item.code || "URUN01",
+                "Barcode": item.barcode || item.stock_code || "",
+                "ProductBrand": item.brand || "",
+                "ProductName": item.name || "Ürün",
+                "ProductNote": item.note || "",
+                "ProductQuantityType": item.unit || "Adet",
+                "ProductQuantity": quantity,
+                "VatRate": vatRate,
+                "ProductUnitPriceTaxExcluding": Number(unitPriceExclTax.toFixed(4)),
+                "ProductUnitPriceTaxIncluding": Number(unitPriceInclTax.toFixed(4)),
+                "DiscountUnitTaxExcluding": Number(discountUnitExclTax.toFixed(4)),
+                "DiscountUnitTaxIncluding": Number(discountUnitInclTax.toFixed(4)),
+                "Variants": []
             });
-        }
+        });
 
-        const calculatedTotalExclTax = calculatedTotal / 1.20;
+        // İndirim toplamları
+        const totalDiscountInclTax = orderDetails.reduce((sum, d) => sum + (d.DiscountUnitTaxIncluding * d.ProductQuantity), 0);
+        const totalDiscountExclTax = orderDetails.reduce((sum, d) => sum + (d.DiscountUnitTaxExcluding * d.ProductQuantity), 0);
+
+        // Genel toplam hesaplama
+        const calculatedTotalExclTax = orderDetails.reduce((sum, d) => sum + (d.ProductUnitPriceTaxExcluding * d.ProductQuantity), 0) - totalDiscountExclTax;
 
         const saleDateObj = new Date(sale.date || sale.created_at);
         const formattedDate = formatDateForBirFatura(saleDateObj);
 
-        let orderId = 0;
-        try {
-            const codeWithoutPrefix = sale.sale_code.split('-')[1] || sale.sale_code;
-            orderId = parseInt(codeWithoutPrefix.substring(0, 18)) || sale.id || 0;
-        } catch (e) {
-            orderId = sale.id || 0;
-        }
+        // *** KRİTİK: OrderId güvenli integer (sale.id kullan, sale_code parse etme) ***
+        const orderId = sale.id || 0;
 
+        // BirFatura Swagger Spec'ine TAM UYUMLU sipariş objesi
+        // NOT: Spec'te olmayan alanlar (Status, OrderStatusId, BillingTaxOffice, ShippingTaxNumber) EKLENMEDİ
         ordersToSend.push({
             "OrderId": orderId,
             "OrderCode": sale.sale_code || `S-${orderId}`,
@@ -430,41 +515,59 @@ app.post('/api/orders/', async (req, res) => {
             "BillingAddress": address,
             "BillingTown": district,
             "BillingCity": city,
-            "BillingMobilePhone": phone, // Dynamic Phone via frontend
-            "BillingTaxOffice": "",
+            "BillingMobilePhone": phone,
+            "BillingPhone": phone,
+            "TaxOffice": taxOffice,
             "TaxNo": taxNo,
             "SSNTCNo": ssnTcNo,
+            "Email": email,
             "ShippingId": 0,
             "ShippingName": customerName,
             "ShippingAddress": address,
             "ShippingTown": district,
             "ShippingCity": city,
-            "ShippingTaxNumber": shippingTaxNumber,
-            "ShipCompany": "Kargo",
-            "PaymentTypeId": 1,
-            "PaymentType": "Kredi Kartı",
-            "Status": 1, // Onaylandı statüsü
-            "OrderStatusId": 1, // Onaylandı statüsü
+            "ShippingCountry": "Türkiye",
+            "ShippingZipCode": "",
+            "ShippingPhone": phone,
+            "ShipCompany": "",
+            "CargoCampaignCode": "",
+            "PaymentTypeId": payment.id,
+            "PaymentType": payment.value,
             "Currency": "TRY",
             "CurrencyRate": 1,
             "TotalPaidTaxIncluding": Number(calculatedTotal.toFixed(2)),
             "TotalPaidTaxExcluding": Number(calculatedTotalExclTax.toFixed(2)),
-            "ProductsTotalTaxIncluding": Number(calculatedTotal.toFixed(2)), // Required
-            "ProductsTotalTaxExcluding": Number(calculatedTotalExclTax.toFixed(2)), // Required
+            "ProductsTotalTaxIncluding": Number(calculatedTotal.toFixed(2)),
+            "ProductsTotalTaxExcluding": Number(calculatedTotalExclTax.toFixed(2)),
+            "CommissionTotalTaxExcluding": 0,
+            "CommissionTotalTaxIncluding": 0,
+            "ShippingChargeTotalTaxExcluding": 0,
+            "ShippingChargeTotalTaxIncluding": 0,
+            "DiscountTotalTaxExcluding": Number(totalDiscountExclTax.toFixed(2)),
+            "DiscountTotalTaxIncluding": Number(totalDiscountInclTax.toFixed(2)),
+            "InstallmentChargeTotalTaxExcluding": 0,
+            "InstallmentChargeTotalTaxIncluding": 0,
+            "BankTransferDiscountTotalTaxExcluding": 0,
+            "BankTransferDiscountTotalTaxIncluding": 0,
+            "PayingAtTheDoorChargeTotalTaxExcluding": 0,
+            "PayingAtTheDoorChargeTotalTaxIncluding": 0,
             "OrderDetails": orderDetails
         });
     }
 
-    console.log(`BirFatura'ya ${ordersToSend.length} sipariş gönderiliyor.`);
+    console.log(`[orders] BirFatura'ya ${ordersToSend.length} sipariş gönderiliyor.`);
+    if (ordersToSend.length > 0) {
+        console.log(`[orders] İlk sipariş (TAM):`);
+        console.log(JSON.stringify(ordersToSend[0], null, 2));
+    } else {
+        console.log(`[orders] UYARI: Gönderilecek sipariş bulunamadı!`);
+    }
     res.json({ "Orders": ordersToSend });
-});
+}
 
-// Trailing slash olmadan da çalışsın
-app.post('/api/orders', async (req, res) => {
-    // Aynı handler'ı çağır
-    req.url = '/api/orders/';
-    app._router.handle(req, res, () => { });
-});
+// Trailing slash'li ve slash'siz ikisi de aynı handler
+app.post('/api/orders/', handleBirFaturaOrders);
+app.post('/api/orders', handleBirFaturaOrders);
 
 // --- SERVE STATIC FRONTEND (Production) ---
 const frontendPath = path.join(__dirname, '../frontend/dist');
@@ -480,10 +583,9 @@ if (fs.existsSync(frontendPath)) {
         }
     });
 } else {
-    // ...
     console.log("Frontend path not found:", frontendPath);
 }
 
 app.listen(PORT, () => {
-    console.log(`BirFatura Bridge Server running on port ${PORT}`);
+    console.log(`PosCebimde Bridge Server running on port ${PORT}`);
 });
