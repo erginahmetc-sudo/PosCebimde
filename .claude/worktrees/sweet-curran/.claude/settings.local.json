@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat /c/Users/incPa/Desktop/poscebimde1/kasapos/backend/migrations/*.sql)",
+      "WebFetch(domain:app.swaggerhub.com)",
+      "Bash(xargs grep:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:packagist.org)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.fitbulut.com)",
+      "Bash(npm run:*)"
+    ]
+  }
+}

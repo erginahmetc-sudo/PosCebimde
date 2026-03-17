@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat /c/Users/incPa/Desktop/poscebimde1/kasapos/backend/migrations/*.sql)",
+      "Bash(find /c/Users/ifpa/Desktop/kasapos/frontend/src/pages -name \"*.jsx\" -exec wc -l {} +)",
+      "Bash(find /c/Users/ifpa/Desktop/kasapos -name .env* -o -name *.env)",
+      "Bash(cp -r /c/Users/ifpa/Desktop/kasapos/frontend /c/Users/ifpa/Desktop/win/)",
+      "Bash(cp -r /c/Users/ifpa/Desktop/kasapos/backend /c/Users/ifpa/Desktop/win/)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(taskkill //F //IM electron.exe)"
+    ]
+  }
+}
