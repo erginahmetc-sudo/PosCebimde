@@ -19,7 +19,8 @@ export default function ExcelImportModal({ isOpen, onClose, type = 'new', onSucc
         price: true,
         barcode: true,
         group: true,
-        brand: true
+        brand: true,
+        vat_rate: true
     });
 
     const fileInputRef = useRef(null);
@@ -35,7 +36,7 @@ export default function ExcelImportModal({ isOpen, onClose, type = 'new', onSucc
         setPreviewRows([]);
         setAllRows([]);
         setImportResult(null);
-        setColumns({ name: true, price: true, barcode: true, group: true, brand: true });
+        setColumns({ name: true, price: true, barcode: true, group: true, brand: true, vat_rate: true });
         if (fileInputRef.current) fileInputRef.current.value = null;
         onClose();
     }, [onClose]);
@@ -48,8 +49,8 @@ export default function ExcelImportModal({ isOpen, onClose, type = 'new', onSucc
         : 'Mevcut ürünlerinizi Excel ile güncelleyin';
 
     const downloadSampleExcel = () => {
-        const headers = ['Stok Kodu', 'Ürün Adı', 'Fiyat', 'Barkod', 'Grup', 'Marka'];
-        const sampleRow = ['STK-0001', 'Örnek Ürün', 100, '8690000000001', 'Genel', 'Markasız'];
+        const headers = ['Stok Kodu', 'Ürün Adı', 'Fiyat', 'Barkod', 'Grup', 'Marka', 'KDV Oranı'];
+        const sampleRow = ['STK-0001', 'Örnek Ürün', 100, '8690000000001', 'Genel', 'Markasız', 20];
         const ws = xlsx.utils.aoa_to_sheet([headers, sampleRow]);
         const wb = xlsx.utils.book_new();
         xlsx.utils.book_append_sheet(wb, ws, "Urunler");
@@ -126,6 +127,7 @@ export default function ExcelImportModal({ isOpen, onClose, type = 'new', onSucc
                     barcode: row[3]?.toString().trim(),
                     group: row[4]?.toString().trim(),
                     brand: row[5]?.toString().trim(),
+                    vat_rate: row[6],
                 };
 
                 if (type === 'new') {
@@ -151,6 +153,7 @@ export default function ExcelImportModal({ isOpen, onClose, type = 'new', onSucc
                         barcode: rowData.barcode || '',
                         group: rowData.group || '',
                         brand: rowData.brand || '',
+                        vat_rate: rowData.vat_rate != null ? parseInt(rowData.vat_rate) : 20,
                         stock: 0
                     };
                     try {
@@ -181,6 +184,10 @@ export default function ExcelImportModal({ isOpen, onClose, type = 'new', onSucc
                     if (columns.barcode && rowData.barcode) updates.barcode = rowData.barcode;
                     if (columns.group && rowData.group) updates.group = rowData.group;
                     if (columns.brand && rowData.brand) updates.brand = rowData.brand;
+                    if (columns.vat_rate && rowData.vat_rate != null) {
+                        const parsedVat = parseInt(rowData.vat_rate);
+                        if (!isNaN(parsedVat)) updates.vat_rate = parsedVat;
+                    }
 
                     if (Object.keys(updates).length === 0) {
                         skippedDuplicates.push(`Satır ${i + 2} (${keyVal}): Güncellenecek alan bulunamadı`);
@@ -344,6 +351,7 @@ export default function ExcelImportModal({ isOpen, onClose, type = 'new', onSucc
                                             <th className="px-2 py-2 text-left font-semibold border-b">Barkod (D)</th>
                                             <th className="px-2 py-2 text-left font-semibold border-b">Grup (E)</th>
                                             <th className="px-2 py-2 text-left font-semibold border-b">Marka (F)</th>
+                                            <th className="px-2 py-2 text-right font-semibold border-b">KDV (G)</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
@@ -356,6 +364,7 @@ export default function ExcelImportModal({ isOpen, onClose, type = 'new', onSucc
                                                 <td className="px-2 py-1.5 text-gray-500">{row[3] || '-'}</td>
                                                 <td className="px-2 py-1.5 text-gray-500">{row[4] || '-'}</td>
                                                 <td className="px-2 py-1.5 text-gray-500">{row[5] || '-'}</td>
+                                                <td className="px-2 py-1.5 text-right text-gray-500">{row[6] != null ? `%${row[6]}` : '-'}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -425,6 +434,7 @@ export default function ExcelImportModal({ isOpen, onClose, type = 'new', onSucc
                                         { key: 'barcode', letter: 'D', label: 'Barkod' },
                                         { key: 'group', letter: 'E', label: 'Grup' },
                                         { key: 'brand', letter: 'F', label: 'Marka' },
+                                        { key: 'vat_rate', letter: 'G', label: 'KDV Oranı' },
                                     ].map(({ key, letter, label }) => (
                                         <label
                                             key={key}

@@ -70,7 +70,8 @@ export default function ProductsPage() {
             'Marka': p.brand || '',
             'Grup': p.group || '',
             'Stok': p.stock || 0,
-            'Fiyat': p.price || 0
+            'Fiyat': p.price || 0,
+            'KDV Oranı': p.vat_rate ?? 20
         }));
 
         const ws = xlsx.utils.json_to_sheet(exportData);
