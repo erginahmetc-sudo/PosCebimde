@@ -362,6 +362,8 @@ async function handleBirFaturaOrders(req, res) {
 
     // 3. Fetch Sales - RLS bypass için adminSupabase kullan!
     const dbClient = adminSupabase || supabase;
+    console.log(`[orders] DB Client: ${adminSupabase ? 'adminSupabase (Service Role)' : 'supabase (Anon Key - RLS aktif!)'}`);
+
     let query = dbClient
         .from('sales')
         .select('*')
@@ -377,12 +379,34 @@ async function handleBirFaturaOrders(req, res) {
 
     const { data: sales, error } = await query;
 
+    // Ürünlerin vat_rate bilgisini products tablosundan çek
+    let productsVatMap = {};
+    try {
+        const { data: products } = await dbClient
+            .from('products')
+            .select('id, stock_code, vat_rate');
+        if (products) {
+            for (const p of products) {
+                if (p.stock_code) productsVatMap[p.stock_code] = p.vat_rate || 20;
+                if (p.id) productsVatMap[String(p.id)] = p.vat_rate || 20;
+            }
+            console.log(`[orders] ${Object.keys(productsVatMap).length} ürün KDV oranı yüklendi.`);
+        }
+    } catch (e) {
+        console.warn("[orders] Ürün KDV oranları çekilemedi:", e.message);
+    }
+
     if (error) {
-        console.error("[orders] Supabase Hatası:", error);
+        console.error("[orders] Supabase Hatası:", JSON.stringify(error));
         return res.status(500).json({ "Orders": [], "error": "Veritabanı Hatası: " + error.message });
     }
 
     console.log(`[orders] DB'den ${sales?.length || 0} satış çekildi.`);
+    if (sales && sales.length > 0) {
+        console.log(`[orders] İlk satış örneği: id=${sales[0].id}, sale_code=${sales[0].sale_code}, date=${sales[0].date}, items_type=${typeof sales[0].items}, items_length=${Array.isArray(sales[0].items) ? sales[0].items.length : 'N/A'}`);
+    } else {
+        console.warn("[orders] UYARI: Hiç satış bulunamadı! Kontrol edin: RLS, company_code, is_deleted filtresi");
+    }
 
     // 4. Process and Filter
     const ordersToSend = [];
@@ -427,7 +451,8 @@ async function handleBirFaturaOrders(req, res) {
         }
 
         // --- Customer & Tax Logic ---
-        const customerName = sale.customer_name || sale.customer || 'Misafir Müşteri';
+        // customer_name alanı DB'de var, customer alanı yok
+        const customerName = sale.customer_name || 'Misafir Müşteri';
 
         let ssnTcNo = "";
         let taxNo = "";
@@ -459,8 +484,16 @@ async function handleBirFaturaOrders(req, res) {
 
         items.forEach(item => {
             // *** KRİTİK: VatRate INTEGER olmalı (Swagger spec: integer) ***
-            const vatRate = parseInt(item.vat_rate || item.kdv || 20, 10);
-            const unitPriceInclTax = parseFloat(item.final_price || item.price || 0);
+            // Items'da vat_rate genelde yok - products tablosundan çek
+            let vatRateRaw = item.vat_rate || item.kdv;
+            if (!vatRateRaw && item.stock_code) {
+                vatRateRaw = productsVatMap[item.stock_code];
+            }
+            if (!vatRateRaw && item.id) {
+                vatRateRaw = productsVatMap[String(item.id)];
+            }
+            const vatRate = parseInt(vatRateRaw || 20, 10);
+            const unitPriceInclTax = parseFloat(item.price || item.final_price || 0);
             const quantity = parseFloat(item.quantity || 1);
             const unitPriceExclTax = vatRate > 0 ? unitPriceInclTax / (1 + vatRate / 100) : unitPriceInclTax;
 
@@ -476,8 +509,19 @@ async function handleBirFaturaOrders(req, res) {
 
             calculatedTotal += lineTotal - discountInclTax;
 
+            // ProductId: long olmalı - UUID ise hash'le
+            let productId = parseInt(item.id, 10);
+            if (isNaN(productId) && item.id) {
+                // UUID → hash
+                let h = 0;
+                for (let i = 0; i < item.id.length; i++) {
+                    h = ((h << 5) - h) + item.id.charCodeAt(i);
+                    h = h & 0x7FFFFFFF;
+                }
+                productId = h || 1;
+            }
             orderDetails.push({
-                "ProductId": parseInt(item.id, 10) || 0,
+                "ProductId": productId || 0,
                 "ProductCode": item.stock_code || item.code || "URUN01",
                 "Barcode": item.barcode || item.stock_code || "",
                 "ProductBrand": item.brand || "",
@@ -508,8 +552,32 @@ async function handleBirFaturaOrders(req, res) {
         const saleDateObj = new Date(sale.date || sale.created_at);
         const formattedDate = formatDateForBirFatura(saleDateObj);
 
-        // *** KRİTİK: OrderId güvenli integer (sale.id kullan, sale_code parse etme) ***
-        const orderId = sale.id || 0;
+        // *** KRİTİK: OrderId long integer olmalı (Swagger: long) ***
+        // sale.id muhtemelen UUID, BirFatura long integer bekliyor
+        // sale_code formatı: SLS-1715000000000 → timestamp kısmını kullan
+        let orderId = 0;
+        if (sale.sale_code && sale.sale_code.includes('-')) {
+            const parts = sale.sale_code.split('-');
+            const numericPart = parts[parts.length - 1];
+            const parsed = parseInt(numericPart, 10);
+            if (!isNaN(parsed) && parsed > 0) {
+                // Timestamp çok büyük olabilir, son 9 haneyi al (long'a sığar)
+                orderId = parsed % 1000000000;
+            }
+        }
+        if (orderId === 0 && typeof sale.id === 'number') {
+            orderId = sale.id;
+        }
+        if (orderId === 0) {
+            // Fallback: sale_code'dan hash üret
+            let hash = 0;
+            const str = sale.sale_code || sale.id?.toString() || '0';
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash = hash & 0x7FFFFFFF; // Pozitif tut
+            }
+            orderId = hash || 1;
+        }
 
         // BirFatura sipariş objesi
         // NOT: BirFatura .NET backend'i null koleksiyonlarda patlar,
