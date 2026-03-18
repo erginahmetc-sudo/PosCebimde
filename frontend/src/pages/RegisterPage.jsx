@@ -12,6 +12,7 @@ export default function RegisterPage() {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [registered, setRegistered] = useState(false);
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
@@ -36,7 +37,7 @@ export default function RegisterPage() {
             });
 
             if (res.data?.success) {
-                navigate('/login');
+                setRegistered(true);
             }
         } catch (err) {
             setError(err.response?.data?.message || err.message || 'Kayıt sırasında bir hata oluştu.');
@@ -109,6 +110,24 @@ export default function RegisterPage() {
                                 <p className="text-text-sub text-lg">PosCebimde ile işletmenizi büyütmeye başlayın.</p>
                             </div>
 
+                            {registered ? (
+                                <div className="flex flex-col items-center text-center py-8">
+                                    <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
+                                        <span className="material-symbols-outlined text-emerald-600 text-5xl">mark_email_read</span>
+                                    </div>
+                                    <h2 className="text-text-main text-2xl font-extrabold mb-3">Kaydınız Alındı!</h2>
+                                    <p className="text-text-sub text-base leading-relaxed max-w-sm">
+                                        Lütfen E-postanıza Gelen <span className="font-bold text-primary">Aktivasyon Linkine</span> Tıklayarak, Kaydınızı Tamamlayınız.
+                                    </p>
+                                    <button
+                                        onClick={() => navigate('/login')}
+                                        className="mt-8 text-primary font-bold text-sm hover:underline"
+                                    >
+                                        Giriş Sayfasına Dön
+                                    </button>
+                                </div>
+                            ) : (
+                            <>
                             {error && (
                                 <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl border border-red-100 flex items-center gap-2 text-sm">
                                     <span className="material-symbols-outlined text-[20px]">error</span>
@@ -224,6 +243,8 @@ export default function RegisterPage() {
                                     <Link className="text-primary font-bold hover:underline ml-1" to="/login">Giriş Yap</Link>
                                 </p>
                             </div>
+                            </>
+                            )}
                         </div>
                     </div>
                 </div>

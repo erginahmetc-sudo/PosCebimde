@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import EmailSuccessPage from './pages/EmailSuccessPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 import NewPOSPage from './pages/NewPOSPage';
 import MobilePOSPage from './pages/MobilePOSPage';
@@ -31,6 +32,7 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/email-success" element={<EmailSuccessPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
 
           {/* Protected Routes */}

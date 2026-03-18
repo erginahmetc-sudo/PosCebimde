@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
+import { supabase } from '../lib/supabaseClient';
 import StatusModal from '../components/modals/StatusModal';
 
 export default function LoginPage() {
@@ -19,6 +20,25 @@ export default function LoginPage() {
     const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
     const navigate = useNavigate();
     const { login } = useAuth();
+
+    // Şifre sıfırlama maili /login'e yönlendiriyor; recovery token'ı yakalayıp /reset-password'e aktar
+    useEffect(() => {
+        // Hash tabanlı akış: #access_token=xxx&type=recovery
+        const hash = window.location.hash;
+        if (hash.includes('type=recovery')) {
+            navigate('/reset-password' + hash, { replace: true });
+            return;
+        }
+
+        // PKCE akışı: onAuthStateChange PASSWORD_RECOVERY eventi
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+            if (event === 'PASSWORD_RECOVERY') {
+                navigate('/reset-password', { replace: true });
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, [navigate]);
 
     const handleLoginSubmit = async (e) => {
         e.preventDefault();
