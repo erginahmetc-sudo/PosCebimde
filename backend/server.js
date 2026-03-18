@@ -493,8 +493,21 @@ async function handleBirFaturaOrders(req, res) {
 
             calculatedTotal += lineTotal - discountInclTax;
 
-            // Gerçek ürün adını products tablosundan al; yoksa item.name'den stok kodu prefix'ini temizle
-            let productName = prodDB?.name || item.name || "Ürün";
+            // Gerçek ürün adını belirle:
+            // products tablosundaki isim anlamlıysa onu kullan, garbage ise item.name'e dön
+            const isGarbageName = (n) => {
+                if (!n || n.length < 3) return true;
+                const garbagePatterns = /^(deneme|tanimlayiniz|test|ahmet|kemal|denem|fgfd|xcxc|asdf|qwer)[a-z0-9]*$/i;
+                const pureAlphanumericShort = /^[a-z0-9]{2,12}$/i;
+                const noTurkishOrSpace = !/[şğüöçıŞĞÜÖÇİa-zA-Z ]{4,}/i.test(n);
+                return garbagePatterns.test(n) || (pureAlphanumericShort.test(n) && noTurkishOrSpace);
+            };
+
+            const dbName = prodDB?.name || "";
+            const itemName = item.name || "";
+            let productName = (!isGarbageName(dbName) ? dbName : null) || (!isGarbageName(itemName) ? itemName : null) || dbName || itemName || "Ürün";
+
+            // Stok kodu prefix'ini temizle (örn: "D004-AÇ KAPA MUSLUK" → "AÇ KAPA MUSLUK")
             if (sc && productName.startsWith(sc + '-')) {
                 productName = productName.substring(sc.length + 1).trim();
             }
