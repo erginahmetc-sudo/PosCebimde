@@ -11,6 +11,7 @@ const menuItems = [
     { path: '/manual-purchase-invoice', label: 'Alış Faturaları\n(Manuel)', icon: 'post_add', permission: 'can_view_invoices' },
     { path: '/invoices', label: 'Alış Faturaları\n(Entegrasyonlu)', icon: 'description', permission: 'can_view_invoices' },
 
+    { path: '/campaigns', label: 'Kampanyalar', icon: 'local_offer', permission: 'can_view_users' },
     { path: '/settings', label: 'Ayarlar', icon: 'settings', permission: 'can_view_users' },
 ];
 

@@ -22,6 +22,7 @@ import InvoicesPage from './pages/InvoicesPage';
 import ManualPurchaseInvoicePage from './pages/ManualPurchaseInvoicePage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
+import CampaignsPage from './pages/CampaignsPage';
 
 function App() {
   return (
@@ -112,6 +113,16 @@ function App() {
               <ProtectedRoute permission="can_view_users">
                 <Layout>
                   <UsersPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campaigns"
+            element={
+              <ProtectedRoute permission="can_view_users">
+                <Layout>
+                  <CampaignsPage />
                 </Layout>
               </ProtectedRoute>
             }

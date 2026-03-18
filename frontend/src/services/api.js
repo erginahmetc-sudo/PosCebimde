@@ -1456,6 +1456,142 @@ export const settingsAPI = {
     }
 };
 
+// ============ CAMPAIGNS API ============
+export const campaignsAPI = {
+    getAll: async () => {
+        const companyCode = getCurrentCompanyCode();
+        if (!companyCode) return { data: { campaigns: [] } };
+
+        const { data, error } = await supabase
+            .from('campaigns')
+            .select('*, campaign_products(stock_code), campaign_customers(customer_id)')
+            .eq('company_code', companyCode)
+            .order('created_at', { ascending: false });
+
+        if (error) return { data: { campaigns: [] } };
+
+        const campaigns = (data || []).map(c => ({
+            ...c,
+            product_codes: (c.campaign_products || []).map(p => p.stock_code),
+            customer_ids: (c.campaign_customers || []).map(cu => cu.customer_id),
+        }));
+
+        return { data: { campaigns } };
+    },
+
+    getActive: async () => {
+        const companyCode = getCurrentCompanyCode();
+        if (!companyCode) return { data: { campaigns: [] } };
+
+        const { data, error } = await supabase
+            .from('campaigns')
+            .select('*, campaign_products(stock_code), campaign_customers(customer_id)')
+            .eq('company_code', companyCode)
+            .eq('is_active', true);
+
+        if (error) return { data: { campaigns: [] } };
+
+        const campaigns = (data || []).map(c => ({
+            ...c,
+            product_codes: (c.campaign_products || []).map(p => p.stock_code),
+            customer_ids: (c.campaign_customers || []).map(cu => cu.customer_id),
+        }));
+
+        return { data: { campaigns } };
+    },
+
+    add: async (campaign) => {
+        const companyCode = getCurrentCompanyCode();
+        if (!companyCode) throw new Error("Şirket kodu bulunamadı.");
+
+        const { product_codes, customer_ids, ...campaignData } = campaign;
+
+        // 1. Insert campaign
+        const { data, error } = await supabase
+            .from('campaigns')
+            .insert([{ ...campaignData, company_code: companyCode }])
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        const campaignId = data.id;
+
+        // 2. Insert campaign products
+        if (product_codes && product_codes.length > 0) {
+            const productRows = product_codes.map(sc => ({ campaign_id: campaignId, stock_code: sc }));
+            await supabase.from('campaign_products').insert(productRows);
+        }
+
+        // 3. Insert campaign customers
+        if (customer_ids && customer_ids.length > 0) {
+            const customerRows = customer_ids.map(cid => ({ campaign_id: campaignId, customer_id: cid }));
+            await supabase.from('campaign_customers').insert(customerRows);
+        }
+
+        return { data: { success: true, id: campaignId } };
+    },
+
+    update: async (id, campaign) => {
+        const companyCode = getCurrentCompanyCode();
+        if (!companyCode) throw new Error("Şirket kodu bulunamadı.");
+
+        const { product_codes, customer_ids, ...campaignData } = campaign;
+
+        // 1. Update campaign fields
+        const { error } = await supabase
+            .from('campaigns')
+            .update(campaignData)
+            .eq('id', id)
+            .eq('company_code', companyCode);
+
+        if (error) throw error;
+
+        // 2. Replace campaign products
+        if (product_codes !== undefined) {
+            await supabase.from('campaign_products').delete().eq('campaign_id', id);
+            if (product_codes.length > 0) {
+                const rows = product_codes.map(sc => ({ campaign_id: id, stock_code: sc }));
+                await supabase.from('campaign_products').insert(rows);
+            }
+        }
+
+        // 3. Replace campaign customers
+        if (customer_ids !== undefined) {
+            await supabase.from('campaign_customers').delete().eq('campaign_id', id);
+            if (customer_ids.length > 0) {
+                const rows = customer_ids.map(cid => ({ campaign_id: id, customer_id: cid }));
+                await supabase.from('campaign_customers').insert(rows);
+            }
+        }
+
+        return { data: { success: true } };
+    },
+
+    delete: async (id) => {
+        const companyCode = getCurrentCompanyCode();
+        // Delete related rows first (cascade should handle it, but explicit for safety)
+        await supabase.from('campaign_products').delete().eq('campaign_id', id);
+        await supabase.from('campaign_customers').delete().eq('campaign_id', id);
+        const { error } = await supabase
+            .from('campaigns')
+            .delete()
+            .eq('id', id)
+            .eq('company_code', companyCode);
+        return { data: { success: true } };
+    },
+
+    toggleActive: async (id, isActive) => {
+        const companyCode = getCurrentCompanyCode();
+        const { error } = await supabase
+            .from('campaigns')
+            .update({ is_active: isActive })
+            .eq('id', id)
+            .eq('company_code', companyCode);
+        return { data: { success: true } };
+    }
+};
+
 export default {
     get: async () => ({ data: {} }),
     post: async () => ({ data: {} }),

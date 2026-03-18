@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { productsAPI, salesAPI, customersAPI, shortcutsAPI, heldSalesAPI, settingsAPI } from '../services/api';
+import { productsAPI, salesAPI, customersAPI, shortcutsAPI, heldSalesAPI, settingsAPI, campaignsAPI } from '../services/api';
 import { birFaturaAPI } from '../services/birFaturaService';
 import { useAuth } from '../context/AuthContext';
 import defaultTemplate from '../data/default_receipt_template.json';
@@ -121,6 +121,10 @@ export default function NewPOSPage() {
     const [showDebtLimitAlert, setShowDebtLimitAlert] = useState(false);
     const [debtLimitAlertData, setDebtLimitAlertData] = useState(null);
 
+    // Campaign state
+    const [activeCampaigns, setActiveCampaigns] = useState([]);
+    const [appliedCampaignNames, setAppliedCampaignNames] = useState([]);
+
     // New Action Modals
     const [showNewProductModal, setShowNewProductModal] = useState(false);
     const [newProductInitialValues, setNewProductInitialValues] = useState(null);
@@ -229,7 +233,8 @@ export default function NewPOSPage() {
                 loadCustomers(),
                 loadHeldSales(),
                 loadShortcuts(),
-                loadSettings()
+                loadSettings(),
+                loadCampaigns()
             ]);
             setTimeout(() => setLoading(false), 300); // 300ms buffer for smooth transition
         };
@@ -321,7 +326,7 @@ export default function NewPOSPage() {
     };
 
     const loadSettings = async () => {
-        // Just ensure localStorage is reflected in state if needed, 
+        // Just ensure localStorage is reflected in state if needed,
         // Sync is handled by AuthContext now.
         const askQty = localStorage.getItem('pos_settings_ask_quantity');
         if (askQty === null) {
@@ -333,6 +338,59 @@ export default function NewPOSPage() {
             } catch (e) { console.error("Error loading settings fallback", e); }
         }
     };
+
+    const loadCampaigns = async () => {
+        try {
+            const res = await campaignsAPI.getActive();
+            setActiveCampaigns(res.data?.campaigns || []);
+        } catch (e) {
+            console.error('Kampanyalar yüklenirken hata:', e);
+        }
+    };
+
+    // Auto-apply campaign discounts when cart or customer changes
+    useEffect(() => {
+        if (activeCampaigns.length === 0 || cart.length === 0) {
+            setAppliedCampaignNames([]);
+            return;
+        }
+
+        // Find the customer's ID
+        const selectedCustomerObj = customers.find(c => c.name === customer);
+        const customerId = selectedCustomerObj?.id || null;
+
+        const applied = [];
+        const newCart = cart.map(item => {
+            let bestDiscount = item.discount_rate || 0;
+            let campaignApplied = false;
+
+            for (const campaign of activeCampaigns) {
+                // Check if product is in campaign
+                if (!campaign.product_codes?.includes(item.stock_code)) continue;
+
+                // Check if customer is eligible (empty means all customers)
+                const customerEligible = campaign.customer_ids?.length === 0 || (customerId && campaign.customer_ids?.includes(customerId));
+                if (!customerEligible) continue;
+
+                // Check minimum quantity
+                if (item.quantity < (campaign.min_quantity || 1)) continue;
+
+                // Apply if higher discount
+                if (campaign.discount_rate > bestDiscount) {
+                    bestDiscount = campaign.discount_rate;
+                    campaignApplied = true;
+                    if (!applied.includes(campaign.name)) applied.push(campaign.name);
+                }
+            }
+
+            return { ...item, discount_rate: bestDiscount };
+        });
+
+        setAppliedCampaignNames(applied);
+        // Only update cart if something changed
+        const hasChanged = newCart.some((item, i) => item.discount_rate !== cart[i].discount_rate);
+        if (hasChanged) setCart(newCart);
+    }, [activeCampaigns, customer, customers, cart.map(i => i.stock_code + ':' + i.quantity).join(',')]);
 
     // Keyboard Shortcuts
     useEffect(() => {
@@ -1718,6 +1776,14 @@ export default function NewPOSPage() {
                     {/* Footer Actions */}
                     <div className="p-4 bg-white border-t border-slate-200 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)] z-10">
                         <div className="space-y-0 mb-4">
+                            {appliedCampaignNames.length > 0 && (
+                                <div className="flex items-center gap-1.5 bg-purple-50 border border-purple-200 rounded-xl px-3 py-1.5 mb-2">
+                                    <span className="material-symbols-outlined text-purple-600 text-sm">local_offer</span>
+                                    <span className="text-xs font-semibold text-purple-700 truncate">
+                                        Kampanya: {appliedCampaignNames.join(', ')}
+                                    </span>
+                                </div>
+                            )}
                             <div className="flex justify-between items-end pt-2">
                                 <span className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">TOPLAM</span>
                                 <span className="text-3xl font-extrabold text-slate-900 tracking-tighter">{calculateTotal().toFixed(2)} ₺</span>
