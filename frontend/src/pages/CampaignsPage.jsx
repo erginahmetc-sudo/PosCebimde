@@ -48,7 +48,9 @@ export default function CampaignsPage() {
             setEditingCampaign(null);
             load();
         } catch (e) {
-            showToast(e?.response?.data?.message || 'Bir hata oluştu.', 'error');
+            const msg = e?.response?.data?.message || e?.message || 'Bir hata oluştu.';
+            console.error('Campaign save error:', e);
+            showToast(msg, 'error');
         }
     };
 

@@ -1515,20 +1515,22 @@ export const campaignsAPI = {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) throw { response: { data: { message: error.message || 'Kampanya eklenemedi.' } } };
 
         const campaignId = data.id;
 
         // 2. Insert campaign products
         if (product_codes && product_codes.length > 0) {
             const productRows = product_codes.map(sc => ({ campaign_id: campaignId, stock_code: sc }));
-            await supabase.from('campaign_products').insert(productRows);
+            const { error: prodError } = await supabase.from('campaign_products').insert(productRows);
+            if (prodError) console.error('campaign_products insert error:', prodError);
         }
 
         // 3. Insert campaign customers
         if (customer_ids && customer_ids.length > 0) {
             const customerRows = customer_ids.map(cid => ({ campaign_id: campaignId, customer_id: cid }));
-            await supabase.from('campaign_customers').insert(customerRows);
+            const { error: custError } = await supabase.from('campaign_customers').insert(customerRows);
+            if (custError) console.error('campaign_customers insert error:', custError);
         }
 
         return { data: { success: true, id: campaignId } };
@@ -1548,7 +1550,7 @@ export const campaignsAPI = {
             .eq('id', id)
             .eq('company_code', companyCode);
 
-        if (error) throw error;
+        if (error) throw { response: { data: { message: error.message || 'Kampanya güncellenemedi.' } } };
 
         // 2. Replace campaign products
         if (product_codes !== undefined) {
