@@ -21,12 +21,18 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
     const [selectedProductCodes, setSelectedProductCodes] = useState(campaign?.product_codes || []);
     const [productNameFilter, setProductNameFilter] = useState('');
     const [productGroupFilter, setProductGroupFilter] = useState('Tümü');
+    const [productBrandFilter, setProductBrandFilter] = useState('Tümü');
+    const [productPriceMin, setProductPriceMin] = useState('');
+    const [productPriceMax, setProductPriceMax] = useState('');
     const [productGroups, setProductGroups] = useState(['Tümü']);
+    const [productBrands, setProductBrands] = useState(['Tümü']);
 
     // Customer selection state
     const [allCustomers, setAllCustomers] = useState([]);
     const [selectedCustomerIds, setSelectedCustomerIds] = useState(campaign?.customer_ids || []);
     const [customerSearch, setCustomerSearch] = useState('');
+    const [customerGroupFilter, setCustomerGroupFilter] = useState('Tümü');
+    const [customerGroups, setCustomerGroups] = useState(['Tümü']);
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -44,7 +50,12 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
                 setAllProducts(prods);
                 const groups = ['Tümü', ...new Set(prods.map(p => p.group).filter(Boolean))];
                 setProductGroups(groups);
-                setAllCustomers(custRes.data?.customers || []);
+                const brands = ['Tümü', ...new Set(prods.map(p => p.brand).filter(Boolean))];
+                setProductBrands(brands);
+                const custs = custRes.data?.customers || [];
+                setAllCustomers(custs);
+                const cGroups = ['Tümü', ...new Set(custs.map(c => c.group).filter(Boolean))];
+                setCustomerGroups(cGroups);
             } catch (e) {
                 console.error('Load error', e);
             }
@@ -59,19 +70,25 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
                 p.name?.toLowerCase().includes(productNameFilter.toLowerCase()) ||
                 p.stock_code?.toLowerCase().includes(productNameFilter.toLowerCase());
             const matchesGroup = productGroupFilter === 'Tümü' || p.group === productGroupFilter;
-            return matchesName && matchesGroup;
+            const matchesBrand = productBrandFilter === 'Tümü' || p.brand === productBrandFilter;
+            const price = p.price ?? 0;
+            const matchesPriceMin = !productPriceMin || price >= parseFloat(productPriceMin);
+            const matchesPriceMax = !productPriceMax || price <= parseFloat(productPriceMax);
+            return matchesName && matchesGroup && matchesBrand && matchesPriceMin && matchesPriceMax;
         });
-    }, [allProducts, productNameFilter, productGroupFilter]);
+    }, [allProducts, productNameFilter, productGroupFilter, productBrandFilter, productPriceMin, productPriceMax]);
 
     const filteredCustomers = useMemo(() => {
-        if (!customerSearch) return allCustomers;
-        const q = customerSearch.toLowerCase();
-        return allCustomers.filter(c =>
-            c.name?.toLowerCase().includes(q) ||
-            c.company?.toLowerCase().includes(q) ||
-            c.customer_code?.toLowerCase().includes(q)
-        );
-    }, [allCustomers, customerSearch]);
+        return allCustomers.filter(c => {
+            const q = customerSearch.toLowerCase();
+            const matchesSearch = !customerSearch ||
+                c.name?.toLowerCase().includes(q) ||
+                c.company?.toLowerCase().includes(q) ||
+                c.customer_code?.toLowerCase().includes(q);
+            const matchesGroup = customerGroupFilter === 'Tümü' || c.group === customerGroupFilter;
+            return matchesSearch && matchesGroup;
+        });
+    }, [allCustomers, customerSearch, customerGroupFilter]);
 
     // ── Tier helpers ──────────────────────────────────────────────
     const addTier = () => setTiers(prev => [...prev, DEFAULT_TIER()]);
@@ -378,9 +395,41 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
                                             {productGroups.map(g => <option key={g}>{g}</option>)}
                                         </select>
                                     </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Marka</label>
+                                        <select
+                                            value={productBrandFilter}
+                                            onChange={e => setProductBrandFilter(e.target.value)}
+                                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                                        >
+                                            {productBrands.map(b => <option key={b}>{b}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Fiyat Aralığı (₺)</label>
+                                        <div className="flex items-center gap-1.5">
+                                            <input
+                                                type="number"
+                                                value={productPriceMin}
+                                                onChange={e => setProductPriceMin(e.target.value)}
+                                                placeholder="Min"
+                                                min="0"
+                                                className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                                            />
+                                            <span className="text-slate-300 flex-shrink-0">—</span>
+                                            <input
+                                                type="number"
+                                                value={productPriceMax}
+                                                onChange={e => setProductPriceMax(e.target.value)}
+                                                placeholder="Max"
+                                                min="0"
+                                                className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                                            />
+                                        </div>
+                                    </div>
                                     <button
                                         type="button"
-                                        onClick={() => { setProductNameFilter(''); setProductGroupFilter('Tümü'); }}
+                                        onClick={() => { setProductNameFilter(''); setProductGroupFilter('Tümü'); setProductBrandFilter('Tümü'); setProductPriceMin(''); setProductPriceMax(''); }}
                                         className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium"
                                     >
                                         <span className="material-symbols-outlined text-sm">filter_alt_off</span>
@@ -469,6 +518,24 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
                                             />
                                         </div>
                                     </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Müşteri Grubu</label>
+                                        <select
+                                            value={customerGroupFilter}
+                                            onChange={e => setCustomerGroupFilter(e.target.value)}
+                                            className="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                                        >
+                                            {customerGroups.map(g => <option key={g}>{g}</option>)}
+                                        </select>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setCustomerSearch(''); setCustomerGroupFilter('Tümü'); }}
+                                        className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 font-medium"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">filter_alt_off</span>
+                                        Filtreyi Temizle
+                                    </button>
                                     <div className="border-t border-slate-200 pt-3">
                                         <button
                                             type="button"
