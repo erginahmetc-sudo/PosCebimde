@@ -1504,7 +1504,9 @@ export const campaignsAPI = {
         const companyCode = getCurrentCompanyCode();
         if (!companyCode) throw new Error("Şirket kodu bulunamadı.");
 
-        const { product_codes, customer_ids, ...campaignData } = campaign;
+        const { product_codes, customer_ids, tiers, ...rest } = campaign;
+        // Store tiers as JSON; remove legacy single-discount fields if present
+        const campaignData = { ...rest, tiers: tiers || [] };
 
         // 1. Insert campaign
         const { data, error } = await supabase
@@ -1536,7 +1538,8 @@ export const campaignsAPI = {
         const companyCode = getCurrentCompanyCode();
         if (!companyCode) throw new Error("Şirket kodu bulunamadı.");
 
-        const { product_codes, customer_ids, ...campaignData } = campaign;
+        const { product_codes, customer_ids, tiers, ...rest } = campaign;
+        const campaignData = { ...rest, tiers: tiers || [] };
 
         // 1. Update campaign fields
         const { error } = await supabase

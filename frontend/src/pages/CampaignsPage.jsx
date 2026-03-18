@@ -164,17 +164,15 @@ export default function CampaignsPage() {
                     </div>
                     <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
                         <div className="flex items-center justify-between mb-3">
-                            <span className="text-xs font-bold text-slate-400 uppercase">Ort. İskonto</span>
+                            <span className="text-xs font-bold text-slate-400 uppercase">Toplam Kademe</span>
                             <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center">
-                                <span className="material-symbols-outlined text-amber-600 text-xl">percent</span>
+                                <span className="material-symbols-outlined text-amber-600 text-xl">layers</span>
                             </div>
                         </div>
                         <p className="text-3xl font-extrabold text-amber-600">
-                            {campaigns.length > 0
-                                ? `%${(campaigns.reduce((s, c) => s + c.discount_rate, 0) / campaigns.length).toFixed(1)}`
-                                : '—'}
+                            {campaigns.reduce((s, c) => s + (c.tiers?.length || 0), 0)}
                         </p>
-                        <p className="text-xs text-slate-400 mt-1">ortalama oran</p>
+                        <p className="text-xs text-slate-400 mt-1">iskonto kademesi</p>
                     </div>
                 </div>
 
@@ -216,35 +214,60 @@ export default function CampaignsPage() {
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="font-bold text-slate-900 text-base truncate">{campaign.name}</h3>
-                                                <div className="flex items-center gap-2 mt-1.5">
+                                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                                                     <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${campaign.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                                                         <span className={`w-1.5 h-1.5 rounded-full ${campaign.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
                                                         {campaign.is_active ? 'Aktif' : 'Pasif'}
                                                     </span>
-                                                    <span className="text-xs text-slate-400">
-                                                        Min. {campaign.min_quantity} adet
+                                                    <span className="text-xs text-slate-400 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-xs">layers</span>
+                                                        {campaign.tiers?.length || 0} kademe
                                                     </span>
                                                 </div>
                                             </div>
                                             <div className={`flex-shrink-0 w-16 h-16 rounded-xl flex flex-col items-center justify-center ${campaign.is_active ? 'bg-purple-600' : 'bg-slate-400'} shadow-md`}>
-                                                <span className="text-white font-extrabold text-xl leading-none">%{campaign.discount_rate}</span>
-                                                <span className="text-white/80 text-[10px] font-semibold mt-0.5">İskonto</span>
+                                                <span className="text-white font-extrabold text-lg leading-none">
+                                                    %{campaign.tiers?.length > 0 ? Math.max(...campaign.tiers.map(t => t.discount_rate)) : 0}
+                                                </span>
+                                                <span className="text-white/80 text-[10px] font-semibold mt-0.5">Maks.</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Card Body */}
                                     <div className="px-5 py-3 space-y-3">
+                                        {/* Tiers */}
+                                        <div>
+                                            <div className="flex items-center gap-1.5 mb-2">
+                                                <span className="material-symbols-outlined text-sm text-purple-500">layers</span>
+                                                <span className="text-xs font-bold text-slate-500 uppercase">İskonto Kademeleri</span>
+                                            </div>
+                                            {campaign.tiers?.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {campaign.tiers.map((t, i) => (
+                                                        <span key={i} className="text-xs bg-purple-50 text-purple-800 px-2 py-1 rounded-lg font-semibold border border-purple-100 flex items-center gap-1">
+                                                            <span className="text-slate-500 font-normal">
+                                                                {t.min_qty}{t.max_qty ? `–${t.max_qty}` : '+'} adet
+                                                            </span>
+                                                            <span className="text-purple-600 font-extrabold">%{t.discount_rate}</span>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-slate-400 italic">Kademe tanımlanmamış</span>
+                                            )}
+                                        </div>
+
                                         {/* Products */}
                                         <div>
                                             <div className="flex items-center gap-1.5 mb-1.5">
-                                                <span className="material-symbols-outlined text-sm text-purple-500">inventory_2</span>
+                                                <span className="material-symbols-outlined text-sm text-indigo-500">inventory_2</span>
                                                 <span className="text-xs font-bold text-slate-500 uppercase">Ürünler ({campaign.product_codes?.length || 0})</span>
                                             </div>
                                             {productNames.length > 0 ? (
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {productNames.map((name, i) => (
-                                                        <span key={i} className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-lg font-medium">{name}</span>
+                                                        <span key={i} className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg font-medium">{name}</span>
                                                     ))}
                                                     {extraProducts > 0 && (
                                                         <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg font-medium">+{extraProducts} daha</span>

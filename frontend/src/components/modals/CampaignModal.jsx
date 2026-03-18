@@ -1,14 +1,20 @@
 import { useState, useEffect, useMemo } from 'react';
 import { productsAPI, customersAPI } from '../../services/api';
 
+const DEFAULT_TIER = () => ({ min_qty: 1, max_qty: '', discount_rate: '' });
+
 export default function CampaignModal({ campaign, onSave, onClose }) {
     const isEdit = !!campaign;
 
     // Form state
     const [name, setName] = useState(campaign?.name || '');
-    const [discountRate, setDiscountRate] = useState(campaign?.discount_rate || '');
-    const [minQuantity, setMinQuantity] = useState(campaign?.min_quantity || 1);
     const [isActive, setIsActive] = useState(campaign?.is_active ?? true);
+
+    // Tiers state — array of { min_qty, max_qty, discount_rate }
+    const [tiers, setTiers] = useState(() => {
+        if (campaign?.tiers && campaign.tiers.length > 0) return campaign.tiers;
+        return [DEFAULT_TIER()];
+    });
 
     // Product selection state
     const [allProducts, setAllProducts] = useState([]);
@@ -24,7 +30,7 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState('products'); // 'products' | 'customers'
+    const [activeTab, setActiveTab] = useState('tiers'); // 'tiers' | 'products' | 'customers'
 
     useEffect(() => {
         const load = async () => {
@@ -49,7 +55,9 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
 
     const filteredProducts = useMemo(() => {
         return allProducts.filter(p => {
-            const matchesName = !productNameFilter || p.name?.toLowerCase().includes(productNameFilter.toLowerCase()) || p.stock_code?.toLowerCase().includes(productNameFilter.toLowerCase());
+            const matchesName = !productNameFilter ||
+                p.name?.toLowerCase().includes(productNameFilter.toLowerCase()) ||
+                p.stock_code?.toLowerCase().includes(productNameFilter.toLowerCase());
             const matchesGroup = productGroupFilter === 'Tümü' || p.group === productGroupFilter;
             return matchesName && matchesGroup;
         });
@@ -65,15 +73,29 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
         );
     }, [allCustomers, customerSearch]);
 
+    // ── Tier helpers ──────────────────────────────────────────────
+    const addTier = () => setTiers(prev => [...prev, DEFAULT_TIER()]);
+
+    const removeTier = (idx) => setTiers(prev => prev.filter((_, i) => i !== idx));
+
+    const updateTier = (idx, field, value) => {
+        setTiers(prev => prev.map((t, i) => i === idx ? { ...t, [field]: value } : t));
+    };
+
+    // Auto-fill min_qty of next tier when max_qty is set
+    const handleMaxQtyChange = (idx, value) => {
+        updateTier(idx, 'max_qty', value);
+        // Auto-set next tier's min_qty = this max_qty + 1
+        if (value && tiers[idx + 1] !== undefined) {
+            const next = parseInt(value) + 1;
+            setTiers(prev => prev.map((t, i) => i === idx + 1 ? { ...t, min_qty: next } : t));
+        }
+    };
+
+    // ── Product helpers ──────────────────────────────────────────
     const toggleProduct = (stockCode) => {
         setSelectedProductCodes(prev =>
             prev.includes(stockCode) ? prev.filter(sc => sc !== stockCode) : [...prev, stockCode]
-        );
-    };
-
-    const toggleCustomer = (id) => {
-        setSelectedCustomerIds(prev =>
-            prev.includes(id) ? prev.filter(cid => cid !== id) : [...prev, id]
         );
     };
 
@@ -82,23 +104,44 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
         setSelectedProductCodes(prev => [...new Set([...prev, ...codes])]);
     };
 
+    // ── Customer helpers ─────────────────────────────────────────
+    const toggleCustomer = (id) => {
+        setSelectedCustomerIds(prev =>
+            prev.includes(id) ? prev.filter(cid => cid !== id) : [...prev, id]
+        );
+    };
+
     const selectAllCustomers = () => {
         const ids = filteredCustomers.map(c => c.id);
         setSelectedCustomerIds(prev => [...new Set([...prev, ...ids])]);
     };
 
+    // ── Validation & Submit ──────────────────────────────────────
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!name.trim()) return alert('Kampanya adı zorunludur.');
-        if (!discountRate || isNaN(discountRate) || discountRate <= 0 || discountRate > 100) return alert('Geçerli bir iskonto oranı giriniz (1-100).');
         if (selectedProductCodes.length === 0) return alert('En az 1 ürün seçiniz.');
+
+        // Validate tiers
+        for (let i = 0; i < tiers.length; i++) {
+            const t = tiers[i];
+            if (!t.min_qty || isNaN(t.min_qty) || t.min_qty < 1)
+                return alert(`${i + 1}. kademede geçerli bir minimum adet giriniz.`);
+            if (!t.discount_rate || isNaN(t.discount_rate) || t.discount_rate <= 0 || t.discount_rate > 100)
+                return alert(`${i + 1}. kademede geçerli bir iskonto oranı giriniz (1-100).`);
+        }
+
+        const cleanTiers = tiers.map(t => ({
+            min_qty: parseInt(t.min_qty),
+            max_qty: t.max_qty ? parseInt(t.max_qty) : null,
+            discount_rate: parseFloat(t.discount_rate),
+        }));
 
         setSaving(true);
         try {
             await onSave({
                 name: name.trim(),
-                discount_rate: parseFloat(discountRate),
-                min_quantity: parseInt(minQuantity) || 1,
+                tiers: cleanTiers,
                 is_active: isActive,
                 product_codes: selectedProductCodes,
                 customer_ids: selectedCustomerIds,
@@ -108,10 +151,16 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
         }
     };
 
+    const tabClass = (t) =>
+        `flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all -mb-px ${activeTab === t
+            ? 'border-purple-600 text-purple-600'
+            : 'border-transparent text-slate-400 hover:text-slate-700'}`;
+
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col overflow-hidden">
-                {/* Header */}
+
+                {/* ── Header ── */}
                 <div className="bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 px-6 py-4 flex items-center justify-between flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -119,7 +168,7 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
                         </div>
                         <div>
                             <h2 className="text-lg font-bold text-white">{isEdit ? 'Kampanya Düzenle' : 'Yeni Kampanya Ekle'}</h2>
-                            <p className="text-white/70 text-xs">Ürün iskontosu kampanyası oluşturun</p>
+                            <p className="text-white/70 text-xs">Kademeli iskonto oranları belirleyin</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="w-9 h-9 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center text-white transition-colors">
@@ -128,10 +177,11 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
                 </div>
 
                 <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-                    {/* Campaign Details */}
+
+                    {/* ── Campaign Name + Active ── */}
                     <div className="px-6 py-4 border-b border-slate-100 flex-shrink-0 bg-slate-50/50">
-                        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                            <div className="md:col-span-2">
+                        <div className="flex items-end gap-4">
+                            <div className="flex-1">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Kampanya Adı *</label>
                                 <input
                                     type="text"
@@ -142,85 +192,166 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
                                     required
                                 />
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">İskonto Oranı (%) *</label>
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        value={discountRate}
-                                        onChange={e => setDiscountRate(e.target.value)}
-                                        placeholder="10"
-                                        min="0.01"
-                                        max="100"
-                                        step="0.01"
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white pr-8"
-                                        required
-                                    />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">%</span>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Min. Adet</label>
-                                <input
-                                    type="number"
-                                    value={minQuantity}
-                                    onChange={e => setMinQuantity(e.target.value)}
-                                    placeholder="1"
-                                    min="1"
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3 mt-3">
                             <button
                                 type="button"
                                 onClick={() => setIsActive(!isActive)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${isActive
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all flex-shrink-0 ${isActive
                                     ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
-                                    : 'bg-slate-100 text-slate-500 border border-slate-200'
-                                    }`}
+                                    : 'bg-slate-100 text-slate-500 border border-slate-200'}`}
                             >
                                 <span className={`w-2.5 h-2.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
                                 {isActive ? 'Aktif' : 'Pasif'}
                             </button>
-                            <span className="text-xs text-slate-400">Aktif kampanyalar POS'ta otomatik uygulanır</span>
                         </div>
                     </div>
 
-                    {/* Tab Switcher */}
+                    {/* ── Tab Switcher ── */}
                     <div className="flex border-b border-slate-200 flex-shrink-0 px-6 bg-white">
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab('products')}
-                            className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all -mb-px ${activeTab === 'products' ? 'border-purple-600 text-purple-600' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
-                        >
+                        <button type="button" onClick={() => setActiveTab('tiers')} className={tabClass('tiers')}>
+                            <span className="material-symbols-outlined text-base">layers</span>
+                            İskonto Kademeleri
+                            <span className="bg-purple-100 text-purple-700 text-xs font-bold px-1.5 py-0.5 rounded-full">{tiers.length}</span>
+                        </button>
+                        <button type="button" onClick={() => setActiveTab('products')} className={tabClass('products')}>
                             <span className="material-symbols-outlined text-base">inventory_2</span>
                             Kampanya Ürünleri
                             {selectedProductCodes.length > 0 && (
                                 <span className="bg-purple-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{selectedProductCodes.length}</span>
                             )}
                         </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveTab('customers')}
-                            className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all -mb-px ${activeTab === 'customers' ? 'border-purple-600 text-purple-600' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
-                        >
+                        <button type="button" onClick={() => setActiveTab('customers')} className={tabClass('customers')}>
                             <span className="material-symbols-outlined text-base">groups</span>
-                            Kampanyaya Dahil Müşteriler
+                            Dahil Müşteriler
                             {selectedCustomerIds.length > 0 && (
                                 <span className="bg-purple-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{selectedCustomerIds.length}</span>
                             )}
                         </button>
                     </div>
 
-                    {/* Tab Content */}
+                    {/* ── Tab Content ── */}
                     <div className="flex-1 overflow-hidden">
                         {loading ? (
                             <div className="flex items-center justify-center h-full text-slate-400">
                                 <span className="material-symbols-outlined animate-spin text-3xl mr-2">progress_activity</span>
                                 Yükleniyor...
                             </div>
+
+                        ) : activeTab === 'tiers' ? (
+                            /* ── TIERS TAB ── */
+                            <div className="p-6 overflow-y-auto h-full">
+                                <div className="max-w-2xl mx-auto">
+                                    <p className="text-sm text-slate-500 mb-5 bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-start gap-2">
+                                        <span className="material-symbols-outlined text-blue-500 text-lg flex-shrink-0 mt-0.5">info</span>
+                                        Sepette bu kampanyanın ürünlerinden kaç adet olduğuna göre en yüksek uygun kademedeki iskonto otomatik uygulanır.
+                                    </p>
+
+                                    {/* Tier rows */}
+                                    <div className="space-y-3">
+                                        {tiers.map((tier, idx) => (
+                                            <div
+                                                key={idx}
+                                                className="flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-xl hover:border-purple-300 transition-colors group"
+                                            >
+                                                {/* Kademe badge */}
+                                                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center text-white text-xs font-extrabold">
+                                                    {idx + 1}
+                                                </div>
+
+                                                {/* Min qty */}
+                                                <div className="flex-1 min-w-0">
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Min. Adet</label>
+                                                    <input
+                                                        type="number"
+                                                        value={tier.min_qty}
+                                                        onChange={e => updateTier(idx, 'min_qty', e.target.value)}
+                                                        min="1"
+                                                        placeholder="1"
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-slate-50"
+                                                    />
+                                                </div>
+
+                                                <div className="flex-shrink-0 text-slate-300 text-lg font-light mt-4">—</div>
+
+                                                {/* Max qty */}
+                                                <div className="flex-1 min-w-0">
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Max. Adet <span className="text-slate-300 font-normal">(boş = sınırsız)</span></label>
+                                                    <input
+                                                        type="number"
+                                                        value={tier.max_qty}
+                                                        onChange={e => handleMaxQtyChange(idx, e.target.value)}
+                                                        min={tier.min_qty || 1}
+                                                        placeholder="∞"
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-slate-50"
+                                                    />
+                                                </div>
+
+                                                <div className="flex-shrink-0 text-slate-300 mt-4">→</div>
+
+                                                {/* Discount rate */}
+                                                <div className="flex-1 min-w-0">
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">İskonto Oranı</label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="number"
+                                                            value={tier.discount_rate}
+                                                            onChange={e => updateTier(idx, 'discount_rate', e.target.value)}
+                                                            min="0.01"
+                                                            max="100"
+                                                            step="0.01"
+                                                            placeholder="0"
+                                                            className="w-full pl-3 pr-8 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-slate-50 font-bold text-purple-700"
+                                                        />
+                                                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">%</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Remove button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeTier(idx)}
+                                                    disabled={tiers.length === 1}
+                                                    className="flex-shrink-0 w-8 h-8 mt-4 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                                >
+                                                    <span className="material-symbols-outlined text-lg">remove_circle</span>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Add Tier button */}
+                                    <button
+                                        type="button"
+                                        onClick={addTier}
+                                        className="mt-4 w-full py-3 border-2 border-dashed border-purple-200 rounded-xl text-purple-600 text-sm font-semibold hover:border-purple-400 hover:bg-purple-50 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">add_circle</span>
+                                        Yeni Kademe Ekle
+                                    </button>
+
+                                    {/* Tier Preview */}
+                                    {tiers.some(t => t.min_qty && t.discount_rate) && (
+                                        <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl border border-purple-100">
+                                            <p className="text-xs font-bold text-purple-700 uppercase mb-3 flex items-center gap-1.5">
+                                                <span className="material-symbols-outlined text-sm">preview</span>
+                                                Önizleme
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {tiers.filter(t => t.min_qty && t.discount_rate).map((t, i) => (
+                                                    <div key={i} className="bg-white rounded-lg px-3 py-2 border border-purple-200 text-xs font-semibold text-slate-700 flex items-center gap-2">
+                                                        <span className="text-slate-500">
+                                                            {t.min_qty}{t.max_qty ? `–${t.max_qty}` : '+'} adet
+                                                        </span>
+                                                        <span className="text-purple-600 font-extrabold">→ %{t.discount_rate}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                         ) : activeTab === 'products' ? (
+                            /* ── PRODUCTS TAB ── */
                             <div className="flex h-full">
                                 {/* Filter Sidebar */}
                                 <div className="w-56 border-r border-slate-100 p-4 flex flex-col gap-3 flex-shrink-0 bg-slate-50/50">
@@ -320,10 +451,10 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
                                     </table>
                                 </div>
                             </div>
+
                         ) : (
-                            // Customers Tab
+                            /* ── CUSTOMERS TAB ── */
                             <div className="flex h-full">
-                                {/* Filter */}
                                 <div className="w-56 border-r border-slate-100 p-4 flex flex-col gap-3 flex-shrink-0 bg-slate-50/50">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Müşteri Ara</label>
@@ -362,11 +493,10 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
                                         <span className="font-bold text-purple-600">{selectedCustomerIds.length}</span> müşteri seçildi
                                     </div>
                                     <p className="text-xs text-slate-400 bg-amber-50 border border-amber-200 rounded-lg p-2 leading-relaxed">
-                                        💡 Hiç müşteri seçilmezse kampanya tüm müşterilere uygulanır
+                                        💡 Hiç müşteri seçilmezse tüm müşterilere uygulanır
                                     </p>
                                 </div>
 
-                                {/* Customer List */}
                                 <div className="flex-1 overflow-y-auto">
                                     <table className="w-full text-sm">
                                         <thead className="bg-slate-50 sticky top-0 z-10">
@@ -409,9 +539,13 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
                         )}
                     </div>
 
-                    {/* Footer */}
+                    {/* ── Footer ── */}
                     <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between flex-shrink-0 bg-slate-50/50">
                         <div className="flex items-center gap-4 text-xs text-slate-500">
+                            <span className="flex items-center gap-1">
+                                <span className="material-symbols-outlined text-sm text-purple-500">layers</span>
+                                <strong className="text-slate-700">{tiers.length}</strong> kademe
+                            </span>
                             <span className="flex items-center gap-1">
                                 <span className="material-symbols-outlined text-sm text-purple-500">inventory_2</span>
                                 <strong className="text-slate-700">{selectedProductCodes.length}</strong> ürün
@@ -420,17 +554,9 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
                                 <span className="material-symbols-outlined text-sm text-purple-500">groups</span>
                                 <strong className="text-slate-700">{selectedCustomerIds.length === 0 ? 'Tümü' : selectedCustomerIds.length}</strong> müşteri
                             </span>
-                            {discountRate && <span className="flex items-center gap-1">
-                                <span className="material-symbols-outlined text-sm text-emerald-500">percent</span>
-                                <strong className="text-emerald-700">%{discountRate}</strong> iskonto
-                            </span>}
                         </div>
                         <div className="flex gap-3">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-100 transition-colors"
-                            >
+                            <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-100 transition-colors">
                                 İptal
                             </button>
                             <button
@@ -438,11 +564,9 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
                                 disabled={saving}
                                 className="px-6 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-violet-600 text-white text-sm font-semibold hover:from-purple-700 hover:to-violet-700 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm"
                             >
-                                {saving ? (
-                                    <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>Kaydediliyor...</>
-                                ) : (
-                                    <><span className="material-symbols-outlined text-sm">save</span>{isEdit ? 'Güncelle' : 'Kampanyayı Kaydet'}</>
-                                )}
+                                {saving
+                                    ? <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>Kaydediliyor...</>
+                                    : <><span className="material-symbols-outlined text-sm">save</span>{isEdit ? 'Güncelle' : 'Kampanyayı Kaydet'}</>}
                             </button>
                         </div>
                     </div>

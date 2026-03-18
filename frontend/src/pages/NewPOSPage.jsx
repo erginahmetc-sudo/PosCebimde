@@ -348,7 +348,7 @@ export default function NewPOSPage() {
         }
     };
 
-    // Auto-apply campaign discounts when cart or customer changes
+    // Auto-apply campaign discounts when cart or customer changes (tier-based)
     useEffect(() => {
         if (activeCampaigns.length === 0 || cart.length === 0) {
             setAppliedCampaignNames([]);
@@ -359,26 +359,45 @@ export default function NewPOSPage() {
         const selectedCustomerObj = customers.find(c => c.name === customer);
         const customerId = selectedCustomerObj?.id || null;
 
+        // Helper: find the best applicable tier discount for a given quantity
+        const getBestTierDiscount = (tiers, quantity) => {
+            if (!tiers || tiers.length === 0) return 0;
+            let best = 0;
+            for (const tier of tiers) {
+                const min = parseInt(tier.min_qty) || 1;
+                const max = tier.max_qty ? parseInt(tier.max_qty) : Infinity;
+                if (quantity >= min && quantity <= max) {
+                    if (tier.discount_rate > best) best = tier.discount_rate;
+                }
+            }
+            // Fallback: if no tier range matches (quantity > all max), use highest tier where quantity >= min
+            if (best === 0) {
+                for (const tier of tiers) {
+                    const min = parseInt(tier.min_qty) || 1;
+                    if (quantity >= min && tier.discount_rate > best) best = tier.discount_rate;
+                }
+            }
+            return best;
+        };
+
         const applied = [];
         const newCart = cart.map(item => {
             let bestDiscount = item.discount_rate || 0;
-            let campaignApplied = false;
 
             for (const campaign of activeCampaigns) {
                 // Check if product is in campaign
                 if (!campaign.product_codes?.includes(item.stock_code)) continue;
 
-                // Check if customer is eligible (empty means all customers)
-                const customerEligible = campaign.customer_ids?.length === 0 || (customerId && campaign.customer_ids?.includes(customerId));
+                // Check if customer is eligible (empty list = all customers)
+                const customerEligible =
+                    !campaign.customer_ids || campaign.customer_ids.length === 0 ||
+                    (customerId && campaign.customer_ids.includes(customerId));
                 if (!customerEligible) continue;
 
-                // Check minimum quantity
-                if (item.quantity < (campaign.min_quantity || 1)) continue;
-
-                // Apply if higher discount
-                if (campaign.discount_rate > bestDiscount) {
-                    bestDiscount = campaign.discount_rate;
-                    campaignApplied = true;
+                // Find applicable tier discount for this quantity
+                const tierDiscount = getBestTierDiscount(campaign.tiers, item.quantity);
+                if (tierDiscount > bestDiscount) {
+                    bestDiscount = tierDiscount;
                     if (!applied.includes(campaign.name)) applied.push(campaign.name);
                 }
             }
