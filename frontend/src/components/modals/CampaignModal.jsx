@@ -78,9 +78,16 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
         });
     }, [allProducts, productNameFilter, productGroupFilter, productBrandFilter, productPriceMin, productPriceMax]);
 
+    // Sanal "Toptan Satış" müşterisi (POS'taki varsayılan)
+    const TOPTAN_CUSTOMER = { id: '__toptan_satis__', name: 'Toptan Satış', company: 'Varsayılan Satış', customer_code: 'VARSAYILAN', group: '' };
+
     const filteredCustomers = useMemo(() => {
-        return allCustomers.filter(c => {
-            const q = customerSearch.toLowerCase();
+        const q = customerSearch.toLowerCase();
+        const matchesToptan = !customerSearch || 'toptan satış'.includes(q) || 'varsayılan'.includes(q);
+        const toptanGroupOk = customerGroupFilter === 'Tümü' || customerGroupFilter === '';
+        const toptanEntry = (matchesToptan && toptanGroupOk) ? [TOPTAN_CUSTOMER] : [];
+
+        const rest = allCustomers.filter(c => {
             const matchesSearch = !customerSearch ||
                 c.name?.toLowerCase().includes(q) ||
                 c.company?.toLowerCase().includes(q) ||
@@ -88,6 +95,7 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
             const matchesGroup = customerGroupFilter === 'Tümü' || c.group === customerGroupFilter;
             return matchesSearch && matchesGroup;
         });
+        return [...toptanEntry, ...rest];
     }, [allCustomers, customerSearch, customerGroupFilter]);
 
     // ── Tier helpers ──────────────────────────────────────────────
@@ -590,7 +598,12 @@ export default function CampaignModal({ campaign, onSave, onClose }) {
                                                             </div>
                                                         </td>
                                                         <td className="px-3 py-2 text-xs text-slate-500 font-mono">{c.customer_code || '-'}</td>
-                                                        <td className="px-3 py-2 font-medium text-slate-800">{c.name}</td>
+                                                        <td className="px-3 py-2 font-medium text-slate-800 flex items-center gap-2">
+                                                            {c.id === '__toptan_satis__' && (
+                                                                <span className="flex-shrink-0 text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">VARSAYILAN</span>
+                                                            )}
+                                                            {c.name}
+                                                        </td>
                                                         <td className="px-3 py-2 text-slate-500 text-xs">{c.company || '-'}</td>
                                                         <td className="px-3 py-2 text-xs text-slate-400">{c.group || '-'}</td>
                                                     </tr>

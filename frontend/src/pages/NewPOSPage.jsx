@@ -389,8 +389,11 @@ export default function NewPOSPage() {
                 if (!campaign.product_codes?.includes(item.stock_code)) continue;
 
                 // Check if customer is eligible (empty list = all customers)
+                // "Toptan Satış" için sanal ID kontrolü
+                const isToptanSatis = customer === 'Toptan Satış';
                 const customerEligible =
                     !campaign.customer_ids || campaign.customer_ids.length === 0 ||
+                    (isToptanSatis && campaign.customer_ids.includes('__toptan_satis__')) ||
                     (customerId && campaign.customer_ids.includes(customerId));
                 if (!customerEligible) continue;
 
