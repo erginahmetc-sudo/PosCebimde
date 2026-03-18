@@ -378,7 +378,22 @@ async function handleBirFaturaOrders(req, res) {
 
     console.log(`[orders] İşlenecek satış sayısı: ${sales.length}`);
 
-    // 4. Process and Filter
+    // 4. Ürün isim + KDV haritası oluştur (products tablosundan gerçek isimler)
+    let productsMap = {}; // stock_code -> { name, vat_rate }
+    try {
+        const { data: productsData } = await supabase
+            .rpc('get_birfatura_products_vat', { p_token: receivedToken });
+        if (Array.isArray(productsData)) {
+            for (const p of productsData) {
+                if (p.stock_code) productsMap[p.stock_code] = { name: p.name, vat_rate: p.vat_rate };
+            }
+            console.log(`[orders] ${Object.keys(productsMap).length} ürün yüklendi.`);
+        }
+    } catch (e) {
+        console.warn('[orders] Ürün haritası oluşturulamadı:', e.message);
+    }
+
+    // 5. Process and Filter
     const ordersToSend = [];
 
     let filterStartDate = null, filterEndDate = null;
@@ -455,11 +470,13 @@ async function handleBirFaturaOrders(req, res) {
         const orderDetails = [];
 
         items.forEach(item => {
+            // Products tablosundan gerçek isim + KDV al
+            const sc = item.stock_code || item.code || "";
+            const prodDB = productsMap[sc];
+
             // *** KRİTİK: VatRate INTEGER olmalı (Swagger spec: integer) ***
-            let vatRate = parseInt(item.vat_rate || item.kdv || 20, 10);
-            // Eski api.js yanlışlıkla vat_rate=18 kaydetmişti. Gerçek KDV oranı %20.
-            // %18 gelen değerleri %20'ye düzelt (Türkiye'de %18 KDV oranı yok).
-            if (vatRate === 18) vatRate = 20;
+            // DB'deki güncel KDV oranına öncelik ver
+            let vatRate = parseInt(prodDB?.vat_rate ?? item.vat_rate ?? item.kdv ?? 20, 10);
             const unitPriceInclTax = parseFloat(item.final_price || item.price || 0);
             const quantity = parseFloat(item.quantity || 1);
             const unitPriceExclTax = vatRate > 0 ? unitPriceInclTax / (1 + vatRate / 100) : unitPriceInclTax;
@@ -476,12 +493,18 @@ async function handleBirFaturaOrders(req, res) {
 
             calculatedTotal += lineTotal - discountInclTax;
 
+            // Gerçek ürün adını products tablosundan al; yoksa item.name'den stok kodu prefix'ini temizle
+            let productName = prodDB?.name || item.name || "Ürün";
+            if (sc && productName.startsWith(sc + '-')) {
+                productName = productName.substring(sc.length + 1).trim();
+            }
+
             orderDetails.push({
                 "ProductId": parseInt(item.id, 10) || 0,
-                "ProductCode": item.stock_code || item.code || "URUN01",
-                "Barcode": item.barcode || item.stock_code || "",
+                "ProductCode": sc || "URUN01",
+                "Barcode": item.barcode || sc || "",
                 "ProductBrand": item.brand || "",
-                "ProductName": item.name || "Ürün",
+                "ProductName": productName,
                 "ProductNote": item.note || "",
                 "ProductQuantityType": item.unit || "Adet",
                 "ProductQuantity": quantity,

@@ -85,7 +85,7 @@ BEGIN
 
     IF v_company_code IS NULL THEN
         IF p_token IN ('poscebimde-2026-secret-api-token', 'kasapos-2026-secret-api-token') THEN
-            SELECT COALESCE(jsonb_agg(jsonb_build_object('id', p.id, 'stock_code', p.stock_code, 'vat_rate', p.vat_rate)), '[]'::jsonb)
+            SELECT COALESCE(jsonb_agg(jsonb_build_object('id', p.id, 'stock_code', p.stock_code, 'name', p.name, 'vat_rate', p.vat_rate)), '[]'::jsonb)
             INTO v_result
             FROM products p;
             RETURN v_result;
@@ -94,7 +94,7 @@ BEGIN
         END IF;
     END IF;
 
-    SELECT COALESCE(jsonb_agg(jsonb_build_object('id', p.id, 'stock_code', p.stock_code, 'vat_rate', p.vat_rate)), '[]'::jsonb)
+    SELECT COALESCE(jsonb_agg(jsonb_build_object('id', p.id, 'stock_code', p.stock_code, 'name', p.name, 'vat_rate', p.vat_rate)), '[]'::jsonb)
     INTO v_result
     FROM products p
     WHERE p.company_code = v_company_code;
