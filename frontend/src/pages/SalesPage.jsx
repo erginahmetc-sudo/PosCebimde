@@ -94,11 +94,9 @@ export default function SalesPage() {
 
     // Fatura Kes - Mevcut satış için BirFatura e-fatura/e-arşiv gönder
     const handleInvoiceForSale = async (sale) => {
-        // Ham DB değerini kullan - "Perakende-Ahmet Can" gibi prefix'i korur
         const storedName = sale.customer_name || sale.customerName || sale.customer || '';
-        const customerName = storedName;
-        // Perakende satış mı? (customer_name "Perakende-" ile başlıyorsa)
-        const isPerakende = storedName.toLowerCase().startsWith('perakende-');
+        // Faturada "Perakende-" prefix'i kesinlikle görünmemeli — temizle
+        const customerName = storedName.replace(/^Perakende-/i, '').trim();
 
         if (!customerName || customerName === 'Toptan Satış' || customerName === 'Misafir') return;
 
@@ -129,12 +127,9 @@ export default function SalesPage() {
                     const custRes = await customersAPI.getAll();
                     const cust = custRes.data?.customers?.find(c => c.id === sale.customer_id);
                     if (cust) {
-                        const baseName = cust.name || customerName;
                         customerData = {
-                            // Perakende satışsa "Perakende-" prefix'ini faturada koru
-                            name: isPerakende && !baseName.startsWith('Perakende-')
-                                ? `Perakende-${baseName}`
-                                : baseName,
+                            // Faturada "Perakende-" prefix'i görünmemeli
+                            name: cust.name.replace(/^Perakende-/i, '').trim() || customerName,
                             tax_number: cust.tax_number || sale.tax_number || '',
                             tax_office: cust.tax_office || '',
                             address: cust.address || sale.address || '',
