@@ -346,29 +346,38 @@ async function handleBirFaturaOrders(req, res) {
         return res.json({ "Orders": [] });
     }
 
-    // 3. Fetch Sales
-    const dbClient = adminSupabase || supabase;
-    let query = dbClient
-        .from('sales')
-        .select('*')
-        .eq('is_deleted', false);
+    // 3. Fetch Sales - RPC ile (SECURITY DEFINER, anon key ile RLS bypass)
+    // NOT: Direkt .from('sales') anon key + RLS ile çalışmaz (0 satış döner)!
+    let sales = [];
+    let fetchError = null;
 
-    if (tokenResult.companyCode) {
-        query = query.eq('company_code', tokenResult.companyCode);
+    try {
+        const { data: rpcResult, error: rpcError } = await supabase
+            .rpc('get_birfatura_sales', { p_token: receivedToken });
+
+        if (rpcError) {
+            console.error("[orders] RPC Hatası:", JSON.stringify(rpcError));
+            fetchError = rpcError;
+        } else {
+            sales = Array.isArray(rpcResult) ? rpcResult : [];
+            console.log(`[orders] RPC'den ${sales.length} satış döndü.`);
+        }
+    } catch (e) {
+        console.error("[orders] RPC çağrı hatası:", e.message);
+        fetchError = { message: e.message };
     }
 
+    if (fetchError) {
+        console.error("[orders] Supabase Hatası:", fetchError);
+        return res.status(500).json({ "Orders": [], "error": "Veritabanı Hatası: " + (fetchError.message || JSON.stringify(fetchError)) });
+    }
+
+    // OrderCode filtresi (RPC tüm şirket satışlarını döndürür, sonradan filtrele)
     if (orderCodeFilter) {
-        query = query.eq('sale_code', orderCodeFilter);
+        sales = sales.filter(s => s.sale_code === orderCodeFilter);
     }
 
-    const { data: sales, error } = await query;
-
-    if (error) {
-        console.error("[orders] Supabase Hatası:", error);
-        return res.status(500).json({ "Orders": [], "error": "Veritabanı Hatası: " + error.message });
-    }
-
-    console.log(`[orders] DB'den ${sales?.length || 0} satış çekildi.`);
+    console.log(`[orders] İşlenecek satış sayısı: ${sales.length}`);
 
     // 4. Process and Filter
     const ordersToSend = [];
