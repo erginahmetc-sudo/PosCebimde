@@ -438,7 +438,7 @@ async function handleBirFaturaOrders(req, res) {
         // --- Customer & Tax Logic ---
         // "Perakende Satış - " prefix'ini kaldır (BirFatura'da gereksiz)
         let customerName = sale.customer_name || sale.customer || 'Misafir Müşteri';
-        customerName = customerName.replace(/^Perakende Satış\s*[-–]\s*/i, '').trim() || 'Misafir Müşteri';
+        customerName = customerName.replace(/^Perakende[-\s]+Satış\s*[-–]?\s*/i, '').replace(/^Perakende-/i, '').trim() || 'Misafir Müşteri';
 
         let ssnTcNo = "";
         let taxNo = "";

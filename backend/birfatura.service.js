@@ -51,10 +51,8 @@ class BirFaturaService {
     mapSaleToOrder(sale, customer = null) {
         let customerName = customer?.name || sale.customer_name || sale.customer || 'Misafir Müşteri';
         
-        // Clean customer name for BirFatura (strip "Perakende-" prefix if requested)
-        if (customerName.startsWith('Perakende-')) {
-            customerName = customerName.replace('Perakende-', '').trim();
-        }
+        // Clean customer name for BirFatura (strip "Perakende-" or "Perakende Satış -" prefix)
+        customerName = customerName.replace(/^Perakende[-\s]+Satış\s*[-–]?\s*/i, '').replace(/^Perakende-/i, '').trim() || 'Misafir Müşteri';
 
         let ssnTcNo = "";
         let taxNo = "";
