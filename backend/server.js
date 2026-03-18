@@ -317,13 +317,11 @@ async function handleBirFaturaOrders(req, res) {
     console.log("[orders] Body:", JSON.stringify(req.body));
     console.log("[orders] Token:", receivedToken ? receivedToken.substring(0, 8) + '...' : 'YOK');
 
-    // 1. Token doğrulama
-    const tokenResult = await validateBirFaturaToken(receivedToken);
-    if (!tokenResult.valid) {
-        console.error(`[orders] Token BAŞARISIZ: ${tokenResult.reason}`);
-        return res.status(401).json({ "Orders": [], "error": "Yetkisiz Erişim: " + tokenResult.reason });
+    // 1. Token var mı? (Boş token kesinlikle reddet)
+    if (!receivedToken) {
+        console.error(`[orders] Token eksik - 401`);
+        return res.status(401).json({ "Orders": [], "error": "Yetkisiz Erişim: Token eksik" });
     }
-    console.log(`[orders] Token OK (company: ${tokenResult.companyCode || 'fallback'})`);
 
     if (!supabase) {
         console.error("[orders] Supabase not initialized.");
@@ -340,14 +338,14 @@ async function handleBirFaturaOrders(req, res) {
     console.log(`[orders] Filtreler - orderStatusId: ${requestedOrderStatusId}, start: ${startDateTimeStr}, end: ${endDateTimeStr}, OrderCode: ${orderCodeFilter || 'yok'}`);
 
     // Sadece "Onaylandı" (status 1) için sipariş döndür
-    // Diğer statusler (2=Kargolandı, 3=İptal) için boş dön
     if (requestedOrderStatusId !== 0 && requestedOrderStatusId !== 1) {
-        console.log(`[orders] Status ${requestedOrderStatusId} istendi - boş döndürülüyor (sadece 1=Onaylandı desteklenir)`);
+        console.log(`[orders] Status ${requestedOrderStatusId} istendi - boş döndürülüyor`);
         return res.json({ "Orders": [] });
     }
 
-    // 3. Fetch Sales - RPC ile (SECURITY DEFINER, anon key ile RLS bypass)
-    // NOT: Direkt .from('sales') anon key + RLS ile çalışmaz (0 satış döner)!
+    // 3. Fetch Sales - RPC ile (SECURITY DEFINER, RLS bypass + dahili token doğrulama)
+    // NOT: validateBirFaturaToken() app_settings'i anon key ile okuyamaz (RLS).
+    // RPC fonksiyonu token'ı Supabase içinden doğrular ve satışları döndürür.
     let sales = [];
     let fetchError = null;
 
@@ -360,6 +358,7 @@ async function handleBirFaturaOrders(req, res) {
             fetchError = rpcError;
         } else {
             sales = Array.isArray(rpcResult) ? rpcResult : [];
+            console.log(`[orders] Token doğrulama + veri çekme: ${sales.length} satış döndü.`);
             console.log(`[orders] RPC'den ${sales.length} satış döndü.`);
         }
     } catch (e) {
