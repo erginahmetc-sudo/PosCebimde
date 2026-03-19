@@ -617,11 +617,15 @@ async function requireSuperAdmin(req, res, next) {
         console.log('[SuperAdmin] auth.getUser:', user?.id, '| error:', error?.message);
         if (error || !user) return res.status(401).json({ error: 'Geçersiz token' });
 
-        // DB sorgusu için her zaman taze bir service role client oluştur (RLS bypass garantisi)
-        const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        // DB sorgusu için taze service role client oluştur (RLS bypass garantisi)
+        const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+            || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
         const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+        console.log('[SuperAdmin] SERVICE_KEY exists:', !!SERVICE_KEY, '| SUPA_URL:', !!SUPA_URL);
         const { createClient: cc } = require('@supabase/supabase-js');
-        const freshAdmin = cc(SUPA_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+        const freshAdmin = (SERVICE_KEY && SUPA_URL)
+            ? cc(SUPA_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
+            : (adminSupabase || supabase);
 
         const { data: profile, error: profileError } = await freshAdmin
             .from('user_profiles')
