@@ -615,6 +615,7 @@ async function requireSuperAdmin(req, res, next) {
 
         // Token ile kullanıcıyı doğrula
         const { data: { user }, error } = await client.auth.getUser(token);
+        console.log('[SuperAdmin] auth.getUser:', user?.id, '| error:', error?.message);
         if (error || !user) return res.status(401).json({ error: 'Geçersiz token' });
 
         // user_profiles tablosundan superadmin kontrolü
@@ -623,6 +624,8 @@ async function requireSuperAdmin(req, res, next) {
             .select('role')
             .eq('id', user.id)
             .single();
+
+        console.log('[SuperAdmin] profile:', JSON.stringify(profile), '| profileError:', profileError?.message);
 
         if (profileError || profile?.role !== 'superadmin') {
             return res.status(403).json({ error: 'Yetersiz yetki. Süper admin girişi gerekli.' });
