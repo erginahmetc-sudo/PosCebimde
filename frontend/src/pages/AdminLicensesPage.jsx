@@ -192,7 +192,7 @@ export default function AdminLicensesPage() {
     const handleCreate = async (form) => {
         const data = await adminLicensesAPI.create(form);
         setLicenses(prev => [data.license, ...prev]);
-        showToast(`✅ Lisans oluşturuldu: ${data.license.key}`);
+        showToast(`✅ Lisans oluşturuldu: ${data.license.license_key}`);
     };
 
     const handleUpdate = async (form) => {
@@ -212,7 +212,7 @@ export default function AdminLicensesPage() {
     };
 
     const handleDelete = async (license) => {
-        if (!window.confirm(`"${license.company_name || license.company_code}" lisansını silmek istediğinizden emin misiniz?\n\nAnahtar: ${license.key}`)) return;
+        if (!window.confirm(`"${license.company_name || license.company_code}" lisansını silmek istediğinizden emin misiniz?\n\nAnahtar: ${license.license_key}`)) return;
         try {
             await adminLicensesAPI.delete(license.id);
             setLicenses(prev => prev.filter(l => l.id !== license.id));
@@ -234,7 +234,7 @@ export default function AdminLicensesPage() {
         const now = new Date();
         const expired = l.expires_at && new Date(l.expires_at) < now;
         const matchSearch = !search ||
-            l.key?.toLowerCase().includes(search.toLowerCase()) ||
+            l.license_key?.toLowerCase().includes(search.toLowerCase()) ||
             l.company_code?.toLowerCase().includes(search.toLowerCase()) ||
             l.company_name?.toLowerCase().includes(search.toLowerCase());
 
@@ -373,17 +373,17 @@ export default function AdminLicensesPage() {
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-mono text-sm font-semibold text-gray-800 tracking-wider">
-                                                        {license.key}
+                                                        {license.license_key}
                                                     </span>
                                                     <button
-                                                        onClick={() => copyToClipboard(license.key)}
+                                                        onClick={() => copyToClipboard(license.license_key)}
                                                         className={`text-xs px-1.5 py-0.5 rounded border transition-colors
-                                                            ${copiedKey === license.key
+                                                            ${copiedKey === license.license_key
                                                                 ? 'bg-green-100 text-green-600 border-green-300'
                                                                 : 'text-gray-400 border-gray-300 hover:text-blue-600 hover:border-blue-300'}`}
                                                         title="Kopyala"
                                                     >
-                                                        {copiedKey === license.key ? '✓' : '⎘'}
+                                                        {copiedKey === license.license_key ? '✓' : '⎘'}
                                                     </button>
                                                 </div>
                                             </td>

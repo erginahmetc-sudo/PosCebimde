@@ -696,8 +696,8 @@ app.post('/api/admin/licenses', requireSuperAdmin, async (req, res) => {
             key = generateLicenseKey();
             const { data: existing } = await client
                 .from('licenses')
-                .select('key')
-                .eq('key', key)
+                .select('license_key')
+                .eq('license_key', key)
                 .single();
             if (!existing) break;
             attempts++;
@@ -706,7 +706,7 @@ app.post('/api/admin/licenses', requireSuperAdmin, async (req, res) => {
         const { data, error } = await client
             .from('licenses')
             .insert({
-                key,
+                license_key: key,
                 company_code,
                 company_name: company_name || company_code,
                 max_users,
@@ -773,8 +773,8 @@ app.get('/api/admin/licenses/validate/:key', async (req, res) => {
         const client = adminSupabase || supabase;
         const { data, error } = await client
             .from('licenses')
-            .select('key, company_code, is_active, max_users, expires_at')
-            .eq('key', key.toUpperCase())
+            .select('license_key, company_code, is_active, max_users, expires_at')
+            .eq('license_key', key.toUpperCase())
             .eq('is_active', true)
             .single();
 
