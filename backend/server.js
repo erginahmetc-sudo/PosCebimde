@@ -611,15 +611,19 @@ async function requireSuperAdmin(req, res, next) {
             return res.status(401).json({ error: 'Yetkilendirme başlığı eksik' });
         }
         const token = authHeader.split(' ')[1];
-        const client = adminSupabase || supabase;
 
-        // Token ile kullanıcıyı doğrula
-        const { data: { user }, error } = await client.auth.getUser(token);
+        // Token doğrulaması için supabase (anon) kullan — adminSupabase'i kirletmemek için
+        const { data: { user }, error } = await supabase.auth.getUser(token);
         console.log('[SuperAdmin] auth.getUser:', user?.id, '| error:', error?.message);
         if (error || !user) return res.status(401).json({ error: 'Geçersiz token' });
 
-        // user_profiles tablosundan superadmin kontrolü
-        const { data: profile, error: profileError } = await client
+        // DB sorgusu için her zaman taze bir service role client oluştur (RLS bypass garantisi)
+        const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+        const { createClient: cc } = require('@supabase/supabase-js');
+        const freshAdmin = cc(SUPA_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+
+        const { data: profile, error: profileError } = await freshAdmin
             .from('user_profiles')
             .select('role')
             .eq('id', user.id)
@@ -634,7 +638,9 @@ async function requireSuperAdmin(req, res, next) {
                     userId: user?.id,
                     role: profile?.role,
                     profileError: profileError?.message,
-                    profileNull: profile === null
+                    profileNull: profile === null,
+                    hasServiceKey: !!SERVICE_KEY,
+                    supaUrl: SUPA_URL
                 }
             });
         }
