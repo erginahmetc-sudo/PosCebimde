@@ -16,7 +16,7 @@ const menuItems = [
 ];
 
 export default function Layout({ children }) {
-    const { user, logout, hasPermission, isKurucu } = useAuth();
+    const { user, logout, hasPermission, isKurucu, isSuperAdmin } = useAuth();
     const location = useLocation();
     const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
@@ -68,6 +68,18 @@ export default function Layout({ children }) {
                         >
                             <span className="material-symbols-outlined text-lg">group</span>
                             <span>Kullanıcılar</span>
+                        </Link>
+                    )}
+
+                    {/* Süper Admin — Lisans Yönetimi */}
+                    {isSuperAdmin && (
+                        <Link
+                            to="/admin/lisanslar"
+                            className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors font-medium text-sm border border-purple-200"
+                            title="Lisans Yönetim Paneli"
+                        >
+                            <span className="material-symbols-outlined text-lg">key</span>
+                            <span>Lisanslar</span>
                         </Link>
                     )}
 

@@ -598,6 +598,186 @@ async function handleBirFaturaOrders(req, res) {
 app.post('/api/orders/', handleBirFaturaOrders);
 app.post('/api/orders', handleBirFaturaOrders);
 
+// ============================================================
+// SÜPER ADMİN — Lisans Yönetimi (/api/admin/licenses)
+// Sadece is_superadmin=true olan kullanıcılar erişebilir.
+// ============================================================
+
+// SuperAdmin doğrulama middleware
+async function requireSuperAdmin(req, res, next) {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+            return res.status(401).json({ error: 'Yetkilendirme başlığı eksik' });
+        }
+        const token = authHeader.split(' ')[1];
+        const client = adminSupabase || supabase;
+
+        // Token ile kullanıcıyı doğrula
+        const { data: { user }, error } = await client.auth.getUser(token);
+        if (error || !user) return res.status(401).json({ error: 'Geçersiz token' });
+
+        // user_profiles tablosundan superadmin kontrolü
+        const { data: profile } = await client
+            .from('user_profiles')
+            .select('is_superadmin, role')
+            .eq('id', user.id)
+            .single();
+
+        if (!profile?.is_superadmin && profile?.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Yetersiz yetki. Süper admin girişi gerekli.' });
+        }
+
+        req.adminUser = user;
+        next();
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+}
+
+// Lisans anahtarı oluştur (XXXX-XXXX-XXXX-XXXX)
+function generateLicenseKey() {
+    const crypto = require('crypto');
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Karışıklık yaratacak karakterler çıkarıldı
+    let key = '';
+    for (let i = 0; i < 16; i++) {
+        if (i > 0 && i % 4 === 0) key += '-';
+        const randomByte = crypto.randomBytes(1)[0];
+        key += chars[randomByte % chars.length];
+    }
+    return key;
+}
+
+// GET /api/admin/licenses — Tüm lisansları listele
+app.get('/api/admin/licenses', requireSuperAdmin, async (req, res) => {
+    try {
+        const client = adminSupabase || supabase;
+        const { data, error } = await client
+            .from('licenses')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        res.json({ success: true, licenses: data || [] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/admin/licenses — Yeni lisans oluştur
+app.post('/api/admin/licenses', requireSuperAdmin, async (req, res) => {
+    try {
+        const {
+            company_code,
+            company_name,
+            max_users = 1,
+            expires_at,
+            notes
+        } = req.body;
+
+        if (!company_code) return res.status(400).json({ error: 'company_code zorunlu' });
+
+        const client = adminSupabase || supabase;
+
+        // Benzersiz anahtar üret (çakışma kontrolü ile)
+        let key;
+        let attempts = 0;
+        do {
+            key = generateLicenseKey();
+            const { data: existing } = await client
+                .from('licenses')
+                .select('key')
+                .eq('key', key)
+                .single();
+            if (!existing) break;
+            attempts++;
+        } while (attempts < 5);
+
+        const { data, error } = await client
+            .from('licenses')
+            .insert({
+                key,
+                company_code,
+                company_name: company_name || company_code,
+                max_users,
+                expires_at: expires_at || null,
+                notes: notes || null,
+                is_active: true,
+                created_at: new Date().toISOString()
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json({ success: true, license: data });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PUT /api/admin/licenses/:id — Lisans güncelle
+app.put('/api/admin/licenses/:id', requireSuperAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { is_active, max_users, expires_at, notes, company_name } = req.body;
+
+        const client = adminSupabase || supabase;
+        const updates = {};
+        if (is_active !== undefined) updates.is_active = is_active;
+        if (max_users !== undefined) updates.max_users = max_users;
+        if (expires_at !== undefined) updates.expires_at = expires_at;
+        if (notes !== undefined) updates.notes = notes;
+        if (company_name !== undefined) updates.company_name = company_name;
+
+        const { data, error } = await client
+            .from('licenses')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json({ success: true, license: data });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE /api/admin/licenses/:id — Lisans sil
+app.delete('/api/admin/licenses/:id', requireSuperAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const client = adminSupabase || supabase;
+        const { error } = await client.from('licenses').delete().eq('id', id);
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/admin/licenses/validate/:key — Lisans anahtarı doğrula (desktop app)
+app.get('/api/admin/licenses/validate/:key', async (req, res) => {
+    try {
+        const { key } = req.params;
+        const client = adminSupabase || supabase;
+        const { data, error } = await client
+            .from('licenses')
+            .select('key, company_code, is_active, max_users, expires_at')
+            .eq('key', key.toUpperCase())
+            .eq('is_active', true)
+            .single();
+
+        if (error || !data) return res.json({ valid: false, reason: 'Geçersiz lisans' });
+        if (data.expires_at && new Date(data.expires_at) < new Date()) {
+            return res.json({ valid: false, reason: 'Lisans süresi dolmuş' });
+        }
+        res.json({ valid: true, company_code: data.company_code, max_users: data.max_users });
+    } catch (err) {
+        res.status(500).json({ valid: false, reason: err.message });
+    }
+});
+
 // --- SERVE STATIC FRONTEND (Production) ---
 const frontendPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendPath)) {

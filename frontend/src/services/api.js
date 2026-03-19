@@ -1597,6 +1597,66 @@ export const campaignsAPI = {
     }
 };
 
+// ============ SÜPER ADMİN — Lisans Yönetim API ============
+// Backend'in /api/admin/licenses endpoint'lerini kullanır.
+// Authorization header'ına aktif Supabase session token'ı eklenir.
+
+async function getAuthHeader() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error('Oturum bulunamadı');
+    return { Authorization: `Bearer ${session.access_token}` };
+}
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
+
+export const adminLicensesAPI = {
+    getAll: async () => {
+        const headers = await getAuthHeader();
+        const res = await fetch(`${BACKEND_URL}/api/admin/licenses`, { headers });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        return res.json();
+    },
+
+    create: async (form) => {
+        const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' };
+        const res = await fetch(`${BACKEND_URL}/api/admin/licenses`, {
+            method: 'POST', headers, body: JSON.stringify(form)
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        return res.json();
+    },
+
+    update: async (id, form) => {
+        const headers = { ...(await getAuthHeader()), 'Content-Type': 'application/json' };
+        const res = await fetch(`${BACKEND_URL}/api/admin/licenses/${id}`, {
+            method: 'PUT', headers, body: JSON.stringify(form)
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        return res.json();
+    },
+
+    delete: async (id) => {
+        const headers = await getAuthHeader();
+        const res = await fetch(`${BACKEND_URL}/api/admin/licenses/${id}`, {
+            method: 'DELETE', headers
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        return res.json();
+    },
+};
+
 export default {
     get: async () => ({ data: {} }),
     post: async () => ({ data: {} }),

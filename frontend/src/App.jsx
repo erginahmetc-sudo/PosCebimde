@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
+import AdminLicensesPage from './pages/AdminLicensesPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import EmailSuccessPage from './pages/EmailSuccessPage';
@@ -177,6 +178,9 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Süper Admin — Lisans Yönetimi */}
+          <Route path="/admin/lisanslar" element={<AdminLicensesPage />} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

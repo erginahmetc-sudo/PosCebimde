@@ -286,6 +286,8 @@ export const AuthProvider = ({ children }) => {
         hasPermission,
         isAuthenticated: !!user,
         isKurucu: user?.role === 'kurucu' || user?.username === 'admin',
+        // Süper admin: platform sahibi, tüm lisansları yönetir
+        isSuperAdmin: user?.role === 'superadmin' || user?.is_superadmin === true,
     };
 
     return (
