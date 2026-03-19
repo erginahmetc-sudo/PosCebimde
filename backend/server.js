@@ -618,13 +618,13 @@ async function requireSuperAdmin(req, res, next) {
         if (error || !user) return res.status(401).json({ error: 'Geçersiz token' });
 
         // user_profiles tablosundan superadmin kontrolü
-        const { data: profile } = await client
+        const { data: profile, error: profileError } = await client
             .from('user_profiles')
-            .select('is_superadmin, role')
+            .select('role')
             .eq('id', user.id)
             .single();
 
-        if (!profile?.is_superadmin && profile?.role !== 'superadmin') {
+        if (profileError || profile?.role !== 'superadmin') {
             return res.status(403).json({ error: 'Yetersiz yetki. Süper admin girişi gerekli.' });
         }
 
