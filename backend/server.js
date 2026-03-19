@@ -628,7 +628,15 @@ async function requireSuperAdmin(req, res, next) {
         console.log('[SuperAdmin] profile:', JSON.stringify(profile), '| profileError:', profileError?.message);
 
         if (profileError || profile?.role !== 'superadmin') {
-            return res.status(403).json({ error: 'Yetersiz yetki. Süper admin girişi gerekli.' });
+            return res.status(403).json({
+                error: 'Yetersiz yetki. Süper admin girişi gerekli.',
+                debug: {
+                    userId: user?.id,
+                    role: profile?.role,
+                    profileError: profileError?.message,
+                    profileNull: profile === null
+                }
+            });
         }
 
         req.adminUser = user;
