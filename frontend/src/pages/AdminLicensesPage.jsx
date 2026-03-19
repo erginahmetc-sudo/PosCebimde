@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { adminLicensesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabaseClient';
+
+// Lisans anahtarı üretici: XXXX-XXXX-XXXX-XXXX
+function generateLicenseKey() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    return `${seg()}-${seg()}-${seg()}-${seg()}`;
+}
 
 // ============================================================
 // Süper Admin — Lisans Yönetim Paneli
@@ -173,8 +180,12 @@ export default function AdminLicensesPage() {
     const loadLicenses = useCallback(async () => {
         try {
             setLoading(true);
-            const data = await adminLicensesAPI.getAll();
-            setLicenses(data.licenses || []);
+            const { data, error } = await supabase
+                .from('licenses')
+                .select('*')
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            setLicenses(data || []);
         } catch (err) {
             showToast('Lisanslar yüklenemedi: ' + err.message, 'error');
         } finally {
@@ -190,22 +201,53 @@ export default function AdminLicensesPage() {
     };
 
     const handleCreate = async (form) => {
-        const data = await adminLicensesAPI.create(form);
-        setLicenses(prev => [data.license, ...prev]);
-        showToast(`✅ Lisans oluşturuldu: ${data.license.license_key}`);
+        const license_key = generateLicenseKey();
+        const { data, error } = await supabase
+            .from('licenses')
+            .insert({
+                license_key,
+                company_code: form.company_code,
+                company_name: form.company_name || form.company_code,
+                max_users: parseInt(form.max_users) || 1,
+                expires_at: form.expires_at || null,
+                notes: form.notes || null,
+                is_active: true,
+            })
+            .select()
+            .single();
+        if (error) throw error;
+        setLicenses(prev => [data, ...prev]);
+        showToast(`✅ Lisans oluşturuldu: ${data.license_key}`);
     };
 
     const handleUpdate = async (form) => {
-        const data = await adminLicensesAPI.update(editingLicense.id, form);
-        setLicenses(prev => prev.map(l => l.id === data.license.id ? data.license : l));
+        const { data, error } = await supabase
+            .from('licenses')
+            .update({
+                company_name: form.company_name,
+                max_users: parseInt(form.max_users) || 1,
+                expires_at: form.expires_at || null,
+                notes: form.notes || null,
+            })
+            .eq('id', editingLicense.id)
+            .select()
+            .single();
+        if (error) throw error;
+        setLicenses(prev => prev.map(l => l.id === data.id ? data : l));
         showToast('💾 Lisans güncellendi');
     };
 
     const handleToggleActive = async (license) => {
         try {
-            const data = await adminLicensesAPI.update(license.id, { is_active: !license.is_active });
-            setLicenses(prev => prev.map(l => l.id === data.license.id ? data.license : l));
-            showToast(data.license.is_active ? '✅ Lisans aktif edildi' : '⏸ Lisans pasife alındı');
+            const { data, error } = await supabase
+                .from('licenses')
+                .update({ is_active: !license.is_active })
+                .eq('id', license.id)
+                .select()
+                .single();
+            if (error) throw error;
+            setLicenses(prev => prev.map(l => l.id === data.id ? data : l));
+            showToast(data.is_active ? '✅ Lisans aktif edildi' : '⏸ Lisans pasife alındı');
         } catch (err) {
             showToast('Hata: ' + err.message, 'error');
         }
@@ -214,7 +256,11 @@ export default function AdminLicensesPage() {
     const handleDelete = async (license) => {
         if (!window.confirm(`"${license.company_name || license.company_code}" lisansını silmek istediğinizden emin misiniz?\n\nAnahtar: ${license.license_key}`)) return;
         try {
-            await adminLicensesAPI.delete(license.id);
+            const { error } = await supabase
+                .from('licenses')
+                .delete()
+                .eq('id', license.id);
+            if (error) throw error;
             setLicenses(prev => prev.filter(l => l.id !== license.id));
             showToast('🗑 Lisans silindi');
         } catch (err) {
