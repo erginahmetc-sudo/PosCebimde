@@ -180,12 +180,80 @@ export default function AdminLicensesPage() {
     const loadLicenses = useCallback(async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+
+            // 1. Tüm kurucu (founder) profilleri çek
+            const { data: founders, error: foundersError } = await supabase
+                .from('user_profiles')
+                .select('id, username, company_code, email')
+                .eq('role', 'kurucu');
+
+            if (foundersError) console.warn('Kurucu fetch warning:', foundersError.message);
+
+            // 2. Mevcut lisansları çek
+            const { data: existingLicenses, error: licError } = await supabase
                 .from('licenses')
                 .select('*')
                 .order('created_at', { ascending: false });
-            if (error) throw error;
-            setLicenses(data || []);
+            if (licError) throw licError;
+
+            // 3. Lisansı olmayan kurucu üyeler için otomatik oluştur
+            const licensedCodes = new Set((existingLicenses || []).map(l => l.company_code));
+            const todayISO = new Date().toISOString().slice(0, 10);
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+
+            const newLicenses = [];
+            for (const founder of (founders || [])) {
+                if (!founder.company_code || licensedCodes.has(founder.company_code)) continue;
+                const autoKey = `${seg()}-${seg()}-${seg()}-${seg()}`;
+                // Supabase auth.users'tan email çek (user_profiles'ta olmayabilir)
+                let ownerEmail = founder.email || null;
+                if (!ownerEmail) {
+                    try {
+                        const { data: authUser } = await supabase.auth.admin?.getUserById?.(founder.id) || {};
+                        ownerEmail = authUser?.user?.email || null;
+                    } catch (_) { /* ignore */ }
+                }
+                const { data: newLic, error: newLicErr } = await supabase
+                    .from('licenses')
+                    .insert({
+                        license_key: autoKey,
+                        company_code: founder.company_code,
+                        company_name: founder.username || founder.company_code,
+                        owner_email: ownerEmail,
+                        max_users: 1,
+                        expires_at: todayISO,
+                        is_active: true,
+                        notes: 'Otomatik oluşturuldu — Mevcut kurucu üyelik',
+                    })
+                    .select()
+                    .single();
+                if (!newLicErr && newLic) {
+                    newLicenses.push(newLic);
+                    licensedCodes.add(founder.company_code);
+                }
+            }
+
+            // 4. Email bilgisini lisanslara birleştir (owner_email alanından ya da user_profiles'tan)
+            const emailMap = {};
+            for (const f of (founders || [])) {
+                if (f.company_code) emailMap[f.company_code] = f.email || null;
+            }
+
+            const allLicenses = [...newLicenses, ...(existingLicenses || [])].map(l => ({
+                ...l,
+                owner_email: l.owner_email || emailMap[l.company_code] || null,
+            }));
+
+            // Deduplicate by id, sort by created_at desc
+            const seen = new Set();
+            const deduped = allLicenses.filter(l => {
+                if (seen.has(l.id)) return false;
+                seen.add(l.id);
+                return true;
+            }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            setLicenses(deduped);
         } catch (err) {
             showToast('Lisanslar yüklenemedi: ' + err.message, 'error');
         } finally {
@@ -282,7 +350,8 @@ export default function AdminLicensesPage() {
         const matchSearch = !search ||
             l.license_key?.toLowerCase().includes(search.toLowerCase()) ||
             l.company_code?.toLowerCase().includes(search.toLowerCase()) ||
-            l.company_name?.toLowerCase().includes(search.toLowerCase());
+            l.company_name?.toLowerCase().includes(search.toLowerCase()) ||
+            l.owner_email?.toLowerCase().includes(search.toLowerCase());
 
         if (!matchSearch) return false;
         if (filter === 'active') return l.is_active && !expired;
@@ -406,6 +475,7 @@ export default function AdminLicensesPage() {
                                     <tr>
                                         <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Lisans Anahtarı</th>
                                         <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Müşteri</th>
+                                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">E-posta</th>
                                         <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Kullanıcı</th>
                                         <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Bitiş Tarihi</th>
                                         <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Durum</th>
@@ -437,6 +507,14 @@ export default function AdminLicensesPage() {
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-gray-800">{license.company_name || '—'}</div>
                                                 <div className="text-xs text-gray-400 font-mono">{license.company_code}</div>
+                                            </td>
+                                            {/* E-posta */}
+                                            <td className="px-4 py-3">
+                                                {license.owner_email ? (
+                                                    <span className="text-sm text-blue-600 font-mono">{license.owner_email}</span>
+                                                ) : (
+                                                    <span className="text-sm text-gray-300">—</span>
+                                                )}
                                             </td>
                                             {/* Kullanıcı limiti */}
                                             <td className="px-4 py-3">
