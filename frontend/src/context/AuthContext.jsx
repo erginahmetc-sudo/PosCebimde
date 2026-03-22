@@ -47,12 +47,11 @@ export const AuthProvider = ({ children }) => {
                     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
                     if (sessionError || !session) {
-                        // Session expired
-                        // setUser(null); 
-                        // localStorage.removeItem('user');
-                        // We could logout, but let's let specific API calls fail 401 if needed, 
-                        // or strict logout here. Strict is better for security.
-                        /* Optional: verify if token matches? For now, we trust if Supabase has a session. */
+                        // Session expired — force logout
+                        setUser(null);
+                        localStorage.removeItem('user');
+                        setLoading(false);
+                        return;
                     } else {
                         // Fetch fresh profile
                         const { data: profile, error: profileError } = await supabase

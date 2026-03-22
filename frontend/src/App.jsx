@@ -180,7 +180,14 @@ function App() {
           />
 
           {/* Süper Admin — Lisans Yönetimi */}
-          <Route path="/admin/lisanslar" element={<AdminLicensesPage />} />
+          <Route
+            path="/admin/lisanslar"
+            element={
+              <ProtectedRoute superAdminOnly>
+                <AdminLicensesPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
