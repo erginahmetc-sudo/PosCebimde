@@ -146,6 +146,12 @@ function LicenseFormModal({ onClose, onSave, initial }) {
 
 // Lisans durumu badge
 function StatusBadge({ license }) {
+    if (license.is_virtual) return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+            ⏳ Bekliyor
+        </span>
+    );
+
     const now = new Date();
     const expired = license.expires_at && new Date(license.expires_at) < now;
 
@@ -196,17 +202,13 @@ export default function AdminLicensesPage() {
                 .order('created_at', { ascending: false });
             if (licError) throw licError;
 
-            // 3. Lisansı olmayan kurucu üyeler için otomatik oluştur
+            // 3. Lisansı olmayan kurucu üyeler için sanal kayıt oluştur
             const licensedCodes = new Set((existingLicenses || []).map(l => l.company_code));
-            const todayISO = new Date().toISOString().slice(0, 10);
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-            const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-
-            const newLicenses = [];
+            
+            const virtualLicenses = [];
             for (const founder of (founders || [])) {
                 if (!founder.company_code || licensedCodes.has(founder.company_code)) continue;
-                const autoKey = `${seg()}-${seg()}-${seg()}-${seg()}`;
-                // Supabase auth.users'tan email çek (user_profiles'ta olmayabilir)
+                
                 let ownerEmail = founder.email || null;
                 if (!ownerEmail) {
                     try {
@@ -214,27 +216,19 @@ export default function AdminLicensesPage() {
                         ownerEmail = authUser?.user?.email || null;
                     } catch (_) { /* ignore */ }
                 }
-                const { data: newLic, error: newLicErr } = await supabase
-                    .from('licenses')
-                    .insert({
-                        license_key: autoKey,
-                        company_code: founder.company_code,
-                        company_name: founder.username || founder.company_code,
-                        owner_email: ownerEmail,
-                        max_users: 1,
-                        expires_at: todayISO,
-                        is_active: true,
-                        notes: 'Otomatik oluşturuldu — Mevcut kurucu üyelik',
-                    })
-                    .select()
-                    .single();
-                if (newLicErr) {
-                    console.error('Admin sync license err:', newLicErr);
-                    showToast('Otomatik lisans oluşturulamadı: ' + newLicErr.message, 'error');
-                } else if (newLic) {
-                    newLicenses.push(newLic);
-                    licensedCodes.add(founder.company_code);
-                }
+
+                virtualLicenses.push({
+                    is_virtual: true,
+                    id: `virtual-${founder.company_code}`,
+                    company_code: founder.company_code,
+                    company_name: founder.username || founder.company_code,
+                    owner_email: ownerEmail,
+                    license_key: 'Atanmadı (Yeni Kayıt)',
+                    max_users: 1,
+                    expires_at: null,
+                    is_active: false,
+                    notes: 'Lisans bekleniyor'
+                });
             }
 
             // 4. Email bilgisini lisanslara birleştir (owner_email alanından ya da user_profiles'tan)
@@ -243,18 +237,22 @@ export default function AdminLicensesPage() {
                 if (f.company_code) emailMap[f.company_code] = f.email || null;
             }
 
-            const allLicenses = [...newLicenses, ...(existingLicenses || [])].map(l => ({
+            const allLicenses = [...virtualLicenses, ...(existingLicenses || [])].map(l => ({
                 ...l,
                 owner_email: l.owner_email || emailMap[l.company_code] || null,
             }));
 
-            // Deduplicate by id, sort by created_at desc
+            // Deduplicate by id, sort by created_at desc (virtuals on top implicitly if we don't fix sort order, let's keep them at top)
             const seen = new Set();
             const deduped = allLicenses.filter(l => {
                 if (seen.has(l.id)) return false;
                 seen.add(l.id);
                 return true;
-            }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            }).sort((a, b) => {
+                if (a.is_virtual && !b.is_virtual) return -1;
+                if (!a.is_virtual && b.is_virtual) return 1;
+                return new Date(b.created_at || Date.now()) - new Date(a.created_at || Date.now());
+            });
 
             setLicenses(deduped);
         } catch (err) {
@@ -340,10 +338,43 @@ export default function AdminLicensesPage() {
     };
 
     const copyToClipboard = (key) => {
+        if (key.includes('Atanmadı')) return;
         navigator.clipboard.writeText(key).then(() => {
             setCopiedKey(key);
             setTimeout(() => setCopiedKey(null), 2000);
         });
+    };
+
+    const handleGenerateLicense = async (virtualLicense) => {
+        try {
+            setLoading(true);
+            const todayISO = new Date().toISOString().slice(0, 10);
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+            const autoKey = `${seg()}-${seg()}-${seg()}-${seg()}`;
+
+            const { error } = await supabase
+                .from('licenses')
+                .insert({
+                    license_key: autoKey,
+                    company_code: virtualLicense.company_code,
+                    company_name: virtualLicense.company_name,
+                    owner_email: virtualLicense.owner_email,
+                    max_users: 1,
+                    expires_at: todayISO,
+                    is_active: true,
+                    notes: 'Panelden manuel oluşturuldu',
+                });
+
+            if (error) throw error;
+            showToast('✅ Lisans başarıyla oluşturuldu');
+            
+            // Reload licenses
+            await loadLicenses();
+        } catch (err) {
+            showToast('Lisans oluşturma hatası: ' + err.message, 'error');
+            setLoading(false);
+        }
     };
 
     // Filtreleme
@@ -487,23 +518,25 @@ export default function AdminLicensesPage() {
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {filtered.map(license => (
-                                        <tr key={license.id} className="hover:bg-gray-50 transition-colors">
+                                        <tr key={license.id} className={`transition-colors ${license.is_virtual ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-gray-50'}`}>
                                             {/* Anahtar */}
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-mono text-sm font-semibold text-gray-800 tracking-wider">
+                                                    <span className={`font-mono text-sm tracking-wider ${license.is_virtual ? 'text-amber-700 font-medium' : 'font-semibold text-gray-800'}`}>
                                                         {license.license_key}
                                                     </span>
-                                                    <button
-                                                        onClick={() => copyToClipboard(license.license_key)}
-                                                        className={`text-xs px-1.5 py-0.5 rounded border transition-colors
-                                                            ${copiedKey === license.license_key
-                                                                ? 'bg-green-100 text-green-600 border-green-300'
-                                                                : 'text-gray-400 border-gray-300 hover:text-blue-600 hover:border-blue-300'}`}
-                                                        title="Kopyala"
-                                                    >
-                                                        {copiedKey === license.license_key ? '✓' : '⎘'}
-                                                    </button>
+                                                    {!license.is_virtual && (
+                                                        <button
+                                                            onClick={() => copyToClipboard(license.license_key)}
+                                                            className={`text-xs px-1.5 py-0.5 rounded border transition-colors
+                                                                ${copiedKey === license.license_key
+                                                                    ? 'bg-green-100 text-green-600 border-green-300'
+                                                                    : 'text-gray-400 border-gray-300 hover:text-blue-600 hover:border-blue-300'}`}
+                                                            title="Kopyala"
+                                                        >
+                                                            {copiedKey === license.license_key ? '✓' : '⎘'}
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                             {/* Müşteri */}
@@ -541,33 +574,44 @@ export default function AdminLicensesPage() {
                                             </td>
                                             {/* İşlemler */}
                                             <td className="px-4 py-3">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <button
-                                                        onClick={() => { setEditingLicense(license); setShowModal(true); }}
-                                                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                        title="Düzenle"
-                                                    >
-                                                        ✏️
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleToggleActive(license)}
-                                                        className={`p-1.5 rounded-lg transition-colors ${
-                                                            license.is_active
-                                                                ? 'text-gray-400 hover:text-orange-500 hover:bg-orange-50'
-                                                                : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
-                                                        }`}
-                                                        title={license.is_active ? 'Pasife Al' : 'Aktif Et'}
-                                                    >
-                                                        {license.is_active ? '⏸' : '▶️'}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(license)}
-                                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                        title="Sil"
-                                                    >
-                                                        🗑
-                                                    </button>
-                                                </div>
+                                                {license.is_virtual ? (
+                                                    <div className="flex justify-end">
+                                                        <button
+                                                            onClick={() => handleGenerateLicense(license)}
+                                                            className="text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-colors"
+                                                        >
+                                                            ✨ Lisans Üret
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <button
+                                                            onClick={() => { setEditingLicense(license); setShowModal(true); }}
+                                                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                            title="Düzenle"
+                                                        >
+                                                            ✏️
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleToggleActive(license)}
+                                                            className={`p-1.5 rounded-lg transition-colors ${
+                                                                license.is_active
+                                                                    ? 'text-gray-400 hover:text-orange-500 hover:bg-orange-50'
+                                                                    : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
+                                                            }`}
+                                                            title={license.is_active ? 'Pasife Al' : 'Aktif Et'}
+                                                        >
+                                                            {license.is_active ? '⏸' : '▶️'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(license)}
+                                                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Sil"
+                                                        >
+                                                            🗑
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}

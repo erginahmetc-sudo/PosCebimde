@@ -1280,35 +1280,6 @@ export const usersAPI = {
             } catch (tokenError) {
                 console.error('Secret token generation exception:', tokenError);
             }
-
-            // 4. Auto-create license (expired by default — superadmin activates it)
-            try {
-                const licenseChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-                const segFn = () => Array.from({ length: 4 }, () => licenseChars[Math.floor(Math.random() * licenseChars.length)]).join('');
-                const autoLicenseKey = `${segFn()}-${segFn()}-${segFn()}-${segFn()}`;
-                const todayISO = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (bugün = süresi dolmuş)
-
-                const { error: licenseError } = await supabase
-                    .from('licenses')
-                    .insert({
-                        license_key: autoLicenseKey,
-                        company_code: userData.company_code,
-                        company_name: userData.username || userData.email,
-                        owner_email: userData.email,
-                        max_users: 1,
-                        expires_at: todayISO,
-                        is_active: true,
-                        notes: 'Otomatik oluşturuldu — Yeni üyelik kaydı',
-                    });
-
-                if (licenseError) {
-                    console.error('Auto license creation DB error:', licenseError);
-                    alert("Lisans arka planda oluşturulamadı! Hata: " + licenseError.message);
-                }
-            } catch (licErr) {
-                console.error('Auto license exception:', licErr);
-                alert("Lisans kaydı sırasında bir hata oluştu: " + licErr.message);
-            }
         }
 
         return response({ success: true, message: 'Şirket kaydı başarıyla oluşturuldu.' }, null);
