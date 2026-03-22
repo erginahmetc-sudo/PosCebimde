@@ -1288,7 +1288,7 @@ export const usersAPI = {
                 const autoLicenseKey = `${segFn()}-${segFn()}-${segFn()}-${segFn()}`;
                 const todayISO = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (bugün = süresi dolmuş)
 
-                await supabase
+                const { error: licenseError } = await supabase
                     .from('licenses')
                     .insert({
                         license_key: autoLicenseKey,
@@ -1300,8 +1300,14 @@ export const usersAPI = {
                         is_active: true,
                         notes: 'Otomatik oluşturuldu — Yeni üyelik kaydı',
                     });
+
+                if (licenseError) {
+                    console.error('Auto license creation DB error:', licenseError);
+                    alert("Lisans arka planda oluşturulamadı! Hata: " + licenseError.message);
+                }
             } catch (licErr) {
                 console.error('Auto license exception:', licErr);
+                alert("Lisans kaydı sırasında bir hata oluştu: " + licErr.message);
             }
         }
 

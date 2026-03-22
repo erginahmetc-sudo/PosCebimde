@@ -228,7 +228,10 @@ export default function AdminLicensesPage() {
                     })
                     .select()
                     .single();
-                if (!newLicErr && newLic) {
+                if (newLicErr) {
+                    console.error('Admin sync license err:', newLicErr);
+                    showToast('Otomatik lisans oluşturulamadı: ' + newLicErr.message, 'error');
+                } else if (newLic) {
                     newLicenses.push(newLic);
                     licensedCodes.add(founder.company_code);
                 }

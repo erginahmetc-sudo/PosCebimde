@@ -7,9 +7,10 @@
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.user_profiles (id, username, role, company_code, permissions)
+  INSERT INTO public.user_profiles (id, email, username, role, company_code, permissions)
   VALUES (
     new.id,
+    new.email,
     COALESCE(new.raw_user_meta_data->>'username', 'Yeni Kullanıcı'),
     COALESCE(new.raw_user_meta_data->>'role', 'user'),
     new.raw_user_meta_data->>'company_code',

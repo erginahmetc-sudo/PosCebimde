@@ -16,10 +16,11 @@ FROM auth.users au
 WHERE up.id = au.id
   AND up.email IS NULL;
 
--- 4. Gelecekte yeni kayıt olunduğunda email otomatik kopyalansın (trigger)
+-- 4. Gelecekte email değiştiğinde (UPDATE) user_profiles'ı senkronize et
 CREATE OR REPLACE FUNCTION sync_user_email_to_profile()
 RETURNS TRIGGER AS $$
 BEGIN
+  -- Sadece update varsa veya row varsa güncelle
   UPDATE user_profiles
   SET email = NEW.email
   WHERE id = NEW.id;
@@ -27,8 +28,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- SADECE UPDATE OF email durumunda çalışsın (INSERT'te zaten handle_new_user eklemeli)
 DROP TRIGGER IF EXISTS on_auth_user_created_sync_email ON auth.users;
-CREATE TRIGGER on_auth_user_created_sync_email
-  AFTER INSERT OR UPDATE OF email ON auth.users
+CREATE TRIGGER on_auth_user_email_updated
+  AFTER UPDATE OF email ON auth.users
   FOR EACH ROW
+  WHEN (OLD.email IS DISTINCT FROM NEW.email)
   EXECUTE FUNCTION sync_user_email_to_profile();
