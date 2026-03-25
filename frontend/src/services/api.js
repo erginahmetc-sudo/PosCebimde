@@ -230,6 +230,17 @@ export const productsAPI = {
         if (error) throw error;
         return { data: { success: true } };
     },
+    getByStockCode: async (stockCode) => {
+        const companyCode = getCurrentCompanyCode();
+        const { data, error } = await supabase
+            .from('products')
+            .select('id, stock, stock_code, name')
+            .eq('stock_code', stockCode)
+            .eq('company_code', companyCode)
+            .single();
+        if (error) return { data: null };
+        return { data };
+    },
     updateStock: async (stockCode, stockData) => {
         // Updates only stock and related pricing fields
         const updates = {};
@@ -614,6 +625,17 @@ export const customersAPI = {
 
         if (updateError) throw updateError;
         return { data: { success: true, message: 'Cari hesaba işlendi.' } };
+    },
+    getPaymentByInvoiceNumber: async (invoiceNumber) => {
+        // Fatura işlendiğinde kaydedilen customer_payments kaydını fatura numarasına göre bul
+        const { data, error } = await supabase
+            .from('customer_payments')
+            .select('*')
+            .eq('payment_type', 'Fatura (Alış)')
+            .ilike('description', `%${invoiceNumber}%`)
+            .limit(1);
+        if (error) throw error;
+        return { data };
     },
     cancelPurchaseTransaction: async (data) => {
         // This reverses a processed invoice - increases customer balance (removes debt)

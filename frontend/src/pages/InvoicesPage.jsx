@@ -755,119 +755,56 @@ export default function InvoicesPage() {
 
         setProcessing(true);
         try {
-            // 1. Get credentials
-            // 1. Get credentials
-            const config = await getBirFaturaConfig();
-            if (!config) {
-                alert("API ayarları bulunamadı. Stok ve cari iptali manuel yapılmalıdır.");
-                // Still update status even without API
-                await invoicesAPI.updateStatus(invoice.id, 'İşlendi ancak iptal edildi');
-                loadInvoices();
-                setProcessing(false);
-                return;
-            }
-
-            // 2. Fetch invoice details again (to get line items)
-            const payload = {
-                "documentUUID": invoice.uuid,
-                "inOutCode": "IN",
-                "systemTypeCodes": "EFATURA"
-            };
-
-            const response = await axios.post('/api/birfatura-proxy', {
-                endpoint: 'OutEBelgeV2/DocumentDownloadByUUID',
-                payload: payload,
-                apiKey: config.api_key,
-                secretKey: config.secret_key,
-                integrationKey: config.integration_key
-            });
-
-            if (!response.data.Success) {
-                throw new Error(response.data.Message || "Fatura detayı alınamadı");
-            }
-
-            const contentBase64 = response.data.Result?.content;
-            if (!contentBase64) {
-                // No content - update status anyway
-                await invoicesAPI.updateStatus(invoice.id, 'İşlendi ancak iptal edildi');
-                alert("Fatura detayları alınamadı ama durum güncellendi. Stok ve cari iptali manuel yapılmalıdır.");
-                loadInvoices();
-                setProcessing(false);
-                return;
-            }
-
-            // 3. Parse XML to get line items
-            const zip = new JSZip();
-            const zipContent = await zip.loadAsync(contentBase64, { base64: true });
-            const xmlFileName = Object.keys(zipContent.files).find(name => name.toLowerCase().endsWith('.xml'));
-            if (!xmlFileName) throw new Error("XML bulunamadı");
-            const xmlString = await zipContent.files[xmlFileName].async("string");
-
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlString, "text/xml");
-
-            const getText = (parent, tagName) => {
-                if (!parent) return "";
-                const els = parent.getElementsByTagName("*");
-                for (let i = 0; i < els.length; i++) {
-                    if (els[i].localName === tagName) return els[i].textContent;
-                }
-                return "";
-            };
-
-            const getTag = (parent, tagName) => {
-                if (!parent) return null;
-                const els = parent.getElementsByTagName("*");
-                for (let i = 0; i < els.length; i++) {
-                    if (els[i].localName === tagName) return els[i];
-                }
-                return null;
-            };
-
-            // Extract Lines
-            const invoiceLines = Array.from(xmlDoc.getElementsByTagName("*")).filter(el => el.localName === "InvoiceLine");
-            const lines = invoiceLines.map(line => {
-                const itemNode = getTag(line, "Item");
-                const quantity = parseFloat(getText(line, "InvoicedQuantity") || 0);
-                return {
-                    name: getText(itemNode, "Name"),
-                    quantity: quantity
-                };
-            });
-
-            // Get total from invoice record (already in DB)
             const totalAmount = invoice.total || 0;
+            let stockReverted = false;
+            let customerReverted = false;
 
-            // 4. Reverse Stock Changes
-            for (const line of lines) {
-                // Find matching product by name
-                const product = products.find(p => p.name.toLowerCase() === line.name.toLowerCase());
-                if (product) {
-                    const newStock = Math.max(0, (product.stock || 0) - line.quantity);
-                    await productsAPI.updateStock(product.stock_code, { stock: newStock });
+            // 1. İşleme anında kaydedilen customer_payments kaydını bul
+            const { data: payments } = await customersAPI.getPaymentByInvoiceNumber(invoice.invoice_number);
+
+            if (payments && payments.length > 0) {
+                const originalPayment = payments[0];
+                const customer_id = originalPayment.customer_id;
+
+                // 2. JSON description'dan kalemleri al (stockCode ve quantity içeriyor)
+                let parsedDesc = null;
+                try { parsedDesc = JSON.parse(originalPayment.description); } catch (e) { /* description JSON değilse atla */ }
+
+                if (parsedDesc?.items && parsedDesc.items.length > 0) {
+                    // 3. Stokları stockCode ile geri düş (isim eşleştirmesi yerine doğrudan DB'den taze veri)
+                    for (const item of parsedDesc.items) {
+                        if (!item.stockCode || !item.quantity) continue;
+                        const { data: freshProduct } = await productsAPI.getByStockCode(item.stockCode);
+                        if (freshProduct) {
+                            const newStock = Math.max(0, (freshProduct.stock || 0) - item.quantity);
+                            await productsAPI.updateStock(item.stockCode, { stock: newStock });
+                        }
+                    }
+                    stockReverted = true;
                 }
-            }
 
-            // 5. Reverse Customer Balance - Find supplier by name
-            const supplierParty = getTag(xmlDoc, "AccountingSupplierParty");
-            const partyNameInfo = getTag(supplierParty, "PartyName");
-            const supplierName = getText(partyNameInfo, "Name");
-
-            const matchedCustomer = customers.find(c => c.name.toLowerCase() === supplierName?.toLowerCase());
-            if (matchedCustomer) {
+                // 4. Cariye ters kayıt yap (BORÇ olarak) — customer_id doğrudan elde edildiğinden isim eşleştirmesi yok
                 await customersAPI.cancelPurchaseTransaction({
-                    customer_id: matchedCustomer.id,
+                    customer_id,
                     amount: totalAmount,
-                    description: `Fatura İptali (${invoice.invoice_number})`
+                    description: `${invoice.invoice_number} numaralı faturanın iptalidir.`
                 });
+                customerReverted = true;
+            } else {
+                // Orijinal kayıt bulunamadı (eski yöntemle işlenmiş fatura)
+                alert(`"${invoice.invoice_number}" için orijinal işlem kaydı bulunamadı.\nStok ve cari iptali manuel yapılmalıdır.`);
             }
 
-            // 6. Update Invoice Status
+            // 5. Fatura durumunu güncelle
             await invoicesAPI.updateStatus(invoice.id, 'İşlendi ancak iptal edildi');
 
-            alert("Fatura başarıyla iptal edildi!\n• Stoklar düşüldü\n• Cari borcu silindi\n• Durum güncellendi");
+            if (stockReverted && customerReverted) {
+                alert("Fatura başarıyla iptal edildi!\n• Stoklar geri düşüldü\n• Cari borç ters kaydı yapıldı (Borç)\n• Fatura durumu güncellendi");
+            } else {
+                alert("Fatura durumu güncellendi. Stok ve cari işlemler manuel kontrol ediniz.");
+            }
+
             loadInvoices();
-            // Refresh products to see updated stock
             loadDataForMatching();
 
         } catch (error) {
