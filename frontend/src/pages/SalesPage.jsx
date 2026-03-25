@@ -31,6 +31,16 @@ export default function SalesPage() {
     // Show Deleted Sales Toggle
     const [showDeleted, setShowDeleted] = useState(false);
 
+    // Transaction Type Filters (all ON by default)
+    const [showSales, setShowSales] = useState(true);
+    const [showReturns, setShowReturns] = useState(true);
+    const [showPurchaseInvoices, setShowPurchaseInvoices] = useState(true);
+    const [onlyRetail, setOnlyRetail] = useState(false);
+
+    // Purchase Invoices (from customer_payments)
+    const [purchaseInvoices, setPurchaseInvoices] = useState([]);
+    const [selectedPurchaseInvoice, setSelectedPurchaseInvoice] = useState(null);
+
     // Modal State
     const [selectedSale, setSelectedSale] = useState(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -73,8 +83,12 @@ export default function SalesPage() {
             if (dateRange.end) params.end_date = dateRange.end;
             if (showDeleted) params.only_deleted = true;
 
-            const res = await salesAPI.getAll(params);
-            setSales(res.data?.sales || []);
+            const [salesRes, purchaseRes] = await Promise.all([
+                salesAPI.getAll(params),
+                customersAPI.getManualPurchaseInvoices().catch(() => ({ data: [] }))
+            ]);
+            setSales(salesRes.data?.sales || []);
+            setPurchaseInvoices(purchaseRes.data || []);
         } catch (error) {
             console.error('Satışlar yüklenirken hata:', error);
         } finally {
@@ -663,35 +677,74 @@ export default function SalesPage() {
 
     // Filter Logic
     const filteredSales = useMemo(() => {
-        return sales.filter(sale => {
+        // Normalize purchase invoices into sale-like objects
+        const normalizedPI = purchaseInvoices.map(inv => {
+            let pd = null;
+            try { pd = JSON.parse(inv.description); } catch { /* ignore */ }
+            return {
+                _isPurchaseInvoice: true,
+                id: inv.id,
+                customer_id: inv.customer_id,
+                date: inv.created_at,
+                sale_code: pd?.invoiceDetails?.serialNo || `FAT-${inv.id.slice(0, 8)}`,
+                customerName: inv.customers?.name || pd?.supplier?.name || '-',
+                customer: inv.customers?.name || pd?.supplier?.name || '-',
+                payment_method: 'Fatura (Alış)',
+                items: (pd?.items || []).map(it => ({ ...it, stock_code: it.stockCode })),
+                total: inv.amount,
+                is_deleted: false,
+                _rawData: inv,
+            };
+        });
+
+        // Separate regular sales vs returns
+        const regularSales = sales.filter(s => !(s.sale_code?.startsWith('RET') || s.payment_method === 'İade'));
+        const returnSales = sales.filter(s => s.sale_code?.startsWith('RET') || s.payment_method === 'İade');
+
+        let combined = [];
+        if (showSales) combined = [...combined, ...regularSales];
+        if (showReturns) combined = [...combined, ...returnSales];
+        if (showPurchaseInvoices) combined = [...combined, ...normalizedPI];
+
+        // Perakende filter
+        const retailDefaults = ['toptan satış', 'misafir', 'misafir müşteri', '-', ''];
+        if (onlyRetail) {
+            combined = combined.filter(item => {
+                if (item._isPurchaseInvoice) return false;
+                const cName = (item.customerName || item.customer || '').toLowerCase().trim();
+                return cName.startsWith('perakende-') || retailDefaults.includes(cName);
+            });
+        }
+
+        // Apply text/price/item filters
+        return combined.filter(item => {
             const term = filters.searchTerm.toLowerCase();
             const matchesGeneral = !term ||
-                sale.sale_code?.toLowerCase().includes(term) ||
-                sale.customerName?.toLowerCase().includes(term) ||
-                sale.customer?.toLowerCase().includes(term);
-
+                item.sale_code?.toLowerCase().includes(term) ||
+                item.customerName?.toLowerCase().includes(term) ||
+                item.customer?.toLowerCase().includes(term);
             if (!matchesGeneral) return false;
 
-            const total = sale.total || 0;
+            const total = item.total || 0;
             if (filters.minPrice && total < parseFloat(filters.minPrice)) return false;
             if (filters.maxPrice && total > parseFloat(filters.maxPrice)) return false;
 
             const hasItemFilters = filters.stockCode || filters.productName || filters.barcode;
             if (hasItemFilters) {
-                const items = sale.items || [];
-                if (items.length === 0) return false;
-                const matchesItemCriteria = items.some(item => {
+                const saleItems = item.items || [];
+                if (saleItems.length === 0) return false;
+                const matchesItemCriteria = saleItems.some(i => {
                     let match = true;
-                    if (filters.stockCode && !item.stock_code?.toLowerCase().includes(filters.stockCode.toLowerCase())) match = false;
-                    if (filters.productName && !item.name?.toLowerCase().includes(filters.productName.toLowerCase())) match = false;
-                    if (filters.barcode && !item.barcode?.toLowerCase().includes(filters.barcode.toLowerCase())) match = false;
+                    if (filters.stockCode && !i.stock_code?.toLowerCase().includes(filters.stockCode.toLowerCase())) match = false;
+                    if (filters.productName && !i.name?.toLowerCase().includes(filters.productName.toLowerCase())) match = false;
+                    if (filters.barcode && !i.barcode?.toLowerCase().includes(filters.barcode.toLowerCase())) match = false;
                     return match;
                 });
                 if (!matchesItemCriteria) return false;
             }
             return true;
-        });
-    }, [sales, filters]);
+        }).sort((a, b) => new Date(b.date) - new Date(a.date));
+    }, [sales, purchaseInvoices, filters, showSales, showReturns, showPurchaseInvoices, onlyRetail]);
 
     const totalRevenue = useMemo(() => filteredSales.reduce((sum, sale) => sum + (sale.total || 0), 0), [filteredSales]);
 
@@ -925,6 +978,69 @@ export default function SalesPage() {
                             </div>
                         </label>
                     </div>
+
+                    <div className="h-px bg-slate-100"></div>
+
+                    {/* Transaction Type Filters */}
+                    <div className="space-y-3">
+                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">İşlem Türleri</label>
+
+                        {/* Satışları Göster */}
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                            <div className="relative flex-shrink-0">
+                                <input type="checkbox" checked={showSales} onChange={(e) => setShowSales(e.target.checked)} className="sr-only peer" />
+                                <div className="w-10 h-5 bg-slate-200 rounded-full peer-checked:bg-emerald-500 transition-colors"></div>
+                                <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm peer-checked:translate-x-5 transition-transform"></div>
+                            </div>
+                            <div>
+                                <span className="text-sm font-bold text-slate-700 group-hover:text-slate-900 transition-colors">Satışları Göster</span>
+                                <p className="text-xs text-slate-400">Nakit, Kredi Kartı, Açık Hesap</p>
+                            </div>
+                        </label>
+
+                        {/* İadeleri Göster */}
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                            <div className="relative flex-shrink-0">
+                                <input type="checkbox" checked={showReturns} onChange={(e) => setShowReturns(e.target.checked)} className="sr-only peer" />
+                                <div className="w-10 h-5 bg-slate-200 rounded-full peer-checked:bg-orange-500 transition-colors"></div>
+                                <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm peer-checked:translate-x-5 transition-transform"></div>
+                            </div>
+                            <div>
+                                <span className="text-sm font-bold text-slate-700 group-hover:text-slate-900 transition-colors">İadeleri Göster</span>
+                                <p className="text-xs text-slate-400">Tüm iade işlemleri</p>
+                            </div>
+                        </label>
+
+                        {/* Alış Faturaları Göster */}
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                            <div className="relative flex-shrink-0">
+                                <input type="checkbox" checked={showPurchaseInvoices} onChange={(e) => setShowPurchaseInvoices(e.target.checked)} className="sr-only peer" />
+                                <div className="w-10 h-5 bg-slate-200 rounded-full peer-checked:bg-indigo-500 transition-colors"></div>
+                                <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm peer-checked:translate-x-5 transition-transform"></div>
+                            </div>
+                            <div>
+                                <span className="text-sm font-bold text-slate-700 group-hover:text-slate-900 transition-colors">Alış Faturalarını Göster</span>
+                                <p className="text-xs text-slate-400">Manuel alış faturaları</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div className="h-px bg-slate-100"></div>
+
+                    {/* Perakende Filter */}
+                    <div className="space-y-2">
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                            <div className="relative flex-shrink-0">
+                                <input type="checkbox" checked={onlyRetail} onChange={(e) => setOnlyRetail(e.target.checked)} className="sr-only peer" />
+                                <div className="w-10 h-5 bg-slate-200 rounded-full peer-checked:bg-violet-500 transition-colors"></div>
+                                <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm peer-checked:translate-x-5 transition-transform"></div>
+                            </div>
+                            <div>
+                                <span className="text-sm font-bold text-slate-700 group-hover:text-slate-900 transition-colors">Sadece Perakende Satışları</span>
+                                <p className="text-xs text-slate-400">Bakiyede kayıtsız müşterileri listele</p>
+                            </div>
+                        </label>
+                    </div>
                 </div>
             </aside>
 
@@ -974,6 +1090,47 @@ export default function SalesPage() {
                                 {/* Using map inside tbody or fragment */}
                                 {filteredSales.map((sale) => {
                                     const status = returnStatusMap[sale.sale_code]?.status;
+                                    const isPI = sale._isPurchaseInvoice;
+
+                                    // Purchase Invoice row
+                                    if (isPI) {
+                                        return (
+                                            <tbody key={`pi-${sale.id}`} className="group hover:bg-indigo-50/30 transition-colors border-b border-slate-100 last:border-0 bg-indigo-50/10">
+                                                <tr>
+                                                    <td className="px-6 py-2 text-sm text-slate-600 whitespace-nowrap">
+                                                        {new Date(sale.date).toLocaleString('tr-TR')}
+                                                    </td>
+                                                    <td className="px-6 py-2 font-medium text-slate-900 font-mono whitespace-nowrap text-sm">
+                                                        {sale.sale_code}
+                                                    </td>
+                                                    <td className="px-6 py-2 text-sm text-slate-600">
+                                                        {sale.customerName || sale.customer || '-'}
+                                                    </td>
+                                                    <td className="px-6 py-2">
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                                            Alış Faturası
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-2 text-sm text-slate-500 max-w-xs truncate">
+                                                        {sale.items && sale.items.length > 0
+                                                            ? sale.items.map(i => `${i.name} x${i.quantity}`).join(', ')
+                                                            : '-'}
+                                                    </td>
+                                                    <td className="px-6 py-2 text-sm font-bold text-indigo-700 text-right whitespace-nowrap">
+                                                        ₺{sale.total?.toFixed(2)}
+                                                    </td>
+                                                    <td className="px-6 py-2 text-center">
+                                                        <button
+                                                            onClick={() => setSelectedPurchaseInvoice(sale._rawData)}
+                                                            className="px-3 py-1 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-sm font-bold transition-colors"
+                                                        >
+                                                            Detay
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        );
+                                    }
 
                                     return (
                                         <tbody key={sale.id} className={`group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 ${!sale.is_deleted && (sale.customerName || sale.customer || '').startsWith('Perakende-') ? 'bg-gray-100' : ''}`}>
@@ -1000,6 +1157,7 @@ export default function SalesPage() {
                                                 <td className="px-6 py-2">
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${sale.payment_method === 'Nakit' ? 'bg-emerald-100 text-emerald-800' :
                                                         (sale.payment_method === 'Kredi Kartı' || sale.payment_method === 'POS') ? 'bg-blue-100 text-blue-800' :
+                                                        (sale.payment_method === 'İade') ? 'bg-orange-100 text-orange-800' :
                                                             'bg-slate-100 text-slate-800'
                                                         }`}>
                                                         {sale.payment_method === 'POS' ? 'Kredi Kartı' : sale.payment_method}
@@ -1356,6 +1514,176 @@ export default function SalesPage() {
                     </div>
                 )
             }
+
+            {/* PURCHASE INVOICE DETAIL MODAL */}
+            {selectedPurchaseInvoice && (() => {
+                let invoiceData = null;
+                try { invoiceData = JSON.parse(selectedPurchaseInvoice.description); } catch { /* ignore */ }
+
+                const invItems = invoiceData?.items || [];
+                const supplierInfo = invoiceData?.supplier || {};
+                const invDetails = invoiceData?.invoiceDetails || {};
+
+                const calcLineTotal = (item) => {
+                    let p = (item.quantity || 0) * (item.price || 0);
+                    if (item.disc1) p -= p * (item.disc1 / 100);
+                    if (item.disc2) p -= p * (item.disc2 / 100);
+                    if (item.disc3) p -= p * (item.disc3 / 100);
+                    if (item.disc4) p -= p * (item.disc4 / 100);
+                    return p + p * ((item.vatRate || 0) / 100);
+                };
+
+                const subTotal = invItems.reduce((sum, it) => {
+                    let p = (it.quantity || 0) * (it.price || 0);
+                    if (it.disc1) p -= p * (it.disc1 / 100);
+                    if (it.disc2) p -= p * (it.disc2 / 100);
+                    if (it.disc3) p -= p * (it.disc3 / 100);
+                    if (it.disc4) p -= p * (it.disc4 / 100);
+                    return sum + p;
+                }, 0);
+                const vatTotal = invItems.reduce((sum, it) => {
+                    let p = (it.quantity || 0) * (it.price || 0);
+                    if (it.disc1) p -= p * (it.disc1 / 100);
+                    if (it.disc2) p -= p * (it.disc2 / 100);
+                    if (it.disc3) p -= p * (it.disc3 / 100);
+                    if (it.disc4) p -= p * (it.disc4 / 100);
+                    return sum + p * ((it.vatRate || 0) / 100);
+                }, 0);
+                const grandTotal = invoiceData?.totals?.grandTotal || (subTotal + vatTotal);
+                const fmtC = (v) => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+                const customerName = selectedPurchaseInvoice.customers?.name || supplierInfo.name || '-';
+
+                return (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+                            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
+                                <div>
+                                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                        <span className="material-symbols-outlined">receipt_long</span>
+                                        Alış Faturası Detayları
+                                        <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-lg text-xs font-medium">Salt Okunur</span>
+                                    </h2>
+                                    <p className="text-indigo-200 text-sm mt-0.5">
+                                        {customerName} • {new Date(selectedPurchaseInvoice.created_at).toLocaleDateString('tr-TR')}
+                                    </p>
+                                </div>
+                                <button onClick={() => setSelectedPurchaseInvoice(null)} className="text-white/70 hover:text-white transition-colors">
+                                    <span className="material-symbols-outlined text-2xl">close</span>
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                {!invoiceData ? (
+                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                        <p className="text-2xl font-bold text-slate-800">{fmtC(selectedPurchaseInvoice.amount)} TL</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
+                                                    <span className="material-symbols-outlined text-sm">business</span>
+                                                    Tedarikçi Bilgileri
+                                                </h3>
+                                                <div className="space-y-1.5 text-sm">
+                                                    <div className="flex justify-between"><span className="text-slate-500">Firma:</span><span className="font-medium text-slate-800">{supplierInfo.name || '-'}</span></div>
+                                                    <div className="flex justify-between"><span className="text-slate-500">Vergi D.:</span><span className="font-medium text-slate-800">{supplierInfo.taxOffice || '-'}</span></div>
+                                                    <div className="flex justify-between"><span className="text-slate-500">Vergi No:</span><span className="font-medium text-slate-800">{supplierInfo.taxNo || '-'}</span></div>
+                                                </div>
+                                            </div>
+                                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
+                                                    <span className="material-symbols-outlined text-sm">description</span>
+                                                    Fatura Bilgileri
+                                                </h3>
+                                                <div className="space-y-1.5 text-sm">
+                                                    <div className="flex justify-between"><span className="text-slate-500">Seri No:</span><span className="font-medium text-slate-800">{invDetails.serialNo || '-'}</span></div>
+                                                    <div className="flex justify-between"><span className="text-slate-500">Tarih:</span><span className="font-medium text-slate-800">{invDetails.date ? new Date(invDetails.date).toLocaleDateString('tr-TR') : '-'}</span></div>
+                                                    {invDetails.dueDate && <div className="flex justify-between"><span className="text-slate-500">Vade:</span><span className="font-medium text-slate-800">{new Date(invDetails.dueDate).toLocaleDateString('tr-TR')}</span></div>}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                            <div className="p-3 border-b border-slate-200 bg-slate-50/50">
+                                                <h3 className="font-semibold flex items-center gap-2 text-slate-900 text-sm">
+                                                    <span className="material-symbols-outlined text-slate-400 text-lg">inventory_2</span>
+                                                    Ürün Kalemleri ({invItems.length})
+                                                </h3>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left border-collapse">
+                                                    <thead>
+                                                        <tr className="bg-slate-50 text-[10px] uppercase tracking-wider font-bold text-slate-500">
+                                                            <th className="px-2 py-2 border-b border-slate-200 w-8 text-center">#</th>
+                                                            <th className="px-2 py-2 border-b border-slate-200 w-24">Stok Kodu</th>
+                                                            <th className="px-2 py-2 border-b border-slate-200">Ürün Adı</th>
+                                                            <th className="px-2 py-2 border-b border-slate-200 text-center w-14">Miktar</th>
+                                                            <th className="px-2 py-2 border-b border-slate-200 text-right w-20">B. Fiyat</th>
+                                                            <th className="px-2 py-2 border-b border-slate-200 text-center w-14">KDV%</th>
+                                                            <th className="px-2 py-2 border-b border-slate-200 text-right w-24">Toplam</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-200">
+                                                        {invItems.map((item, index) => (
+                                                            <tr key={index} className="hover:bg-slate-50 transition-colors">
+                                                                <td className="px-2 py-2 text-xs text-slate-400 text-center">{index + 1}</td>
+                                                                <td className="px-2 py-2 text-xs font-mono font-medium text-slate-600">{item.stockCode || '-'}</td>
+                                                                <td className="px-2 py-2 text-xs font-semibold text-slate-900">{item.name || '-'}</td>
+                                                                <td className="px-2 py-2 text-xs text-center font-medium text-slate-800">{item.quantity}</td>
+                                                                <td className="px-2 py-2 text-xs text-right font-medium text-slate-800">{fmtC(item.price)}</td>
+                                                                <td className="px-2 py-2 text-xs text-center text-slate-600">%{item.vatRate || 0}</td>
+                                                                <td className="px-2 py-2 text-xs text-right font-bold text-slate-700">{fmtC(calcLineTotal(item))} TL</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div className="md:col-span-2">
+                                                {invoiceData.note && (
+                                                    <>
+                                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Fatura Notu</label>
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700">{invoiceData.note}</div>
+                                                    </>
+                                                )}
+                                            </div>
+                                            <div className="bg-gradient-to-br from-slate-50 to-indigo-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-slate-500">Ara Toplam</span>
+                                                    <span className="font-semibold text-slate-900">{fmtC(subTotal)} TL</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-slate-500">KDV Toplamı</span>
+                                                    <span className="font-semibold text-slate-900">{fmtC(vatTotal)} TL</span>
+                                                </div>
+                                                <div className="pt-2 border-t border-slate-300">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-xs font-bold uppercase tracking-widest text-indigo-600">Genel Toplam</span>
+                                                        <span className="text-xl font-extrabold text-slate-900">{fmtC(grandTotal)} TL</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            <div className="border-t border-slate-200 px-6 py-4 bg-slate-50 flex items-center justify-end flex-shrink-0">
+                                <button
+                                    onClick={() => setSelectedPurchaseInvoice(null)}
+                                    className="px-6 py-2.5 text-white bg-indigo-600 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20 text-sm flex items-center gap-1.5"
+                                >
+                                    <span className="material-symbols-outlined text-base">close</span>
+                                    Kapat
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div >
     );
 }
