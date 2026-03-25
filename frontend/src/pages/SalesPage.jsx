@@ -85,7 +85,7 @@ export default function SalesPage() {
 
             const [salesRes, purchaseRes] = await Promise.all([
                 salesAPI.getAll(params),
-                customersAPI.getManualPurchaseInvoices().catch(() => ({ data: [] }))
+                customersAPI.getAllPurchaseInvoicesFromPayments().catch(() => ({ data: [] }))
             ]);
             setSales(salesRes.data?.sales || []);
             setPurchaseInvoices(purchaseRes.data || []);
@@ -681,8 +681,10 @@ export default function SalesPage() {
         const normalizedPI = purchaseInvoices.map(inv => {
             let pd = null;
             try { pd = JSON.parse(inv.description); } catch { /* ignore */ }
+            const isManuel = pd?.source === 'manuel';
             return {
                 _isPurchaseInvoice: true,
+                _piSource: isManuel ? 'manuel' : 'entegrasyon',
                 id: inv.id,
                 customer_id: inv.customer_id,
                 date: inv.created_at,
@@ -1094,8 +1096,9 @@ export default function SalesPage() {
 
                                     // Purchase Invoice row
                                     if (isPI) {
+                                        const isManuelPI = sale._piSource === 'manuel';
                                         return (
-                                            <tbody key={`pi-${sale.id}`} className="group hover:bg-indigo-50/30 transition-colors border-b border-slate-100 last:border-0 bg-indigo-50/10">
+                                            <tbody key={`pi-${sale.id}`} className={`group transition-colors border-b border-slate-100 last:border-0 ${isManuelPI ? 'hover:bg-indigo-50/30 bg-indigo-50/10' : 'hover:bg-purple-50/30 bg-purple-50/10'}`}>
                                                 <tr>
                                                     <td className="px-6 py-2 text-sm text-slate-600 whitespace-nowrap">
                                                         {new Date(sale.date).toLocaleString('tr-TR')}
@@ -1107,9 +1110,15 @@ export default function SalesPage() {
                                                         {sale.customerName || sale.customer || '-'}
                                                     </td>
                                                     <td className="px-6 py-2">
-                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                                                            Alış Faturası
-                                                        </span>
+                                                        {isManuelPI ? (
+                                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                                                Alış (Manuel)
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                                Alış (E-Fatura)
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-2 text-sm text-slate-500 max-w-xs truncate">
                                                         {sale.items && sale.items.length > 0

@@ -702,6 +702,16 @@ export const customersAPI = {
         if (error) throw error;
         return { data };
     },
+    getAllPurchaseInvoicesFromPayments: async () => {
+        // Fetches ALL Fatura (Alış) records — both manual and integrated (e-fatura)
+        const { data, error } = await supabase
+            .from('customer_payments')
+            .select('id, customer_id, amount, description, created_at, customers(name, customer_code)')
+            .eq('payment_type', 'Fatura (Alış)')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return { data };
+    },
     deleteManualPurchaseInvoice: async (payment) => {
         // Deletes a manual purchase invoice: restores customer balance + deletes the record
         const { id, customer_id, amount } = payment;
