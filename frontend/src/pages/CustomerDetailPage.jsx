@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import XLSX from 'xlsx-js-style';
-import { customersAPI, salesAPI, productsAPI } from '../services/api';
+import { customersAPI, salesAPI, productsAPI, logsAPI } from '../services/api';
 import { supabase } from '../lib/supabaseClient';
 import SaleDetailModal from '../components/modals/SaleDetailModal';
 
@@ -133,6 +133,17 @@ export default function CustomerDetailPage() {
 
             if (foundCustomer) {
                 setCustomer(foundCustomer);
+
+                // Cari Hareket Raporu görüntüleme logu
+                logsAPI.logAction({
+                    module: 'MÜŞTERİLER',
+                    action_type: 'VIEW',
+                    details: {
+                        title: `"${foundCustomer.name}" carisi hareket raporu görüntülendi.`,
+                        message: `Cari hareket raporu incelendi.`,
+                        customer_name: foundCustomer.name
+                    }
+                });
 
                 // Get transactions for this customer
                 const { data: txData } = await customersAPI.getTransactions(foundCustomer.id);

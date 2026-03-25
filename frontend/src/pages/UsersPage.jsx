@@ -631,27 +631,19 @@ export default function UsersPage() {
                     <div className="bg-white rounded-xl w-full max-w-[98vw] h-[96vh] flex flex-col shadow-2xl">
 
                         {/* Başlık */}
-                        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50 rounded-t-xl shrink-0">
+                        <div className="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between bg-gray-50 rounded-t-xl shrink-0">
                             <div className="flex items-center gap-3">
                                 <span className="text-lg">📋</span>
                                 <div>
-                                    <h2 className="text-base font-bold text-gray-900 leading-tight">Kullanıcı İşlem Logları</h2>
+                                    <h2 className="text-sm font-bold text-gray-900 leading-tight">Kullanıcı İşlem Logları</h2>
                                     <p className="text-xs text-gray-500">Kullanıcı: <strong className="text-gray-700">{selectedUser.username}</strong> — {userLogs.length} kayıt</p>
                                 </div>
                             </div>
-                            <button onClick={() => setShowLogsModal(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-200 text-gray-500 transition-colors text-sm font-bold">✕</button>
+                            <button onClick={() => setShowLogsModal(false)} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-200 text-gray-500 transition-colors text-xs font-bold">✕</button>
                         </div>
 
-                        {/* Kolon başlıkları */}
-                        <div className="grid grid-cols-[90px_90px_1fr_auto] gap-x-2 px-3 py-1.5 bg-gray-100 border-b border-gray-200 shrink-0">
-                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">İşlem</span>
-                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Modül</span>
-                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Detay</span>
-                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Tarih / Saat</span>
-                        </div>
-
-                        {/* Log listesi */}
-                        <div className="flex-1 overflow-y-auto">
+                        {/* Log grid */}
+                        <div className="flex-1 overflow-y-auto p-2">
                             {loadingLogs ? (
                                 <div className="flex flex-col items-center justify-center h-full gap-3">
                                     <div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
@@ -663,68 +655,66 @@ export default function UsersPage() {
                                     <p className="text-sm">Henüz kayıt yok.</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-gray-100">
-                                    {userLogs.map((log, idx) => (
-                                        <div key={log.id} className={`grid grid-cols-[90px_90px_1fr_auto] gap-x-2 px-3 py-1.5 items-start hover:bg-blue-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                                <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+                                    {userLogs.map((log) => {
+                                        const badgeStyle =
+                                            log.action_type === 'DELETE' ? 'bg-red-100 text-red-700 border-red-200' :
+                                            log.action_type === 'UPDATE' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                            log.action_type === 'CREATE' ? 'bg-green-100 text-green-700 border-green-200' :
+                                            'bg-blue-100 text-blue-700 border-blue-200';
+                                        const cardBorder =
+                                            log.action_type === 'DELETE' ? 'border-red-100 hover:border-red-300' :
+                                            log.action_type === 'UPDATE' ? 'border-amber-100 hover:border-amber-300' :
+                                            log.action_type === 'CREATE' ? 'border-green-100 hover:border-green-300' :
+                                            'border-blue-100 hover:border-blue-300';
+                                        return (
+                                            <div key={log.id} className={`border rounded-lg p-2 bg-white hover:shadow-sm transition-all flex flex-col gap-1 ${cardBorder}`}>
+                                                {/* Üst: badge + modül + tarih */}
+                                                <div className="flex items-center justify-between gap-1">
+                                                    <div className="flex items-center gap-1 min-w-0">
+                                                        <span className={`shrink-0 px-1.5 py-0.5 rounded text-[8px] font-black uppercase border ${badgeStyle}`}>
+                                                            {log.action_type}
+                                                        </span>
+                                                        <span className="text-[9px] font-bold text-gray-400 uppercase truncate">{log.module}</span>
+                                                    </div>
+                                                    <span className="text-[10px] font-black text-black whitespace-nowrap shrink-0">{formatDate(log.created_at)}</span>
+                                                </div>
 
-                                            {/* İşlem tipi */}
-                                            <div className="pt-0.5">
-                                                <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wide ${
-                                                    log.action_type === 'DELETE' ? 'bg-red-100 text-red-700' :
-                                                    log.action_type === 'UPDATE' ? 'bg-amber-100 text-amber-700' :
-                                                    log.action_type === 'CREATE' ? 'bg-green-100 text-green-700' :
-                                                    'bg-blue-100 text-blue-700'
-                                                }`}>{log.action_type}</span>
-                                            </div>
-
-                                            {/* Modül */}
-                                            <div className="pt-0.5">
-                                                <span className="text-[10px] font-bold text-gray-500 uppercase">{log.module}</span>
-                                            </div>
-
-                                            {/* Detay */}
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-semibold text-gray-800 leading-snug truncate">
+                                                {/* Ana metin */}
+                                                <p className="text-[11px] font-semibold text-gray-800 leading-tight line-clamp-2">
                                                     {log.details?.title || log.details?.message || `${log.module} işlemi`}
                                                 </p>
+
+                                                {/* Alt mesaj */}
                                                 {log.details?.message && log.details?.title && (
-                                                    <p className="text-[10px] text-gray-500 truncate">{log.details.message}</p>
+                                                    <p className="text-[10px] text-gray-500 leading-tight line-clamp-1">{log.details.message}</p>
                                                 )}
-                                                {/* Eski → Yeni değer */}
-                                                {(log.details?.old_value !== undefined || log.details?.change) && (
-                                                    <div className="flex items-center gap-1 mt-0.5">
-                                                        <span className="text-[10px] text-red-500 line-through bg-red-50 px-1 rounded">{String(log.details.old_value ?? '').trim()}</span>
-                                                        <span className="text-[10px] text-gray-400">→</span>
-                                                        <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1 rounded">{String(log.details.new_value ?? '').trim()}</span>
+
+                                                {/* Eski → Yeni */}
+                                                {(log.details?.old_value !== undefined || log.details?.new_value !== undefined) && (
+                                                    <div className="flex items-center gap-1 flex-wrap">
+                                                        <span className="text-[9px] text-red-500 line-through bg-red-50 px-1 rounded border border-red-100">{String(log.details.old_value ?? '')}</span>
+                                                        <span className="text-[9px] text-gray-400">→</span>
+                                                        <span className="text-[9px] text-green-600 font-bold bg-green-50 px-1 rounded border border-green-100">{String(log.details.new_value ?? '')}</span>
                                                     </div>
                                                 )}
-                                                {/* Ürün bazlı değişimler */}
+
+                                                {/* Ürün değişimleri */}
                                                 {log.details?.detailed_changes && (
-                                                    <div className="flex flex-wrap gap-1 mt-0.5">
-                                                        {String(log.details.detailed_changes).split(' | ').map((ch, i) => (
-                                                            <span key={i} className="text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100 font-medium">{ch}</span>
+                                                    <div className="flex flex-wrap gap-0.5">
+                                                        {String(log.details.detailed_changes).split(' | ').slice(0, 3).map((ch, i) => (
+                                                            <span key={i} className="text-[8px] bg-amber-50 text-amber-700 px-1 py-0.5 rounded border border-amber-100 font-medium leading-tight">{ch}</span>
                                                         ))}
                                                     </div>
                                                 )}
-                                                {/* Ürünler */}
-                                                {log.details?.items && (
-                                                    <p className="text-[10px] text-gray-500 mt-0.5 truncate">
-                                                        <span className="font-bold text-gray-400 uppercase mr-1 text-[9px]">Ürünler:</span>
-                                                        {log.details.items}
-                                                    </p>
-                                                )}
+
                                                 {/* Satış kodu */}
                                                 {log.details?.sale_code && (
-                                                    <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono mt-0.5 inline-block">{log.details.sale_code}</span>
+                                                    <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono self-start">{log.details.sale_code}</span>
                                                 )}
                                             </div>
-
-                                            {/* Tarih / Saat */}
-                                            <div className="text-right whitespace-nowrap pt-0.5 shrink-0">
-                                                <p className="text-[11px] font-black text-black leading-snug">{formatDate(log.created_at)}</p>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
