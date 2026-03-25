@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { customersAPI, settingsAPI } from '../services/api';
 import { birFaturaAPI } from '../services/birFaturaService';
 import * as XLSX from 'xlsx';
+import StatusModal from '../components/modals/StatusModal';
 
 export default function CustomersPage() {
     const [customers, setCustomers] = useState([]);
@@ -30,6 +31,11 @@ export default function CustomersPage() {
         tax_office: '',
         tax_number: '',
     });
+
+    // Profesyonel bildirim modalı
+    const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'success' });
+    const showSuccess = (title, message) => setStatusModal({ isOpen: true, title, message, type: 'success' });
+    const showError = (title, message) => setStatusModal({ isOpen: true, title, message, type: 'error' });
 
     // Payment Modal State
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -251,7 +257,7 @@ export default function CustomersPage() {
 
     const handleSaveNew = async () => {
         if (!formData.name.trim()) {
-            alert('Müşteri adı boş bırakılamaz.');
+            showError('Eksik Bilgi', 'Müşteri adı boş bırakılamaz.');
             return;
         }
 
@@ -264,14 +270,14 @@ export default function CustomersPage() {
         try {
             const response = await customersAPI.add(customerData);
             if (response.data?.success) {
-                alert(response.data.message);
                 setShowAddModal(false);
                 loadCustomers();
+                showSuccess('Müşteri Eklendi ✓', `"${customerData.name}" başarıyla sisteme eklendi.`);
             } else {
-                alert('Hata: ' + response.data?.message);
+                showError('Ekleme Hatası', response.data?.message || 'Bir hata oluştu.');
             }
         } catch (error) {
-            alert('Müşteri eklenirken hata: ' + (error.response?.data?.message || error.message));
+            showError('Ekleme Hatası', error.response?.data?.message || error.message);
         }
     };
 
@@ -281,14 +287,14 @@ export default function CustomersPage() {
         try {
             const response = await customersAPI.update(editingCustomer.id, formData);
             if (response.data?.success) {
-                alert(response.data.message);
                 setShowEditModal(false);
                 loadCustomers();
+                showSuccess('Müşteri Güncellendi ✓', `"${formData.name}" bilgileri başarıyla güncellendi.`);
             } else {
-                alert('Güncelleme hatası: ' + response.data?.message);
+                showError('Güncelleme Hatası', response.data?.message || 'Bir hata oluştu.');
             }
         } catch (error) {
-            alert('Güncelleme hatası: ' + (error.response?.data?.message || error.message));
+            showError('Güncelleme Hatası', error.response?.data?.message || error.message);
         }
     };
 
@@ -327,30 +333,34 @@ export default function CustomersPage() {
 
     const handlePaymentSubmit = async () => {
         if (!paymentData.customer_id || !paymentData.amount) {
-            alert('Lütfen müşteri seçin ve tutar girin.');
+            showError('Eksik Bilgi', 'Lütfen müşteri seçin ve tutar girin.');
             return;
         }
+        const selectedCustomer = customers.find(c => c.id === paymentData.customer_id);
+        const customerName = selectedCustomer?.name || 'Müşteri';
+        const amount = parseFloat(paymentData.amount || 0).toFixed(2);
         try {
             let response;
             if (transactionType === 'payment') {
-                // Customer pays US (Collection) -> Reduces Balance
                 response = await customersAPI.addPayment(paymentData);
             } else {
-                // We pay Customer / Add Debt (Debit) -> Increases Balance
-                // Note: 'Firmaya Ödeme Yap' button maps to this. User requested it adds Debt.
                 response = await customersAPI.addManualDebit(paymentData);
             }
 
             if (response.data?.success) {
-                alert(response.data.message);
                 setShowPaymentModal(false);
                 loadCustomers();
                 setPaymentData({ customer_id: '', amount: '', description: 'Ödeme', payment_type: 'Nakit' });
+                if (transactionType === 'payment') {
+                    showSuccess('Ödeme Alındı ✓', `"${customerName}" için ${amount} TL tahsilat başarıyla işlendi. Bakiye güncellendi.`);
+                } else {
+                    showSuccess('Borç Kaydedildi ✓', `"${customerName}" için ${amount} TL borç kaydı başarıyla işlendi. Bakiye güncellendi.`);
+                }
             } else {
-                alert('Hata: ' + response.data?.message);
+                showError('İşlem Hatası', response.data?.message || 'Bir hata oluştu.');
             }
         } catch (error) {
-            alert('İşlem hatası: ' + (error.response?.data?.message || error.message));
+            showError('İşlem Hatası', error.response?.data?.message || error.message);
         }
     };
 
@@ -396,6 +406,7 @@ export default function CustomersPage() {
 
 
     return (
+        <>
         <div className="min-h-screen bg-gray-100 flex flex-col relative">
 
             {/* Modern Loading Screen - Variant 2 */}
@@ -619,16 +630,16 @@ export default function CustomersPage() {
                                                         {isActive ? 'Aktif' : 'Pasif'}
                                                     </span>
                                                 </td>
-                                                <td className={`border border-gray-200 p-2 font-bold ${balance > 0 ? 'text-red-500' : balance < 0 ? 'text-green-500' : ''}`}>
+                                                <td className={`border border-gray-200 p-2 font-bold text-base ${balance > 0 ? 'text-red-500' : balance < 0 ? 'text-green-500' : ''}`}>
                                                     {balance.toFixed(2)} TL
                                                 </td>
                                                 <td className={`border border-gray-200 p-2 ${balance > 0 ? 'text-red-500' : balance < 0 ? 'text-green-500' : ''}`}>
                                                     {balance > 0 ? 'Borçlu' : balance < 0 ? 'Alacaklı' : 'Nötr'}
                                                 </td>
-                                                <td className="border border-gray-200 p-2 text-right font-bold text-red-500">
+                                                <td className="border border-gray-200 p-2 text-right font-light text-red-500">
                                                     {(parseFloat(customer.total_debt) || 0).toFixed(2)} TL
                                                 </td>
-                                                <td className="border border-gray-200 p-2 text-right font-bold text-green-500">
+                                                <td className="border border-gray-200 p-2 text-right font-light text-green-500">
                                                     {(parseFloat(customer.total_credit) || 0).toFixed(2)} TL
                                                 </td>
                                                 <td className="border border-gray-200 p-2">{formatDate(customer.last_transaction_date)}</td>
@@ -1558,5 +1569,15 @@ export default function CustomersPage() {
                 </div>
             )}
         </div>
+
+        {/* Profesyonel bildirim modalı */}
+        <StatusModal
+            isOpen={statusModal.isOpen}
+            onClose={() => setStatusModal(prev => ({ ...prev, isOpen: false }))}
+            title={statusModal.title}
+            message={statusModal.message}
+            type={statusModal.type}
+        />
+        </>
     );
 }
