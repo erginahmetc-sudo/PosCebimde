@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { usersAPI } from '../services/api';
+import { usersAPI, logsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 import StatusModal from '../components/modals/StatusModal';
@@ -10,6 +10,9 @@ export default function UsersPage() {
     const [showModal, setShowModal] = useState(false);
     const [showPermModal, setShowPermModal] = useState(false);
     const [showScheduleModal, setShowScheduleModal] = useState(false);
+    const [showLogsModal, setShowLogsModal] = useState(false);
+    const [userLogs, setUserLogs] = useState([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
     const [statusModal, setStatusModal] = useState({ isOpen: false, title: '', message: '', type: 'error' });
     const [selectedUser, setSelectedUser] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
@@ -84,6 +87,20 @@ export default function UsersPage() {
             end_time: '23:59'
         });
         setShowScheduleModal(true);
+    };
+
+    const handleOpenLogs = async (user) => {
+        setSelectedUser(user);
+        setShowLogsModal(true);
+        setLoadingLogs(true);
+        try {
+            const res = await logsAPI.getAll(user.id);
+            setUserLogs(res.data?.logs || []);
+        } catch (error) {
+            console.error('Loglar yüklenirken hata:', error);
+        } finally {
+            setLoadingLogs(false);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -328,8 +345,18 @@ export default function UsersPage() {
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-right">
+                                        <div className="flex justify-end gap-1 flex-wrap">
+                                        {isKurucu && (
+                                            <button
+                                                onClick={() => handleOpenLogs(user)}
+                                                className="px-2 py-1.5 text-xs bg-slate-50 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
+                                                title="İşlem Logları"
+                                            >
+                                                📋 Loglar
+                                            </button>
+                                        )}
                                         {isKurucu && user.id !== currentUser?.id && (
-                                            <div className="flex justify-end gap-1 flex-wrap">
+                                            <>
                                                 <button
                                                     onClick={() => openEditModal(user)}
                                                     className="px-2 py-1.5 text-xs bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
@@ -368,8 +395,9 @@ export default function UsersPage() {
                                                         🗑️ Sil
                                                     </button>
                                                 )}
-                                            </div>
+                                            </>
                                         )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -592,6 +620,110 @@ export default function UsersPage() {
                             >
                                 Kaydet
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Logs Modal — sadece Kurucu görebilir */}
+            {showLogsModal && selectedUser && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+                    <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
+                        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-2xl">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-800">📋 Kullanıcı İşlem Logları</h2>
+                                <p className="text-gray-500 text-sm mt-1">Kullanıcı: <strong>{selectedUser.username}</strong></p>
+                            </div>
+                            <button onClick={() => setShowLogsModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 transition-colors">✕</button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            {loadingLogs ? (
+                                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                                    <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
+                                    <p className="text-gray-500 font-medium">Loglar yükleniyor...</p>
+                                </div>
+                            ) : userLogs.length === 0 ? (
+                                <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                                    <p className="text-4xl mb-3">📭</p>
+                                    <p className="text-gray-400">Bu kullanıcıya ait henüz bir kayıt bulunamadı.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {userLogs.map((log) => (
+                                        <div key={log.id} className="p-4 bg-white border border-gray-100 rounded-xl hover:border-blue-200 transition-all hover:shadow-md group">
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                                            log.action_type === 'DELETE' ? 'bg-red-100 text-red-600' :
+                                                            log.action_type === 'UPDATE' ? 'bg-amber-100 text-amber-600' :
+                                                            log.action_type === 'CREATE' ? 'bg-green-100 text-green-600' :
+                                                            'bg-blue-100 text-blue-600'
+                                                        }`}>{log.action_type}</span>
+                                                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{log.module}</span>
+                                                    </div>
+                                                    <p className="text-sm text-gray-700 font-medium">
+                                                        {log.details?.title || log.details?.message || `${log.module} işlemi yapıldı.`}
+                                                    </p>
+                                                    {log.details?.message && log.details?.title && (
+                                                        <p className="text-xs text-gray-500 mt-0.5">{log.details.message}</p>
+                                                    )}
+                                                    {/* Fiyat/tutar değişimi */}
+                                                    {(log.details?.old_value !== undefined || log.details?.change) && (
+                                                        <div className="mt-2 text-xs grid grid-cols-2 gap-2 p-2 bg-gray-50 rounded-lg">
+                                                            <div className="text-gray-500">
+                                                                <span className="block font-bold text-gray-400 uppercase mb-0.5">Eski</span>
+                                                                <span className="text-red-500 bg-red-50 px-1 rounded line-through">{String(log.details.old_value ?? log.details.change?.split('→')[0] ?? '')}</span>
+                                                            </div>
+                                                            <div className="text-gray-500 border-l border-gray-200 pl-2">
+                                                                <span className="block font-bold text-gray-400 uppercase mb-0.5">Yeni</span>
+                                                                <span className="text-green-600 bg-green-50 px-1 rounded font-bold">{String(log.details.new_value ?? log.details.change?.split('→')[1] ?? '')}</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {/* Ürün bazlı detay değişimleri */}
+                                                    {log.details?.detailed_changes && (
+                                                        <div className="flex flex-wrap gap-1.5 mt-1">
+                                                            {String(log.details.detailed_changes).split(' | ').map((ch, idx) => (
+                                                                <div key={idx} className="text-[10px] bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-100 font-medium flex items-center gap-1">
+                                                                    <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
+                                                                    {ch}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {/* Ürün listesi */}
+                                                    {log.details?.items && (
+                                                        <div className="text-[11px] bg-gray-50 p-2 rounded-lg border border-gray-200 mt-1.5 text-gray-600">
+                                                            <span className="font-bold text-gray-400 uppercase text-[9px] block mb-0.5">Ürünler</span>
+                                                            {log.details.items}
+                                                        </div>
+                                                    )}
+                                                    {/* Diğer detaylar */}
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                                                        {Object.entries(log.details || {})
+                                                            .filter(([key]) => !['title', 'message', 'change', 'items', 'sale_code', 'detailed_changes', 'old_value', 'new_value'].includes(key))
+                                                            .map(([key, value]) => (
+                                                                <div key={key} className="text-[11px] bg-slate-50/50 p-1.5 rounded-lg border border-gray-100 flex items-center gap-2">
+                                                                    <span className="text-gray-400 font-bold uppercase min-w-[75px] text-[9px] tracking-tighter">{key.replace(/_/g, ' ')}:</span>
+                                                                    <span className="text-gray-600 truncate">{String(value)}</span>
+                                                                </div>
+                                                            ))}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right whitespace-nowrap">
+                                                    <p className="text-xs text-gray-400 group-hover:text-gray-600 font-medium">{formatDate(log.created_at)}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-4 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl">
+                            <button onClick={() => setShowLogsModal(false)} className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-100 transition-colors font-medium shadow-sm">Kapat</button>
                         </div>
                     </div>
                 </div>

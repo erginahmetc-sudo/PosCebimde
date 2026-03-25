@@ -193,10 +193,15 @@ export const productsAPI = {
             .single();
 
         if (error) throw error;
+        logsAPI.logAction({ module: 'ÜRÜNLER', action_type: 'CREATE', details: { title: `Yeni ürün eklendi: ${product.name}`, product_name: product.name, stock_code: product.stock_code, price: `${product.price} TL`, stock: product.stock } });
         return { data };
     },
     update: async (stockCode, product) => {
         const companyCode = getCurrentCompanyCode();
+        // Eski fiyatı log için önceden çek
+        const { data: oldProd } = await supabase.from('products').select('sale_price, name, unit').eq('stock_code', stockCode).eq('company_code', companyCode).single();
+        const oldPrice = oldProd?.sale_price || 0;
+        const prodName = oldProd?.name || product.name;
         const dbProduct = {
             name: product.name,
             barcode: product.barcode,
@@ -217,6 +222,11 @@ export const productsAPI = {
             .select();
 
         if (error) throw error;
+        if (product.price !== undefined && parseFloat(oldPrice) !== parseFloat(product.price)) {
+            logsAPI.logAction({ module: 'ÜRÜNLER', action_type: 'UPDATE', details: { title: `Fiyat Güncelleme: ${prodName}`, message: `${prodName} isimli ürün ${oldPrice} TL'den ${product.price} TL olmuştur.`, old_value: `${oldPrice} TL`, new_value: `${product.price} TL` } });
+        } else {
+            logsAPI.logAction({ module: 'ÜRÜNLER', action_type: 'UPDATE', details: { title: `Ürün güncellendi: ${prodName}`, stock_code: stockCode } });
+        }
         return { data };
     },
     delete: async (stockCode) => {
@@ -228,6 +238,7 @@ export const productsAPI = {
             .eq('company_code', companyCode); // Security check
 
         if (error) throw error;
+        logsAPI.logAction({ module: 'ÜRÜNLER', action_type: 'DELETE', details: { title: `Ürün silindi (Stok Kodu: ${stockCode})`, stock_code: stockCode } });
         return { data: { success: true } };
     },
     getByStockCode: async (stockCode) => {
@@ -493,6 +504,10 @@ export const customersAPI = {
             .eq('id', payment.customer_id);
 
         if (updateError) throw updateError;
+        // Sadece gerçek tahsilat/ödeme işlemlerini logla (otomatik satış kayıtlarını değil)
+        if (!payment.description?.includes('Satış -') && !payment.description?.includes('Alacak (Tahsilat)') && !payment.description?.includes('İade -')) {
+            logsAPI.logAction({ module: 'MÜŞTERİLER', action_type: 'UPDATE', details: { title: `Müşteriye ödeme/tahsilat işlendi.`, new_value: `${paymentAmount.toFixed(2)} TL (${payment.payment_type || 'Nakit'})`, message: payment.description, sale_code: payment.description?.match(/(SLS|RET)-\d+/)?.[0] || undefined } });
+        }
         return { data: { success: true, message: 'Ödeme alındı ve bakiye güncellendi.' } };
     },
     // NEW: Add Sale Debit (Borç) - Increases customer balance for a sale
@@ -869,6 +884,7 @@ export const salesAPI = {
             });
         }
 
+        logsAPI.logAction({ module: 'SATIŞLAR', action_type: 'CREATE', details: { title: `${originalSale.sale_code} için iade oluşturuldu.`, message: `${originalSale.customer_name || originalSale.customerName || 'Misafir'} müşterisine ${refundTotal.toFixed(2)} TL iade yapıldı.`, new_value: `İade Kodu: ${returnSaleCode}` } });
         return response({ success: true, message: 'İade işlemi tamamlandı.' });
     },
     complete: async (sale) => {
@@ -946,6 +962,8 @@ export const salesAPI = {
             // NOTE: For Veresiye/Açık Hesap - no Alacak is added, so balance stays increased (debt)
         }
 
+        const itemSummary = cleanSale.items?.map(it => `${it.quantity} ${it.unit || 'AD.'} ${it.name}`).join(', ') || '';
+        logsAPI.logAction({ module: 'SATIŞLAR', action_type: 'CREATE', details: { title: `Yeni satış: ${data?.sale_code || cleanSale.sale_code}`, message: `${cleanSale.customer_name} müşterisine ${parseFloat(cleanSale.total).toFixed(2)} TL satış yapıldı.`, sale_code: data?.sale_code || cleanSale.sale_code, total: `${parseFloat(cleanSale.total).toFixed(2)} TL`, payment: cleanSale.payment_method, items: itemSummary } });
         return response({ success: true, message: 'Satış tamamlandı', sale_code: data?.sale_code }, error);
     },
     // Alias for backward compatibility if needed
@@ -987,6 +1005,7 @@ export const salesAPI = {
             .from('sales')
             .update({ is_deleted: true })
             .eq('sale_code', saleCode);
+        logsAPI.logAction({ module: 'SATIŞLAR', action_type: 'DELETE', details: { title: `${saleCode} numaralı satış iptal/silindi.`, sale_code: saleCode, message: 'Satış kaydı silindi ve müşteri hareketlerinden kaldırıldı.' } });
         return response({ success: true, message: 'Satış iptal edildi' }, error);
     },
     getByCode: async (saleCode) => {
@@ -1003,7 +1022,7 @@ export const salesAPI = {
         // 1. Fetch existing sale for customer_id validation and total check
         const { data: existingSale, error: fetchError } = await supabase
             .from('sales')
-            .select('customer_id, total')
+            .select('customer_id, total, items')
             .eq('sale_code', saleCode)
             .eq('company_code', companyCode)
             .single();
@@ -1085,6 +1104,32 @@ export const salesAPI = {
             }
         }
 
+        // Log satış güncelleme (ürün fiyat/miktar değişimi dahil)
+        try {
+            const oldTotal = parseFloat(existingSale.total || 0).toFixed(2);
+            const newTotal = parseFloat(data.total || existingSale.total || 0).toFixed(2);
+            const oldItems = existingSale.items || [];
+            const newProducts = data.products || oldItems;
+            // Fiyat/miktar değişimlerini bul
+            const changeDetails = [];
+            newProducts.forEach(newP => {
+                const oldP = oldItems.find(o => o.stock_code === newP.stock_code || o.name === newP.name);
+                if (oldP) {
+                    if (parseFloat(oldP.quantity) !== parseFloat(newP.quantity)) changeDetails.push(`${newP.name}: Miktar ${oldP.quantity} → ${newP.quantity}`);
+                    if (parseFloat(oldP.price) !== parseFloat(newP.price)) changeDetails.push(`${newP.name}: Fiyat ${oldP.price} TL → ${newP.price} TL`);
+                } else {
+                    changeDetails.push(`Yeni Ürün: ${newP.name} (${newP.quantity} AD.)`);
+                }
+            });
+            oldItems.forEach(oldP => {
+                if (!newProducts.find(n => n.stock_code === oldP.stock_code || n.name === oldP.name)) changeDetails.push(`Ürün Çıkarıldı: ${oldP.name}`);
+            });
+            const itemSummary = newProducts.map(it => `${it.quantity} ${it.unit || 'AD.'} ${it.name}`).join(', ');
+            const detailedChanges = changeDetails.length > 0 ? changeDetails.join(' | ') : undefined;
+            logsAPI.logAction({ module: 'SATIŞLAR', action_type: 'UPDATE', details: { title: `${saleCode} numaralı satış GÜNCELLENDİ.`, message: `Satış detayları ve ürün listesi değiştirildi.`, sale_code: saleCode, old_value: `${oldTotal} TL`, new_value: `${newTotal} TL`, change: `${oldTotal} TL → ${newTotal} TL`, items: itemSummary, detailed_changes: detailedChanges } });
+        } catch (e) {
+            console.warn('Satış güncelleme log hatası', e);
+        }
         return response({ success: true, message: 'Satış ve cari hesap güncellendi' }, null);
     }
 };
@@ -1609,6 +1654,59 @@ export const campaignsAPI = {
             .eq('id', id)
             .eq('company_code', companyCode);
         return { data: { success: true } };
+    }
+};
+
+// ============ LOGS API ============
+export const logsAPI = {
+    getAll: async (userId) => {
+        const companyCode = getCurrentCompanyCode();
+        let query = supabase
+            .from('activity_logs')
+            .select('*')
+            .eq('company_code', companyCode);
+
+        if (userId) {
+            query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false });
+        if (error) {
+            console.error('Supabase Error:', error);
+            return { data: { logs: [] }, error: error.message };
+        }
+
+        // Parse details if they arrived as strings
+        const processedLogs = (data || []).map(log => {
+            let details = log.details;
+            if (typeof details === 'string') {
+                try { details = JSON.parse(details); } catch (e) { /* ignore */ }
+            }
+            return { ...log, details };
+        });
+
+        return { data: { logs: processedLogs } };
+    },
+
+    logAction: async (actionData) => {
+        try {
+            const userStr = localStorage.getItem('user');
+            if (!userStr) return;
+            const user = JSON.parse(userStr);
+            const logData = {
+                user_id: user.id || user.uid,
+                username: user.username,
+                company_code: user.company_code,
+                module: actionData.module,
+                action_type: actionData.action_type,
+                details: actionData.details || {},
+                created_at: new Date().toISOString()
+            };
+            const { error } = await supabase.from('activity_logs').insert([logData]);
+            if (error) console.error('Logging Error:', error);
+        } catch (e) {
+            console.error('Logging Exception:', e);
+        }
     }
 };
 
