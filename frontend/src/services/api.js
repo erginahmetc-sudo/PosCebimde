@@ -1032,6 +1032,7 @@ export const salesAPI = {
         const updateData = {};
         // Database uses 'items' column for products
         if (data.products) updateData.items = data.products;
+        if (data.items) updateData.items = data.items; // Doğrudan items key'i ile gelen güncellemeler
         if (data.total !== undefined) updateData.total = data.total;
         if (data.payment_method !== undefined) updateData.payment_method = data.payment_method;
         if (data.customer_id !== undefined) updateData.customer_id = data.customer_id;
