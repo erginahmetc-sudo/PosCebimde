@@ -177,35 +177,42 @@ export const AuthProvider = ({ children }) => {
 
     const checkAccess = (currentUser) => {
         if (!currentUser) return false;
-        if (currentUser.role === 'kurucu' || currentUser.username === 'admin') return true;
 
+        const role = (currentUser.role || '').toLowerCase();
+        const username = (currentUser.username || '').toLowerCase();
+
+        // 1. Yetkili Rol Kontrolü (Sadece Kurucu, Çalışan, admin ve superadmin)
+        const isAuthorized = role === 'kurucu' || role === 'calisan' || role === 'superadmin' || username === 'admin' || currentUser.is_superadmin === true;
+        if (!isAuthorized) return false;
+
+        // 2. Kurucu, admin ve superadmin için çalışma saati kısıtlaması yok
+        if (role === 'kurucu' || role === 'superadmin' || username === 'admin' || currentUser.is_superadmin === true) return true;
+
+        // 3. Çalışanlar (calisan) için Erişim Takvimi Kontrolü
         const schedule = currentUser.access_schedule;
 
-        // If no schedule is defined at all, allow access (default behavior)
+        // Eğer hiç takvim tanımlanmamışsa, varsayılan olarak erişime izin ver (Çalışan için)
         if (!schedule) return true;
 
-        // If schedule exists, check days and time
+        // Takvim varsa gün ve saat kontrolü yap
         const daysMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         const now = new Date();
         const currentDay = daysMap[now.getDay()];
         const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-        // Check Day
+        // Gün Kontrolü
         if (schedule.days && Array.isArray(schedule.days)) {
             if (!schedule.days.includes(currentDay)) {
-                return false; // Not allowed today
+                return false; // Bugün izin yok
             }
         } else {
-            // If days is not an array or undefined but schedule exists, assume no restrictions on days? 
-            // Or strict? Let's assume strict if schedule object exists but is malformed/empty days might mean "no access".
-            // Consistently with UsersPage defaults, empty days = no access.
             if (schedule.days && schedule.days.length === 0) return false;
         }
 
-        // Check Time
+        // Saat Kontrolü
         if (schedule.start_time && schedule.end_time) {
             if (currentTime < schedule.start_time || currentTime > schedule.end_time) {
-                return false; // Outside allowed hours
+                return false; // Çalışma saatleri dışında
             }
         }
 

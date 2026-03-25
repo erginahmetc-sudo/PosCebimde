@@ -1371,19 +1371,12 @@ export const invoicesAPI = {
         const companyCode = getCurrentCompanyCode();
         if (!companyCode) throw new Error("Şirket kodu bulunamadı.");
 
-        // Add company_code to each invoice ensuring data isolation
-        const securedInvoices = invoices.map(inv => ({
-            ...inv,
-            company_code: companyCode
-        }));
-
-        // Upsert based on UUID or invoice_number to avoid duplicates
+        // RPC ile upsert: SECURITY DEFINER fonksiyon RLS USING hatasını önler
         const { data, error } = await supabase
-            .from('invoices')
-            .upsert(securedInvoices, { onConflict: 'uuid' }) // UUID + Company Code typically
-            .select();
+            .rpc('upsert_invoices_batch', { p_invoices: invoices });
 
-        return response({ success: true, message: `${invoices.length} fatura senkronize edildi.`, data }, error);
+        if (error) throw error;
+        return { data: { success: data?.success, message: `${invoices.length} fatura senkronize edildi.` } };
     },
     updateStatus: async (id, status) => {
         const companyCode = getCurrentCompanyCode();
