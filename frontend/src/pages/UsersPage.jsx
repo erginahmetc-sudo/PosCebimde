@@ -627,94 +627,101 @@ export default function UsersPage() {
 
             {/* Logs Modal — sadece Kurucu görebilir */}
             {showLogsModal && selectedUser && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
-                    <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-2xl">
-                            <div>
-                                <h2 className="text-xl font-bold text-gray-800">📋 Kullanıcı İşlem Logları</h2>
-                                <p className="text-gray-500 text-sm mt-1">Kullanıcı: <strong>{selectedUser.username}</strong></p>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 z-[60]">
+                    <div className="bg-white rounded-xl w-full max-w-[98vw] h-[96vh] flex flex-col shadow-2xl">
+
+                        {/* Başlık */}
+                        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50 rounded-t-xl shrink-0">
+                            <div className="flex items-center gap-3">
+                                <span className="text-lg">📋</span>
+                                <div>
+                                    <h2 className="text-base font-bold text-gray-900 leading-tight">Kullanıcı İşlem Logları</h2>
+                                    <p className="text-xs text-gray-500">Kullanıcı: <strong className="text-gray-700">{selectedUser.username}</strong> — {userLogs.length} kayıt</p>
+                                </div>
                             </div>
-                            <button onClick={() => setShowLogsModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 transition-colors">✕</button>
+                            <button onClick={() => setShowLogsModal(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-200 text-gray-500 transition-colors text-sm font-bold">✕</button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                        {/* Kolon başlıkları */}
+                        <div className="grid grid-cols-[90px_90px_1fr_auto] gap-x-2 px-3 py-1.5 bg-gray-100 border-b border-gray-200 shrink-0">
+                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">İşlem</span>
+                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Modül</span>
+                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Detay</span>
+                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Tarih / Saat</span>
+                        </div>
+
+                        {/* Log listesi */}
+                        <div className="flex-1 overflow-y-auto">
                             {loadingLogs ? (
-                                <div className="flex flex-col items-center justify-center py-12 gap-3">
-                                    <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
-                                    <p className="text-gray-500 font-medium">Loglar yükleniyor...</p>
+                                <div className="flex flex-col items-center justify-center h-full gap-3">
+                                    <div className="w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
+                                    <p className="text-gray-500 text-sm">Loglar yükleniyor...</p>
                                 </div>
                             ) : userLogs.length === 0 ? (
-                                <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                                    <p className="text-4xl mb-3">📭</p>
-                                    <p className="text-gray-400">Bu kullanıcıya ait henüz bir kayıt bulunamadı.</p>
+                                <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-400">
+                                    <p className="text-3xl">📭</p>
+                                    <p className="text-sm">Henüz kayıt yok.</p>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
-                                    {userLogs.map((log) => (
-                                        <div key={log.id} className="p-4 bg-white border border-gray-100 rounded-xl hover:border-blue-200 transition-all hover:shadow-md group">
-                                            <div className="flex items-start justify-between gap-4">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                                            log.action_type === 'DELETE' ? 'bg-red-100 text-red-600' :
-                                                            log.action_type === 'UPDATE' ? 'bg-amber-100 text-amber-600' :
-                                                            log.action_type === 'CREATE' ? 'bg-green-100 text-green-600' :
-                                                            'bg-blue-100 text-blue-600'
-                                                        }`}>{log.action_type}</span>
-                                                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{log.module}</span>
+                                <div className="divide-y divide-gray-100">
+                                    {userLogs.map((log, idx) => (
+                                        <div key={log.id} className={`grid grid-cols-[90px_90px_1fr_auto] gap-x-2 px-3 py-1.5 items-start hover:bg-blue-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+
+                                            {/* İşlem tipi */}
+                                            <div className="pt-0.5">
+                                                <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wide ${
+                                                    log.action_type === 'DELETE' ? 'bg-red-100 text-red-700' :
+                                                    log.action_type === 'UPDATE' ? 'bg-amber-100 text-amber-700' :
+                                                    log.action_type === 'CREATE' ? 'bg-green-100 text-green-700' :
+                                                    'bg-blue-100 text-blue-700'
+                                                }`}>{log.action_type}</span>
+                                            </div>
+
+                                            {/* Modül */}
+                                            <div className="pt-0.5">
+                                                <span className="text-[10px] font-bold text-gray-500 uppercase">{log.module}</span>
+                                            </div>
+
+                                            {/* Detay */}
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-semibold text-gray-800 leading-snug truncate">
+                                                    {log.details?.title || log.details?.message || `${log.module} işlemi`}
+                                                </p>
+                                                {log.details?.message && log.details?.title && (
+                                                    <p className="text-[10px] text-gray-500 truncate">{log.details.message}</p>
+                                                )}
+                                                {/* Eski → Yeni değer */}
+                                                {(log.details?.old_value !== undefined || log.details?.change) && (
+                                                    <div className="flex items-center gap-1 mt-0.5">
+                                                        <span className="text-[10px] text-red-500 line-through bg-red-50 px-1 rounded">{String(log.details.old_value ?? '').trim()}</span>
+                                                        <span className="text-[10px] text-gray-400">→</span>
+                                                        <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1 rounded">{String(log.details.new_value ?? '').trim()}</span>
                                                     </div>
-                                                    <p className="text-sm text-gray-700 font-medium">
-                                                        {log.details?.title || log.details?.message || `${log.module} işlemi yapıldı.`}
+                                                )}
+                                                {/* Ürün bazlı değişimler */}
+                                                {log.details?.detailed_changes && (
+                                                    <div className="flex flex-wrap gap-1 mt-0.5">
+                                                        {String(log.details.detailed_changes).split(' | ').map((ch, i) => (
+                                                            <span key={i} className="text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100 font-medium">{ch}</span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {/* Ürünler */}
+                                                {log.details?.items && (
+                                                    <p className="text-[10px] text-gray-500 mt-0.5 truncate">
+                                                        <span className="font-bold text-gray-400 uppercase mr-1 text-[9px]">Ürünler:</span>
+                                                        {log.details.items}
                                                     </p>
-                                                    {log.details?.message && log.details?.title && (
-                                                        <p className="text-xs text-gray-500 mt-0.5">{log.details.message}</p>
-                                                    )}
-                                                    {/* Fiyat/tutar değişimi */}
-                                                    {(log.details?.old_value !== undefined || log.details?.change) && (
-                                                        <div className="mt-2 text-xs grid grid-cols-2 gap-2 p-2 bg-gray-50 rounded-lg">
-                                                            <div className="text-gray-500">
-                                                                <span className="block font-bold text-gray-400 uppercase mb-0.5">Eski</span>
-                                                                <span className="text-red-500 bg-red-50 px-1 rounded line-through">{String(log.details.old_value ?? log.details.change?.split('→')[0] ?? '')}</span>
-                                                            </div>
-                                                            <div className="text-gray-500 border-l border-gray-200 pl-2">
-                                                                <span className="block font-bold text-gray-400 uppercase mb-0.5">Yeni</span>
-                                                                <span className="text-green-600 bg-green-50 px-1 rounded font-bold">{String(log.details.new_value ?? log.details.change?.split('→')[1] ?? '')}</span>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {/* Ürün bazlı detay değişimleri */}
-                                                    {log.details?.detailed_changes && (
-                                                        <div className="flex flex-wrap gap-1.5 mt-1">
-                                                            {String(log.details.detailed_changes).split(' | ').map((ch, idx) => (
-                                                                <div key={idx} className="text-[10px] bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-100 font-medium flex items-center gap-1">
-                                                                    <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
-                                                                    {ch}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                    {/* Ürün listesi */}
-                                                    {log.details?.items && (
-                                                        <div className="text-[11px] bg-gray-50 p-2 rounded-lg border border-gray-200 mt-1.5 text-gray-600">
-                                                            <span className="font-bold text-gray-400 uppercase text-[9px] block mb-0.5">Ürünler</span>
-                                                            {log.details.items}
-                                                        </div>
-                                                    )}
-                                                    {/* Diğer detaylar */}
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                                                        {Object.entries(log.details || {})
-                                                            .filter(([key]) => !['title', 'message', 'change', 'items', 'sale_code', 'detailed_changes', 'old_value', 'new_value'].includes(key))
-                                                            .map(([key, value]) => (
-                                                                <div key={key} className="text-[11px] bg-slate-50/50 p-1.5 rounded-lg border border-gray-100 flex items-center gap-2">
-                                                                    <span className="text-gray-400 font-bold uppercase min-w-[75px] text-[9px] tracking-tighter">{key.replace(/_/g, ' ')}:</span>
-                                                                    <span className="text-gray-600 truncate">{String(value)}</span>
-                                                                </div>
-                                                            ))}
-                                                    </div>
-                                                </div>
-                                                <div className="text-right whitespace-nowrap">
-                                                    <p className="text-xs text-gray-400 group-hover:text-gray-600 font-medium">{formatDate(log.created_at)}</p>
-                                                </div>
+                                                )}
+                                                {/* Satış kodu */}
+                                                {log.details?.sale_code && (
+                                                    <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono mt-0.5 inline-block">{log.details.sale_code}</span>
+                                                )}
+                                            </div>
+
+                                            {/* Tarih / Saat */}
+                                            <div className="text-right whitespace-nowrap pt-0.5 shrink-0">
+                                                <p className="text-[11px] font-black text-black leading-snug">{formatDate(log.created_at)}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -722,8 +729,10 @@ export default function UsersPage() {
                             )}
                         </div>
 
-                        <div className="p-4 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl">
-                            <button onClick={() => setShowLogsModal(false)} className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-100 transition-colors font-medium shadow-sm">Kapat</button>
+                        {/* Alt buton */}
+                        <div className="px-4 py-2 border-t border-gray-200 bg-gray-50 rounded-b-xl shrink-0 flex justify-between items-center">
+                            <span className="text-xs text-gray-400">{userLogs.length} log kaydı</span>
+                            <button onClick={() => setShowLogsModal(false)} className="px-5 py-1.5 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-semibold">Kapat</button>
                         </div>
                     </div>
                 </div>
