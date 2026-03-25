@@ -692,6 +692,45 @@ export const customersAPI = {
         if (updateError) throw updateError;
         return { data: { success: true, message: 'Fatura iptali cariye işlendi.' } };
     },
+    getManualPurchaseInvoices: async () => {
+        const { data, error } = await supabase
+            .from('customer_payments')
+            .select('id, customer_id, amount, description, created_at, customers(name, customer_code)')
+            .eq('payment_type', 'Fatura (Alış)')
+            .ilike('description', '%"source":"manuel"%')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return { data };
+    },
+    deleteManualPurchaseInvoice: async (payment) => {
+        // Deletes a manual purchase invoice: restores customer balance + deletes the record
+        const { id, customer_id, amount } = payment;
+
+        const { data: customer, error: fetchError } = await supabase
+            .from('customers')
+            .select('balance')
+            .eq('id', customer_id)
+            .single();
+        if (fetchError) throw fetchError;
+
+        const currentBalance = parseFloat(customer?.balance) || 0;
+        const txAmount = parseFloat(amount) || 0;
+        const newBalance = currentBalance + txAmount; // Restore balance (purchase had subtracted it)
+
+        const { error: updateError } = await supabase
+            .from('customers')
+            .update({ balance: newBalance, last_transaction_date: new Date().toISOString() })
+            .eq('id', customer_id);
+        if (updateError) throw updateError;
+
+        const { error: deleteError } = await supabase
+            .from('customer_payments')
+            .delete()
+            .eq('id', id);
+        if (deleteError) throw deleteError;
+
+        return { data: { success: true } };
+    },
     deletePayment: async (id, customerId, amount) => {
         // 1. Delete payment record
         const { error: deleteError } = await supabase

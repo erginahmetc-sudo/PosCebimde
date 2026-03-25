@@ -25,6 +25,14 @@ export default function ManualPurchaseInvoicePage() {
     const [showCustomerSearch, setShowCustomerSearch] = useState(false);
     const [showProductSearch, setShowProductSearch] = useState(false);
 
+    // Past Invoices State
+    const [showPastInvoices, setShowPastInvoices] = useState(false);
+    const [pastInvoices, setPastInvoices] = useState([]);
+    const [loadingPastInvoices, setLoadingPastInvoices] = useState(false);
+    const [selectedPastInvoice, setSelectedPastInvoice] = useState(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+    const [deletingId, setDeletingId] = useState(null);
+
     // Fetch Products
     useEffect(() => {
         const fetchProducts = async () => {
@@ -41,6 +49,66 @@ export default function ManualPurchaseInvoicePage() {
         };
         fetchProducts();
     }, []);
+
+    // Fetch Past Invoices
+    const fetchPastInvoices = async () => {
+        setLoadingPastInvoices(true);
+        try {
+            const res = await customersAPI.getManualPurchaseInvoices();
+            setPastInvoices(res.data || []);
+        } catch (error) {
+            console.error('Error loading past invoices:', error);
+        } finally {
+            setLoadingPastInvoices(false);
+        }
+    };
+
+    const handleOpenPastInvoices = () => {
+        setShowPastInvoices(true);
+        fetchPastInvoices();
+    };
+
+    // Delete past invoice
+    const handleDeleteInvoice = async (invoice) => {
+        setDeletingId(invoice.id);
+        try {
+            // 1. Parse items from description to reverse stock
+            let invoiceData = null;
+            try { invoiceData = JSON.parse(invoice.description); } catch { /* ignore */ }
+            const invoiceItems = invoiceData?.items || [];
+
+            // 2. Reverse stock for each item
+            for (const item of invoiceItems) {
+                if (item.stockCode && item.quantity) {
+                    try {
+                        const stockRes = await productsAPI.getByStockCode(item.stockCode);
+                        if (stockRes.data) {
+                            const currentStock = parseFloat(stockRes.data.stock) || 0;
+                            const newStock = Math.max(0, currentStock - parseFloat(item.quantity));
+                            await productsAPI.updateStock(item.stockCode, { stock: newStock });
+                        }
+                    } catch (err) {
+                        console.error(`Stock reversal error for ${item.stockCode}:`, err);
+                    }
+                }
+            }
+
+            // 3. Restore customer balance + delete record
+            await customersAPI.deleteManualPurchaseInvoice({
+                id: invoice.id,
+                customer_id: invoice.customer_id,
+                amount: invoice.amount,
+            });
+
+            setPastInvoices(prev => prev.filter(inv => inv.id !== invoice.id));
+            setConfirmDeleteId(null);
+        } catch (error) {
+            console.error('Delete invoice error:', error);
+            alert('Fatura silinirken bir hata oluştu: ' + (error.message || 'Bilinmeyen hata'));
+        } finally {
+            setDeletingId(null);
+        }
+    };
 
     // Add product from modal
     const addProductFromModal = (product) => {
@@ -105,6 +173,7 @@ export default function ManualPurchaseInvoicePage() {
                 customer_id: supplier.customerId,
                 amount: totals.grandTotal,
                 description: JSON.stringify({
+                    source: 'manuel',
                     summary: `Alış Faturası - ${invoiceDetails.serialNo || 'Seri No Yok'} - ${items.length} kalem`,
                     supplier: { name: supplier.name, taxOffice: supplier.taxOffice, taxNo: supplier.taxNo, email: supplier.email, phone: supplier.phone, customerCode: supplier.customerCode, customerId: supplier.customerId },
                     invoiceDetails,
@@ -113,7 +182,24 @@ export default function ManualPurchaseInvoicePage() {
                     totals,
                 }),
             });
-            alert('Fatura başarıyla kaydedildi ve bakiyeye alacak olarak işlendi.');
+
+            // Increase stock for each item
+            for (const item of items) {
+                if (item.stockCode && item.quantity) {
+                    try {
+                        const stockRes = await productsAPI.getByStockCode(item.stockCode);
+                        if (stockRes.data) {
+                            const currentStock = parseFloat(stockRes.data.stock) || 0;
+                            const newStock = currentStock + parseFloat(item.quantity);
+                            await productsAPI.updateStock(item.stockCode, { stock: newStock });
+                        }
+                    } catch (err) {
+                        console.error(`Stock update error for ${item.stockCode}:`, err);
+                    }
+                }
+            }
+
+            alert('Fatura başarıyla kaydedildi, stoklar güncellendi ve bakiyeye işlendi.');
             // Reset form
             setSupplier({ name: '', taxOffice: '', taxNo: '', email: '', phone: '', customerCode: '', customerId: null });
             setInvoiceDetails({ serialNo: '', date: new Date().toISOString().split('T')[0], dueDate: new Date().toISOString().split('T')[0], isEInvoice: false });
@@ -142,8 +228,12 @@ export default function ManualPurchaseInvoicePage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <button onClick={() => window.print()} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors border border-slate-200 bg-white" title="Yazdır">
-                        <span className="material-symbols-outlined">print</span>
+                    <button
+                        onClick={handleOpenPastInvoices}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+                    >
+                        <span className="material-symbols-outlined text-base">history</span>
+                        Daha Önce Kesilen Manuel Faturalar
                     </button>
                 </div>
             </div>
@@ -421,6 +511,323 @@ export default function ManualPurchaseInvoicePage() {
                     onSelect={addProductFromModal}
                 />
             )}
+
+            {/* Past Invoices List Modal */}
+            {showPastInvoices && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
+                            <div>
+                                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined">history</span>
+                                    Daha Önce Kesilen Manuel Faturalar
+                                </h2>
+                                <p className="text-indigo-200 text-sm mt-0.5">
+                                    Toplam {pastInvoices.length} fatura
+                                </p>
+                            </div>
+                            <button onClick={() => { setShowPastInvoices(false); setConfirmDeleteId(null); }} className="text-white/70 hover:text-white transition-colors">
+                                <span className="material-symbols-outlined text-2xl">close</span>
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {loadingPastInvoices ? (
+                                <div className="flex items-center justify-center py-16">
+                                    <span className="material-symbols-outlined animate-spin text-4xl text-indigo-400">progress_activity</span>
+                                </div>
+                            ) : pastInvoices.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-16 text-center">
+                                    <span className="material-symbols-outlined text-5xl text-slate-300 mb-3">receipt_long</span>
+                                    <p className="text-slate-500 font-medium">Henüz manuel fatura kaydedilmemiş</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {pastInvoices.map((inv) => {
+                                        let invData = null;
+                                        try { invData = JSON.parse(inv.description); } catch { /* ignore */ }
+                                        const serialNo = invData?.invoiceDetails?.serialNo || '-';
+                                        const invDate = invData?.invoiceDetails?.date || inv.created_at;
+                                        const customerName = inv.customers?.name || invData?.supplier?.name || '-';
+                                        const customerCode = inv.customers?.customer_code || invData?.supplier?.customerCode || '';
+                                        const itemCount = invData?.items?.length || 0;
+                                        const isConfirmingDelete = confirmDeleteId === inv.id;
+                                        const isDeleting = deletingId === inv.id;
+
+                                        return (
+                                            <div key={inv.id} className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors group">
+                                                {/* Icon */}
+                                                <div className="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-indigo-600 text-lg">receipt_long</span>
+                                                </div>
+
+                                                {/* Info */}
+                                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedPastInvoice(inv)}>
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-semibold text-slate-900 text-sm truncate">{customerName}</span>
+                                                        {customerCode && (
+                                                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold font-mono rounded border border-blue-200">{customerCode}</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-500 flex-wrap">
+                                                        {serialNo !== '-' && (
+                                                            <span className="font-mono font-medium text-slate-600">{serialNo}</span>
+                                                        )}
+                                                        <span>{new Date(invDate).toLocaleDateString('tr-TR')}</span>
+                                                        <span>{itemCount} kalem</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Amount */}
+                                                <div className="flex-shrink-0 text-right cursor-pointer" onClick={() => setSelectedPastInvoice(inv)}>
+                                                    <div className="font-bold text-slate-800 text-sm">{formatCurrency(inv.amount)} TL</div>
+                                                    <div className="text-[10px] text-slate-400">{new Date(inv.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</div>
+                                                </div>
+
+                                                {/* Delete */}
+                                                <div className="flex-shrink-0 flex items-center gap-1">
+                                                    {isConfirmingDelete ? (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleDeleteInvoice(inv)}
+                                                                disabled={isDeleting}
+                                                                className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-1"
+                                                            >
+                                                                {isDeleting ? <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-xs">delete</span>}
+                                                                Sil
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setConfirmDeleteId(null)}
+                                                                className="px-2 py-1 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-300 transition-colors"
+                                                            >
+                                                                Vazgeç
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => setConfirmDeleteId(inv.id)}
+                                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                            title="Faturayı Sil"
+                                                        >
+                                                            <span className="material-symbols-outlined text-base">delete_outline</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="border-t border-slate-200 px-6 py-3 bg-slate-50 flex items-center justify-end flex-shrink-0">
+                            <button
+                                onClick={() => { setShowPastInvoices(false); setConfirmDeleteId(null); }}
+                                className="px-6 py-2 text-white bg-indigo-600 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20 text-sm flex items-center gap-1.5"
+                            >
+                                <span className="material-symbols-outlined text-base">close</span>
+                                Kapat
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Invoice Detail Modal (same as CustomerDetailPage Alış Faturası) */}
+            {selectedPastInvoice && (() => {
+                let invoiceData = null;
+                try { invoiceData = JSON.parse(selectedPastInvoice.description); } catch { /* not JSON */ }
+
+                const invItems = invoiceData?.items || [];
+                const supplierInfo = invoiceData?.supplier || {};
+                const invDetails = invoiceData?.invoiceDetails || {};
+
+                const calcLineTotal = (item) => {
+                    let p = (item.quantity || 0) * (item.price || 0);
+                    if (item.disc1) p -= p * (item.disc1 / 100);
+                    if (item.disc2) p -= p * (item.disc2 / 100);
+                    if (item.disc3) p -= p * (item.disc3 / 100);
+                    if (item.disc4) p -= p * (item.disc4 / 100);
+                    return p + p * ((item.vatRate || 0) / 100);
+                };
+
+                const subTotal = invItems.reduce((sum, it) => {
+                    let p = (it.quantity || 0) * (it.price || 0);
+                    if (it.disc1) p -= p * (it.disc1 / 100);
+                    if (it.disc2) p -= p * (it.disc2 / 100);
+                    if (it.disc3) p -= p * (it.disc3 / 100);
+                    if (it.disc4) p -= p * (it.disc4 / 100);
+                    return sum + p;
+                }, 0);
+                const vatTotal = invItems.reduce((sum, it) => {
+                    let p = (it.quantity || 0) * (it.price || 0);
+                    if (it.disc1) p -= p * (it.disc1 / 100);
+                    if (it.disc2) p -= p * (it.disc2 / 100);
+                    if (it.disc3) p -= p * (it.disc3 / 100);
+                    if (it.disc4) p -= p * (it.disc4 / 100);
+                    return sum + p * ((it.vatRate || 0) / 100);
+                }, 0);
+                const grandTotal = invoiceData?.totals?.grandTotal || (subTotal + vatTotal);
+                const customerName = selectedPastInvoice.customers?.name || supplierInfo.name || '-';
+
+                return (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+                            {/* Header */}
+                            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
+                                <div>
+                                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                        <span className="material-symbols-outlined">receipt_long</span>
+                                        Alış Faturası Detayları
+                                        <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-lg text-xs font-medium">Salt Okunur</span>
+                                    </h2>
+                                    <p className="text-indigo-200 text-sm mt-0.5">
+                                        {customerName} • {new Date(selectedPastInvoice.created_at).toLocaleDateString('tr-TR')}
+                                    </p>
+                                </div>
+                                <button onClick={() => setSelectedPastInvoice(null)} className="text-white/70 hover:text-white transition-colors">
+                                    <span className="material-symbols-outlined text-2xl">close</span>
+                                </button>
+                            </div>
+
+                            {/* Scrollable Content */}
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                {!invoiceData ? (
+                                    <div className="space-y-4">
+                                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                                            <p className="text-amber-700 text-sm font-medium flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-lg">info</span>
+                                                Bu fatura eski formatta kaydedilmiş. Detaylı ürün bilgisi mevcut değil.
+                                            </p>
+                                        </div>
+                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                            <p className="text-xs text-slate-500 font-medium mb-1">Tutar</p>
+                                            <p className="text-2xl font-bold text-slate-800">{formatCurrency(selectedPastInvoice.amount)} TL</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Supplier & Invoice Info */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
+                                                    <span className="material-symbols-outlined text-sm">business</span>
+                                                    Tedarikçi Bilgileri
+                                                </h3>
+                                                <div className="space-y-1.5 text-sm">
+                                                    <div className="flex justify-between"><span className="text-slate-500">Firma:</span><span className="font-medium text-slate-800">{supplierInfo.name || '-'}</span></div>
+                                                    <div className="flex justify-between"><span className="text-slate-500">Vergi D.:</span><span className="font-medium text-slate-800">{supplierInfo.taxOffice || '-'}</span></div>
+                                                    <div className="flex justify-between"><span className="text-slate-500">Vergi No:</span><span className="font-medium text-slate-800">{supplierInfo.taxNo || '-'}</span></div>
+                                                </div>
+                                            </div>
+                                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
+                                                    <span className="material-symbols-outlined text-sm">description</span>
+                                                    Fatura Bilgileri
+                                                </h3>
+                                                <div className="space-y-1.5 text-sm">
+                                                    <div className="flex justify-between"><span className="text-slate-500">Seri No:</span><span className="font-medium text-slate-800">{invDetails.serialNo || '-'}</span></div>
+                                                    <div className="flex justify-between"><span className="text-slate-500">Tarih:</span><span className="font-medium text-slate-800">{invDetails.date ? new Date(invDetails.date).toLocaleDateString('tr-TR') : '-'}</span></div>
+                                                    {invDetails.dueDate && (
+                                                        <div className="flex justify-between"><span className="text-slate-500">Vade:</span><span className="font-medium text-slate-800">{new Date(invDetails.dueDate).toLocaleDateString('tr-TR')}</span></div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Products Table */}
+                                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                            <div className="p-3 border-b border-slate-200 bg-slate-50/50">
+                                                <h3 className="font-semibold flex items-center gap-2 text-slate-900 text-sm">
+                                                    <span className="material-symbols-outlined text-slate-400 text-lg">inventory_2</span>
+                                                    Ürün Kalemleri ({invItems.length})
+                                                </h3>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left border-collapse">
+                                                    <thead>
+                                                        <tr className="bg-slate-50 text-[10px] uppercase tracking-wider font-bold text-slate-500">
+                                                            <th className="px-2 py-2 border-b border-slate-200 w-8 text-center">#</th>
+                                                            <th className="px-2 py-2 border-b border-slate-200 w-24 text-left">Stok Kodu</th>
+                                                            <th className="px-2 py-2 border-b border-slate-200 text-left">Ürün Adı</th>
+                                                            <th className="px-2 py-2 border-b border-slate-200 text-center w-14">Miktar</th>
+                                                            <th className="px-2 py-2 border-b border-slate-200 text-right w-20">B. Fiyat</th>
+                                                            <th className="px-2 py-2 border-b border-slate-200 text-center w-14">KDV%</th>
+                                                            <th className="px-2 py-2 border-b border-slate-200 text-right w-24">Toplam</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-200">
+                                                        {invItems.map((item, index) => (
+                                                            <tr key={index} className="hover:bg-slate-50 transition-colors">
+                                                                <td className="px-2 py-2 text-xs text-slate-400 text-center">{index + 1}</td>
+                                                                <td className="px-2 py-2 text-xs font-mono font-medium text-slate-600">{item.stockCode || '-'}</td>
+                                                                <td className="px-2 py-2 text-xs font-semibold text-slate-900">{item.name || '-'}</td>
+                                                                <td className="px-2 py-2 text-xs text-center font-medium text-slate-800">{item.quantity}</td>
+                                                                <td className="px-2 py-2 text-xs text-right font-medium text-slate-800">{formatCurrency(item.price)}</td>
+                                                                <td className="px-2 py-2 text-xs text-center text-slate-600">%{item.vatRate || 0}</td>
+                                                                <td className="px-2 py-2 text-xs text-right font-bold text-slate-700">{formatCurrency(calcLineTotal(item))} TL</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                                {invItems.length === 0 && (
+                                                    <div className="p-8 text-center">
+                                                        <p className="text-slate-500 text-sm">Ürün kalemi bulunamadı</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Note & Totals */}
+                                        {(invoiceData.note || invItems.length > 0) && (
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div className="md:col-span-2">
+                                                    {invoiceData.note && (
+                                                        <>
+                                                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Fatura Notu</label>
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700">{invoiceData.note}</div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                <div className="bg-gradient-to-br from-slate-50 to-indigo-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                                                    <div className="flex justify-between items-center text-sm">
+                                                        <span className="text-slate-500">Ara Toplam</span>
+                                                        <span className="font-semibold text-slate-900">{formatCurrency(subTotal)} TL</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-sm">
+                                                        <span className="text-slate-500">KDV Toplamı</span>
+                                                        <span className="font-semibold text-slate-900">{formatCurrency(vatTotal)} TL</span>
+                                                    </div>
+                                                    <div className="pt-2 border-t border-slate-300">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-xs font-bold uppercase tracking-widest text-indigo-600">Genel Toplam</span>
+                                                            <span className="text-xl font-extrabold text-slate-900">{formatCurrency(grandTotal)} TL</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="border-t border-slate-200 px-6 py-4 bg-slate-50 flex items-center justify-end flex-shrink-0">
+                                <button
+                                    onClick={() => setSelectedPastInvoice(null)}
+                                    className="px-6 py-2.5 text-white bg-indigo-600 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20 text-sm flex items-center gap-1.5"
+                                >
+                                    <span className="material-symbols-outlined text-base">close</span>
+                                    Kapat
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }
