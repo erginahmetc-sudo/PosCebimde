@@ -690,7 +690,9 @@ export default function InvoicesPage() {
                     const newStock = (product.stock || 0) + line.quantity;
                     // Also potentially update buying price? User didn't explicitly ask but it's common.
                     // For now just stock.
-                    await productsAPI.updateStock(product.stock_code, { stock: newStock, buying_price: line.unit_price });
+                    // Store buying_price KDV-dahil
+                    const buyingPriceIncVat = line.unit_price * (1 + ((line.vat_rate || 0) / 100));
+                    await productsAPI.updateStock(product.stock_code, { stock: newStock, buying_price: buyingPriceIncVat });
                 }
             }
 
@@ -1181,8 +1183,8 @@ export default function InvoicesPage() {
 
             {/* Detail Modal Redesign (Ultra Premium Glassmorphism) */}
             {showDetailModal && selectedInvoice && (
-                <div className="fixed inset-0 bg-gradient-to-br from-slate-900/90 via-indigo-900/80 to-purple-900/90 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
-                    <div className="bg-white/95 backdrop-blur-xl rounded-none shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden ring-1 ring-white/20 relative">
+                <div className="fixed inset-0 bg-gradient-to-br from-slate-900/90 via-indigo-900/80 to-purple-900/90 backdrop-blur-md flex items-center justify-center p-1 z-50 animate-in fade-in duration-300">
+                    <div className="bg-white/95 backdrop-blur-xl rounded-none shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] w-full max-w-[98vw] max-h-[98vh] flex flex-col overflow-hidden ring-1 ring-white/20 relative">
 
                         {/* Decorative Glows */}
                         <div className="absolute -top-20 -right-20 w-60 h-60 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
@@ -1285,30 +1287,32 @@ export default function InvoicesPage() {
                                     <table className="w-full">
                                         <thead className="bg-gradient-to-r from-slate-800 to-indigo-900 text-white font-bold text-xs uppercase tracking-wide">
                                             <tr>
-                                                <th className="px-4 py-4 text-center w-12">#</th>
-                                                <th className="px-4 py-4 text-left min-w-[200px]">Ürün / Hizmet</th>
-                                                <th className="px-4 py-4 text-center w-20">Miktar</th>
-                                                <th className="px-4 py-4 text-right w-40">Birim Fiyat<br /><span className="text-[10px] text-indigo-300 font-normal">(KDV Dahil)</span></th>
-                                                <th className="px-4 py-4 text-center w-16">İsk.%</th>
-                                                <th className="px-4 py-4 text-center w-16">KDV%</th>
-                                                <th className="px-4 py-4 text-right w-40">Net Tutar<br /><span className="text-[10px] text-indigo-300 font-normal">(KDV Dahil)</span></th>
-                                                <th className="px-4 py-4 text-center w-24">Durum</th>
-                                                <th className="px-4 py-4 text-center w-32">Eşleştirme</th>
+                                                <th className="px-3 py-2.5 text-center w-10">#</th>
+                                                <th className="px-3 py-2.5 text-left min-w-[200px]">Ürün / Hizmet</th>
+                                                <th className="px-3 py-2.5 text-center w-16">Miktar</th>
+                                                <th className="px-3 py-2.5 text-right w-44">Birim Fiyat<br /><span className="text-[10px] text-indigo-300 font-normal">(KDV Dahil)</span></th>
+                                                <th className="px-3 py-2.5 text-center w-14">İsk.%</th>
+                                                <th className="px-3 py-2.5 text-center w-14">KDV%</th>
+                                                <th className="px-3 py-2.5 text-right w-36">Net Tutar<br /><span className="text-[10px] text-indigo-300 font-normal">(KDV Dahil)</span></th>
+                                                <th className="px-3 py-2.5 text-center w-20">Durum</th>
+                                                <th className="px-3 py-2.5 text-center w-28">Eşleştirme</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
                                             {invoiceDetail.lines.map((item, index) => {
                                                 const isMatched = !!productMatches[index];
                                                 const matchedProduct = products.find(p => p.id == productMatches[index]);
+                                                const unitPriceIncVat = item.unit_price * (1 + (item.vat_rate || 0) / 100);
+                                                const lineNetIncVat = item.line_net * (1 + (item.vat_rate || 0) / 100);
 
                                                 return (
                                                     <tr key={index} className={`hover:bg-indigo-50/50 transition-all duration-200 group ${isMatched ? 'bg-emerald-50/50 hover:bg-emerald-50/70' : ''}`}>
-                                                        <td className="px-4 py-3 text-center">
+                                                        <td className="px-3 py-2 text-center">
                                                             <span className="text-gray-400 font-bold text-sm">{index + 1}</span>
                                                         </td>
-                                                        <td className="px-4 py-3">
+                                                        <td className="px-3 py-2">
                                                             <div className="font-semibold text-gray-900 text-sm">{item.name}</div>
-                                                            <div className="flex items-center gap-2 mt-1">
+                                                            <div className="flex items-center gap-2 mt-0.5">
                                                                 {matchedProduct ? (
                                                                     <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
                                                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
@@ -1319,46 +1323,46 @@ export default function InvoicesPage() {
                                                                 )}
                                                             </div>
                                                         </td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            <span className="font-bold text-gray-800 text-sm bg-indigo-100 px-3 py-1 rounded-lg">{item.quantity}</span>
+                                                        <td className="px-3 py-2 text-center">
+                                                            <span className="font-bold text-gray-800 text-sm bg-indigo-100 px-2 py-0.5 rounded-lg">{item.quantity}</span>
                                                         </td>
-                                                        <td className="px-4 py-3 text-right">
-                                                            <span className="font-mono text-gray-700 text-sm font-semibold">₺{item.unit_price.toFixed(2)}</span>
+                                                        <td className="px-3 py-2 text-right">
+                                                            <span className="font-mono text-gray-700 text-sm font-semibold">₺{unitPriceIncVat.toFixed(2)}</span>
                                                             {matchedProduct && matchedProduct.buying_price != null && matchedProduct.buying_price > 0 && (() => {
                                                                 const prev = parseFloat(matchedProduct.buying_price);
-                                                                const curr = parseFloat(item.unit_price);
+                                                                const curr = unitPriceIncVat;
                                                                 const diff = curr - prev;
                                                                 const isUp = diff > 0.001;
                                                                 const isDown = diff < -0.001;
                                                                 return (
                                                                     <div className="mt-1 text-right">
-                                                                        <span className="text-[9px] text-slate-400 block leading-none">Son Alış Fiyatı (KDV dahil)</span>
-                                                                        <span className={`text-[11px] font-bold font-mono leading-tight block ${isUp ? 'text-red-600' : isDown ? 'text-emerald-600' : 'text-slate-500'}`}>
+                                                                        <span className="text-[13px] text-slate-400 block leading-snug">Son Alış (KDV dahil)</span>
+                                                                        <span className={`text-[16px] font-bold font-mono leading-tight block ${isUp ? 'text-red-600' : isDown ? 'text-emerald-600' : 'text-slate-500'}`}>
                                                                             ₺{prev.toFixed(2)}
-                                                                            {isUp && <span className="ml-1 text-[9px]">▲ ZAM</span>}
-                                                                            {isDown && <span className="ml-1 text-[9px]">▼ İNDİRİM</span>}
+                                                                            {isUp && <span className="ml-1 text-[13px]">▲ ZAM</span>}
+                                                                            {isDown && <span className="ml-1 text-[13px]">▼ İNDİRİM</span>}
                                                                         </span>
                                                                     </div>
                                                                 );
                                                             })()}
                                                         </td>
-                                                        <td className="px-4 py-3 text-center">
+                                                        <td className="px-3 py-2 text-center">
                                                             {item.discount > 0 ? (
                                                                 <span className="text-red-600 font-bold text-xs bg-red-100 px-2 py-0.5 rounded">%{((item.discount / (item.quantity * item.unit_price)) * 100).toFixed(0)}</span>
                                                             ) : <span className="text-gray-400 text-sm">-</span>}
                                                         </td>
-                                                        <td className="px-4 py-3 text-center">
+                                                        <td className="px-3 py-2 text-center">
                                                             <span className="font-bold text-indigo-700 text-xs bg-indigo-100 px-2 py-0.5 rounded">%{item.vat_rate}</span>
                                                         </td>
-                                                        <td className="px-4 py-3 text-right">
-                                                            <span className="font-bold text-gray-900 text-sm">₺{item.line_net.toFixed(2)}</span>
+                                                        <td className="px-3 py-2 text-right">
+                                                            <span className="font-bold text-gray-900 text-sm">₺{lineNetIncVat.toFixed(2)}</span>
                                                         </td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border border-amber-200">
+                                                        <td className="px-3 py-2 text-center">
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border border-amber-200">
                                                                 ⏳ Bekliyor
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3 text-center">
+                                                        <td className="px-3 py-2 text-center">
                                                             <div className="flex justify-center">
                                                                 {isMatched ? (
                                                                     <button
@@ -1366,7 +1370,7 @@ export default function InvoicesPage() {
                                                                             setMatchModalData({ index, line: item });
                                                                             setMatchModalOpen(true);
                                                                         }}
-                                                                        className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg hover:from-emerald-600 hover:to-green-700 shadow-md transition-all text-xs font-bold"
+                                                                        className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg hover:from-emerald-600 hover:to-green-700 shadow-md transition-all text-xs font-bold"
                                                                     >
                                                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                                                                         Değiştir
@@ -1377,7 +1381,7 @@ export default function InvoicesPage() {
                                                                             setMatchModalData({ index, line: item });
                                                                             setMatchModalOpen(true);
                                                                         }}
-                                                                        className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 shadow-md transition-all text-xs font-bold"
+                                                                        className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 shadow-md transition-all text-xs font-bold"
                                                                     >
                                                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                                                                         Eşleştir
