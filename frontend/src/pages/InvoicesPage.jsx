@@ -1312,7 +1312,7 @@ export default function InvoicesPage() {
                                                                 {matchedProduct ? (
                                                                     <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
                                                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                                                                        {matchedProduct.stock_code}
+                                                                        {matchedProduct.name}
                                                                     </div>
                                                                 ) : (
                                                                     <span className="text-[10px] font-bold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">⚠ Eşleşmedi</span>
@@ -1324,6 +1324,23 @@ export default function InvoicesPage() {
                                                         </td>
                                                         <td className="px-4 py-3 text-right">
                                                             <span className="font-mono text-gray-700 text-sm font-semibold">₺{item.unit_price.toFixed(2)}</span>
+                                                            {matchedProduct && matchedProduct.buying_price != null && matchedProduct.buying_price > 0 && (() => {
+                                                                const prev = parseFloat(matchedProduct.buying_price);
+                                                                const curr = parseFloat(item.unit_price);
+                                                                const diff = curr - prev;
+                                                                const isUp = diff > 0.001;
+                                                                const isDown = diff < -0.001;
+                                                                return (
+                                                                    <div className="mt-1 text-right">
+                                                                        <span className="text-[9px] text-slate-400 block leading-none">Son Alış Fiyatı (KDV dahil)</span>
+                                                                        <span className={`text-[11px] font-bold font-mono leading-tight block ${isUp ? 'text-red-600' : isDown ? 'text-emerald-600' : 'text-slate-500'}`}>
+                                                                            ₺{prev.toFixed(2)}
+                                                                            {isUp && <span className="ml-1 text-[9px]">▲ ZAM</span>}
+                                                                            {isDown && <span className="ml-1 text-[9px]">▼ İNDİRİM</span>}
+                                                                        </span>
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </td>
                                                         <td className="px-4 py-3 text-center">
                                                             {item.discount > 0 ? (
