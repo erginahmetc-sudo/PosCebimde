@@ -385,6 +385,7 @@ export default function SalesPage() {
         });
         setQuoteProductSearch('');
         setEditingQuoteId(q.id);
+        setShowViewQuoteModal(false); // view modalı kapat, edit modal üstte açılsın
         setShowNewQuoteModal(true);
     };
 
@@ -433,13 +434,17 @@ export default function SalesPage() {
             };
             if (editingQuoteId) {
                 await priceQuotesAPI.update(editingQuoteId, payload);
-                // Refresh selectedQuote so view modal shows updated data
-                setSelectedQuote(prev => prev ? { ...prev, ...payload, items: quoteForm.items } : prev);
+                // Güncellenmiş veriyi view modalına taşı ve yeniden aç
+                const updatedQuote = { ...selectedQuote, ...payload, items: quoteForm.items };
+                setSelectedQuote(updatedQuote);
+                setShowNewQuoteModal(false);
+                setEditingQuoteId(null);
+                setShowViewQuoteModal(true); // view modalı güncellenen veriyle aç
             } else {
                 await priceQuotesAPI.create(payload);
+                setShowNewQuoteModal(false);
+                setEditingQuoteId(null);
             }
-            setShowNewQuoteModal(false);
-            setEditingQuoteId(null);
             loadQuotes();
         } catch (e) { alert('Kayıt hatası: ' + e.message); }
         finally { setQuoteSaving(false); }
