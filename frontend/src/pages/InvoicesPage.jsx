@@ -690,9 +690,8 @@ export default function InvoicesPage() {
                     const newStock = (product.stock || 0) + line.quantity;
                     // Also potentially update buying price? User didn't explicitly ask but it's common.
                     // For now just stock.
-                    // Store buying_price KDV-dahil
-                    const buyingPriceIncVat = line.unit_price * (1 + ((line.vat_rate || 0) / 100));
-                    await productsAPI.updateStock(product.stock_code, { stock: newStock, buying_price: buyingPriceIncVat });
+                    // buying_price KDV-hariç olarak saklanır (unit_price = LineExtensionAmount birim fiyatı)
+                    await productsAPI.updateStock(product.stock_code, { stock: newStock, buying_price: line.unit_price });
                 }
             }
 
@@ -1329,16 +1328,16 @@ export default function InvoicesPage() {
                                                         <td className="px-3 py-2 text-right">
                                                             <span className="font-mono text-gray-700 text-sm font-semibold">₺{unitPriceIncVat.toFixed(2)}</span>
                                                             {matchedProduct && matchedProduct.buying_price != null && matchedProduct.buying_price > 0 && (() => {
-                                                                const prev = parseFloat(matchedProduct.buying_price);
-                                                                const curr = unitPriceIncVat;
+                                                                const prev = parseFloat(matchedProduct.buying_price); // KDV-hariç
+                                                                const curr = parseFloat(item.unit_price);             // KDV-hariç (tutarlı karşılaştırma)
                                                                 const diff = curr - prev;
                                                                 const isUp = diff > 0.001;
                                                                 const isDown = diff < -0.001;
                                                                 return (
                                                                     <div className="mt-1 text-right">
-                                                                        <span className="text-[13px] text-slate-400 block leading-snug">Son Alış (KDV dahil)</span>
+                                                                        <span className="text-[13px] text-slate-400 block leading-snug">Son Alış (KDV Hariç)</span>
                                                                         <span className={`text-[16px] font-bold font-mono leading-tight block ${isUp ? 'text-red-600' : isDown ? 'text-emerald-600' : 'text-slate-500'}`}>
-                                                                            ₺{prev.toFixed(2)}
+                                                                            ₺{prev.toFixed(2)}<span className="text-[12px] font-normal ml-0.5">+KDV</span>
                                                                             {isUp && <span className="ml-1 text-[13px]">▲ ZAM</span>}
                                                                             {isDown && <span className="ml-1 text-[13px]">▼ İNDİRİM</span>}
                                                                         </span>
@@ -1393,10 +1392,22 @@ export default function InvoicesPage() {
                                                 );
                                             })}
                                         </tbody>
-                                        <tfoot className="bg-gray-50 border-t border-gray-200">
+                                        <tfoot className="bg-gray-50 border-t-2 border-gray-300">
                                             <tr>
-                                                <td colSpan="9" className="px-6 py-3 text-right text-xs text-gray-500 italic">
-                                                    * Toplam {invoiceDetail.lines.length} kalem ürün listelenmektedir.
+                                                <td colSpan="6" className="px-6 py-3 text-left text-xs text-gray-500 italic">
+                                                    * Toplam {invoiceDetail.lines.length} kalem
+                                                </td>
+                                                <td className="px-3 py-3 text-right">
+                                                    <div className="text-[11px] text-gray-400 leading-none mb-0.5">Satır Toplamı (KDV Dahil)</div>
+                                                    <div className="font-mono font-bold text-sm text-gray-700">
+                                                        ₺{invoiceDetail.lines.reduce((sum, ln) => sum + ln.line_net * (1 + (ln.vat_rate || 0) / 100), 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </div>
+                                                </td>
+                                                <td colSpan="2" className="px-3 py-3 text-right">
+                                                    <div className="text-[11px] text-gray-400 leading-none mb-0.5">Genel Toplam (KDV Dahil)</div>
+                                                    <div className="font-mono font-black text-base text-emerald-700">
+                                                        ₺{invoiceDetail.total_amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         </tfoot>
