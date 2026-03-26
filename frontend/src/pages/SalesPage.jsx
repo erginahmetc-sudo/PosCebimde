@@ -428,6 +428,7 @@ export default function SalesPage() {
         try {
             const payload = {
                 ...quoteForm,
+                customer_id: quoteForm.customer_id || null,  // boş string UUID hatası verir
                 subtotal: quoteItemTotals.net,
                 vat_total: quoteItemTotals.vat,
                 total: quoteItemTotals.grand
@@ -2257,7 +2258,7 @@ th:last-child { border-radius:0 6px 6px 0; }
 
         {/* 2. Yeni Teklif Formu */}
         {showNewQuoteModal && (
-            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[94vh] flex flex-col overflow-hidden">
                     <div className="bg-gradient-to-r from-violet-700 to-purple-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
                         <div className="flex items-center gap-3">
