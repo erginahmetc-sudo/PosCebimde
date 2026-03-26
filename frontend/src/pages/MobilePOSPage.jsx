@@ -137,11 +137,14 @@ export default function MobilePOSPage() {
                     if (!applied.includes(campaign.name)) applied.push(campaign.name);
                 }
             }
-            return { ...item, discount_rate: bestDiscount };
+            const newFinalPrice = item.price * (1 - bestDiscount / 100);
+            return { ...item, discount_rate: bestDiscount, final_price: newFinalPrice };
         });
 
         setAppliedCampaignNames(applied);
-        const hasChanged = newCart.some((item, i) => item.discount_rate !== cart[i].discount_rate);
+        const hasChanged = newCart.some((item, i) =>
+            item.discount_rate !== cart[i].discount_rate || item.final_price !== cart[i].final_price
+        );
         if (hasChanged) setCart(newCart);
     }, [activeCampaigns, selectedCustomer, customers, cart.map(i => i.stock_code + ':' + i.quantity).join(',')]);
 
@@ -830,15 +833,22 @@ export default function MobilePOSPage() {
                                     className={`flex justify-between items-center py-3 px-3 cursor-pointer rounded-lg mb-2 transition-colors shadow-sm
                                         ${selectedCartIndex === index ? 'bg-green-200 border-2 border-green-400' : 'bg-yellow-50 border border-gray-200'}`}
                                 >
-                                    <div className="flex-1">
-                                        <h4 className="m-0 mb-1 text-base font-semibold">{item.name}</h4>
-                                        <p className="m-0 text-sm text-gray-600 flex items-center gap-1">
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="m-0 mb-0.5 text-sm font-semibold leading-tight line-clamp-2 overflow-hidden">{item.name}</h4>
+                                        <p className="m-0 text-xs text-gray-600 flex items-center gap-1 flex-wrap">
                                             <span className="text-blue-600 font-bold">{item.quantity}</span>
-                                            <span className="font-black">Adet x</span>
-                                            <span className="text-blue-600 font-bold">{item.final_price?.toFixed(2)} TL</span>
+                                            <span className="font-black">x</span>
+                                            {(item.discount_rate > 0) ? (
+                                                <span className="flex flex-col leading-tight">
+                                                    <span className="line-through text-gray-400">{item.price?.toFixed(2)} TL</span>
+                                                    <span className="text-green-600 font-bold">{item.final_price?.toFixed(2)} TL</span>
+                                                </span>
+                                            ) : (
+                                                <span className="text-blue-600 font-bold">{item.final_price?.toFixed(2)} TL</span>
+                                            )}
                                         </p>
                                     </div>
-                                    <div className="font-bold text-green-600 text-lg w-24 text-right">
+                                    <div className="font-bold text-green-600 text-base w-20 text-right shrink-0">
                                         {(item.final_price * item.quantity).toFixed(2)} TL
                                     </div>
                                     <button
