@@ -1568,13 +1568,14 @@ export const settingsAPI = {
 
 // ============ CAMPAIGNS API ============
 export const campaignsAPI = {
+    // customer_ids doğrudan campaigns tablosunda JSONB olarak saklanır (RLS karmaşasından kaçınmak için)
     getAll: async () => {
         const companyCode = getCurrentCompanyCode();
         if (!companyCode) return { data: { campaigns: [] } };
 
         const { data, error } = await supabase
             .from('campaigns')
-            .select('*, campaign_products(stock_code), campaign_customers(customer_id)')
+            .select('*, campaign_products(stock_code)')
             .eq('company_code', companyCode)
             .order('created_at', { ascending: false });
 
@@ -1583,7 +1584,7 @@ export const campaignsAPI = {
         const campaigns = (data || []).map(c => ({
             ...c,
             product_codes: (c.campaign_products || []).map(p => p.stock_code),
-            customer_ids: (c.campaign_customers || []).map(cu => cu.customer_id),
+            customer_ids: Array.isArray(c.customer_ids) ? c.customer_ids : [],
         }));
 
         return { data: { campaigns } };
@@ -1595,7 +1596,7 @@ export const campaignsAPI = {
 
         const { data, error } = await supabase
             .from('campaigns')
-            .select('*, campaign_products(stock_code), campaign_customers(customer_id)')
+            .select('*, campaign_products(stock_code)')
             .eq('company_code', companyCode)
             .eq('is_active', true);
 
@@ -1604,7 +1605,7 @@ export const campaignsAPI = {
         const campaigns = (data || []).map(c => ({
             ...c,
             product_codes: (c.campaign_products || []).map(p => p.stock_code),
-            customer_ids: (c.campaign_customers || []).map(cu => cu.customer_id),
+            customer_ids: Array.isArray(c.customer_ids) ? c.customer_ids : [],
         }));
 
         return { data: { campaigns } };
@@ -1615,13 +1616,17 @@ export const campaignsAPI = {
         if (!companyCode) throw new Error("Şirket kodu bulunamadı.");
 
         const { product_codes, customer_ids, tiers, ...rest } = campaign;
-        // Store tiers as JSON; remove legacy single-discount fields if present
-        const campaignData = { ...rest, tiers: tiers || [] };
+        // customer_ids ve tiers doğrudan campaigns tablosuna JSONB olarak kaydedilir
+        const campaignData = {
+            ...rest,
+            tiers: tiers || [],
+            customer_ids: customer_ids || [],
+            company_code: companyCode,
+        };
 
-        // 1. Insert campaign
         const { data, error } = await supabase
             .from('campaigns')
-            .insert([{ ...campaignData, company_code: companyCode }])
+            .insert([campaignData])
             .select()
             .single();
 
@@ -1629,21 +1634,11 @@ export const campaignsAPI = {
 
         const campaignId = data.id;
 
-        // 2. Insert campaign products
+        // campaign_products (ayrı tablo, RLS sorunu yok)
         if (product_codes && product_codes.length > 0) {
             const productRows = product_codes.map(sc => ({ campaign_id: campaignId, stock_code: sc }));
             const { error: prodError } = await supabase.from('campaign_products').insert(productRows);
             if (prodError) console.error('campaign_products insert error:', prodError);
-        }
-
-        // 3. Insert campaign customers
-        if (customer_ids && customer_ids.length > 0) {
-            const customerRows = customer_ids.map(cid => ({ campaign_id: campaignId, customer_id: String(cid) }));
-            const { error: custError } = await supabase.from('campaign_customers').insert(customerRows);
-            if (custError) {
-                console.error('campaign_customers INSERT hatası:', custError);
-                throw { response: { data: { message: 'Müşteriler kaydedilemedi: ' + custError.message } } };
-            }
         }
 
         return { data: { success: true, id: campaignId } };
@@ -1654,9 +1649,13 @@ export const campaignsAPI = {
         if (!companyCode) throw new Error("Şirket kodu bulunamadı.");
 
         const { product_codes, customer_ids, tiers, ...rest } = campaign;
-        const campaignData = { ...rest, tiers: tiers || [] };
+        // customer_ids ve tiers doğrudan campaigns satırına güncellenir
+        const campaignData = {
+            ...rest,
+            tiers: tiers || [],
+            customer_ids: customer_ids !== undefined ? customer_ids : [],
+        };
 
-        // 1. Update campaign fields
         const { error } = await supabase
             .from('campaigns')
             .update(campaignData)
@@ -1665,7 +1664,7 @@ export const campaignsAPI = {
 
         if (error) throw { response: { data: { message: error.message || 'Kampanya güncellenemedi.' } } };
 
-        // 2. Replace campaign products
+        // campaign_products güncelle
         if (product_codes !== undefined) {
             const { error: delProdErr } = await supabase.from('campaign_products').delete().eq('campaign_id', id);
             if (delProdErr) console.error('campaign_products DELETE hatası:', delProdErr);
@@ -1673,23 +1672,6 @@ export const campaignsAPI = {
                 const rows = product_codes.map(sc => ({ campaign_id: id, stock_code: sc }));
                 const { error: insProdErr } = await supabase.from('campaign_products').insert(rows);
                 if (insProdErr) console.error('campaign_products INSERT hatası:', insProdErr);
-            }
-        }
-
-        // 3. Replace campaign customers
-        if (customer_ids !== undefined) {
-            const { error: delCustErr } = await supabase.from('campaign_customers').delete().eq('campaign_id', id);
-            if (delCustErr) {
-                console.error('campaign_customers DELETE hatası:', delCustErr);
-                throw { response: { data: { message: 'Müşteri listesi silinemedi: ' + delCustErr.message } } };
-            }
-            if (customer_ids.length > 0) {
-                const rows = customer_ids.map(cid => ({ campaign_id: id, customer_id: String(cid) }));
-                const { error: insCustErr } = await supabase.from('campaign_customers').insert(rows);
-                if (insCustErr) {
-                    console.error('campaign_customers INSERT hatası:', insCustErr);
-                    throw { response: { data: { message: 'Müşteriler kaydedilemedi: ' + insCustErr.message } } };
-                }
             }
         }
 
