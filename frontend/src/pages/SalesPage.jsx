@@ -55,6 +55,7 @@ export default function SalesPage() {
     const [quoteProductSearch, setQuoteProductSearch] = useState('');
     const [quoteSaving, setQuoteSaving] = useState(false);
     const [quoteConverting, setQuoteConverting] = useState(false);
+    const [editingQuoteId, setEditingQuoteId] = useState(null); // null=yeni, id=düzenleme
 
     // Modal State
     const [selectedSale, setSelectedSale] = useState(null);
@@ -370,6 +371,20 @@ export default function SalesPage() {
         const future = new Date(); future.setDate(today.getDate() + 30);
         setQuoteForm({ customer_id: '', customer_name: '', items: [], valid_until: future.toISOString().split('T')[0], notes: '' });
         setQuoteProductSearch('');
+        setEditingQuoteId(null);
+        setShowNewQuoteModal(true);
+    };
+
+    const openEditQuoteModal = (q) => {
+        setQuoteForm({
+            customer_id: q.customer_id || '',
+            customer_name: q.customer_name || '',
+            items: (q.items || []).map(it => ({ ...it, is_vat_inc: it.is_vat_inc ?? true })),
+            valid_until: q.valid_until || '',
+            notes: q.notes || ''
+        });
+        setQuoteProductSearch('');
+        setEditingQuoteId(q.id);
         setShowNewQuoteModal(true);
     };
 
@@ -410,13 +425,21 @@ export default function SalesPage() {
         if (quoteForm.items.length === 0) { alert('En az bir ürün ekleyin.'); return; }
         setQuoteSaving(true);
         try {
-            await priceQuotesAPI.create({
+            const payload = {
                 ...quoteForm,
                 subtotal: quoteItemTotals.net,
                 vat_total: quoteItemTotals.vat,
                 total: quoteItemTotals.grand
-            });
+            };
+            if (editingQuoteId) {
+                await priceQuotesAPI.update(editingQuoteId, payload);
+                // Refresh selectedQuote so view modal shows updated data
+                setSelectedQuote(prev => prev ? { ...prev, ...payload, items: quoteForm.items } : prev);
+            } else {
+                await priceQuotesAPI.create(payload);
+            }
             setShowNewQuoteModal(false);
+            setEditingQuoteId(null);
             loadQuotes();
         } catch (e) { alert('Kayıt hatası: ' + e.message); }
         finally { setQuoteSaving(false); }
@@ -566,6 +589,148 @@ body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:#f1f5f9; 
 </html>`;
 
         const w = window.open('', '_blank', 'width=800,height=1100');
+        if (w) { w.document.write(html); w.document.close(); }
+    };
+
+    const printQuoteA4 = (q) => {
+        const savedConfig = localStorage.getItem('receipt_design_config');
+        let ci = { name: 'Firma Adı', address: '', phone: '', logo_text: 'F', logo_url: '', showWatermark: true };
+        if (savedConfig) { try { ci = { ...ci, ...JSON.parse(savedConfig) }; } catch (e) {} }
+
+        const dateStr = q.created_at ? new Date(q.created_at).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR');
+        const validStr = q.valid_until ? new Date(q.valid_until).toLocaleDateString('tr-TR') : '—';
+
+        const items = q.items || [];
+        let net = 0, vat = 0;
+        const itemsHtml = items.map((item, idx) => {
+            const qty = parseFloat(item.quantity) || 0;
+            const pr = parseFloat(item.price) || 0;
+            const disc = parseFloat(item.discount_rate) || 0;
+            const rate = parseFloat(item.vat_rate) || 0;
+            const lineTotal = pr * qty * (1 - disc / 100);
+            const unitNet = item.is_vat_inc ? pr / (1 + rate / 100) : pr;
+            const lineNet = unitNet * qty * (1 - disc / 100);
+            net += lineNet;
+            vat += lineNet * (rate / 100);
+            return `<tr style="border-bottom:1px solid #e2e8f0;">
+                <td style="padding:6px 8px; font-size:12px;">${idx + 1}</td>
+                <td style="padding:6px 8px; font-size:12px; font-weight:600;">${item.name}${item.stock_code ? `<br/><span style="font-size:10px;color:#888;">${item.stock_code}</span>` : ''}</td>
+                <td style="padding:6px 8px; font-size:12px; text-align:center;">${qty}</td>
+                <td style="padding:6px 8px; font-size:12px; text-align:right; font-family:monospace;">${pr.toFixed(2)}</td>
+                <td style="padding:6px 8px; font-size:12px; text-align:center; color:${disc > 0 ? '#dc2626' : '#999'};">${disc > 0 ? `%${disc}` : '—'}</td>
+                <td style="padding:6px 8px; font-size:12px; text-align:center; color:#4f46e5; font-weight:700;">%${rate}</td>
+                <td style="padding:6px 8px; font-size:12px; text-align:right; font-weight:700; font-family:monospace;">${lineTotal.toFixed(2)}</td>
+            </tr>`;
+        }).join('');
+        const grand = net + vat;
+
+        const vatBreakdown = {};
+        items.forEach(item => {
+            const qty = parseFloat(item.quantity) || 0;
+            const pr = parseFloat(item.price) || 0;
+            const disc = parseFloat(item.discount_rate) || 0;
+            const rate = parseFloat(item.vat_rate) || 0;
+            const unitNet = item.is_vat_inc ? pr / (1 + rate / 100) : pr;
+            const lineNet = unitNet * qty * (1 - disc / 100);
+            if (!vatBreakdown[rate]) vatBreakdown[rate] = 0;
+            vatBreakdown[rate] += lineNet * (rate / 100);
+        });
+        const vatRows = Object.entries(vatBreakdown).map(([rate, amt]) =>
+            `<div style="display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:3px;">
+                <span>KDV %${rate}</span><span style="font-weight:600;">${amt.toFixed(2)} TL</span>
+            </div>`).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"/>
+<title>Fiyat Teklifi A4 - ${q.quote_number}</title>
+<style>
+@page { size: A4; margin: 12mm 15mm; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:white; }
+@media print { body { background:white !important; } .no-print { display:none !important; } }
+.totals-block { page-break-inside:avoid; break-inside:avoid; }
+th { background:#1e293b; color:white; padding:8px 10px; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; }
+th:first-child { border-radius:6px 0 0 6px; }
+th:last-child { border-radius:0 6px 6px 0; }
+</style>
+</head>
+<body>
+<div style="width:100%; background:white; padding:0; position:relative; overflow:hidden;">
+  <!-- WATERMARK -->
+  ${ci.showWatermark ? `<div style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-30deg); font-size:220px; color:rgba(124,58,237,0.04); pointer-events:none; user-select:none; z-index:0;">TEKLİF</div>` : ''}
+
+  <!-- HEADER -->
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8mm; position:relative; z-index:1; border-bottom:3px solid #7c3aed; padding-bottom:6mm;">
+    <div style="display:flex; flex-direction:column; gap:4px;">
+      ${ci.logo_url
+        ? `<img src="${ci.logo_url}" style="height:40px; object-fit:contain; margin-bottom:4px;" />`
+        : `<div style="background:#7c3aed; color:white; width:40px; height:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:18px; margin-bottom:4px;">${ci.logo_text}</div>`
+      }
+      <div style="font-size:18px; font-weight:900; color:#1e293b; text-transform:uppercase; letter-spacing:0.03em;">${ci.name}</div>
+      ${ci.address ? `<div style="font-size:11px; color:#555; margin-top:2px;">${ci.address}</div>` : ''}
+      ${ci.phone ? `<div style="font-size:11px; color:#555;">${ci.phone}</div>` : ''}
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:32px; font-weight:900; color:#7c3aed; letter-spacing:0.1em; line-height:1;">TEKLİF</div>
+      <div style="font-size:14px; font-weight:700; font-family:monospace; color:#1e293b; margin-top:4px;">${q.quote_number}</div>
+      <div style="font-size:12px; color:#555; margin-top:4px;">Tarih: ${dateStr}</div>
+      <div style="font-size:12px; font-weight:700; color:${q.valid_until && new Date(q.valid_until) < new Date() ? '#dc2626' : '#059669'}; margin-top:2px;">Geçerlilik: ${validStr}</div>
+    </div>
+  </div>
+
+  <!-- MÜŞTERİ -->
+  <div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; padding:4mm 6mm; margin-bottom:6mm; position:relative; z-index:1;">
+    <div style="font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:#7c3aed; margin-bottom:4px;">Teklif Verilen Firma</div>
+    <div style="font-size:16px; font-weight:900; color:#1e293b;">${q.customer_name || '—'}</div>
+  </div>
+
+  <!-- ÜRÜN TABLOSU -->
+  <div style="position:relative; z-index:1; margin-bottom:6mm;">
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="text-align:center; width:5%;">#</th>
+          <th style="text-align:left; width:38%;">Ürün / Hizmet</th>
+          <th style="text-align:center; width:8%;">Miktar</th>
+          <th style="text-align:right; width:14%;">Birim Fiyat</th>
+          <th style="text-align:center; width:8%;">İsk.%</th>
+          <th style="text-align:center; width:8%;">KDV%</th>
+          <th style="text-align:right; width:14%;">Tutar (TL)</th>
+        </tr>
+      </thead>
+      <tbody style="border:1px solid #e2e8f0;">${itemsHtml}</tbody>
+    </table>
+  </div>
+
+  <!-- TOPLAMLAR -->
+  <div class="totals-block" style="position:relative; z-index:1; display:flex; justify-content:flex-end; margin-bottom:6mm;">
+    <div style="width:45%; border-top:2px solid #7c3aed; padding-top:4mm;">
+      <div style="display:flex; justify-content:space-between; font-size:12px; color:#555; margin-bottom:4px;">
+        <span>Ara Toplam (KDV Hariç)</span><span style="font-weight:600;">${net.toFixed(2)} TL</span>
+      </div>
+      ${vatRows}
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5mm; padding-top:3mm; border-top:1px solid #ddd6fe;">
+        <span style="font-size:12px; font-weight:900; text-transform:uppercase; letter-spacing:0.08em; color:#7c3aed;">GENEL TOPLAM</span>
+        <span style="font-size:24px; font-weight:900; color:#7c3aed;">${grand.toFixed(2)} TL</span>
+      </div>
+    </div>
+  </div>
+
+  ${q.notes ? `
+  <!-- NOTLAR -->
+  <div class="totals-block" style="position:relative; z-index:1; border-top:1px solid #e2e8f0; padding-top:3mm;">
+    <div style="font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:#92400e; margin-bottom:4px;">Notlar / Koşullar</div>
+    <div style="font-size:12px; color:#555; white-space:pre-wrap;">${q.notes}</div>
+  </div>` : ''}
+
+</div>
+<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 800); }</script>
+</body>
+</html>`;
+
+        const w = window.open('', '_blank', 'width=900,height=1200');
         if (w) { w.document.write(html); w.document.close(); }
     };
 
@@ -2091,10 +2256,10 @@ body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:#f1f5f9; 
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[94vh] flex flex-col overflow-hidden">
                     <div className="bg-gradient-to-r from-violet-700 to-purple-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
                         <div className="flex items-center gap-3">
-                            <span className="material-symbols-outlined text-white text-xl">add_circle</span>
-                            <h2 className="text-white font-black text-lg">Yeni Fiyat Teklifi</h2>
+                            <span className="material-symbols-outlined text-white text-xl">{editingQuoteId ? 'edit' : 'add_circle'}</span>
+                            <h2 className="text-white font-black text-lg">{editingQuoteId ? 'Teklifi Düzenle' : 'Yeni Fiyat Teklifi'}</h2>
                         </div>
-                        <button onClick={() => setShowNewQuoteModal(false)} className="text-white/70 hover:text-white">
+                        <button onClick={() => { setShowNewQuoteModal(false); setEditingQuoteId(null); }} className="text-white/70 hover:text-white">
                             <span className="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -2254,13 +2419,16 @@ body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:#f1f5f9; 
                         )}
                     </div>
                     <div className="border-t border-slate-200 px-6 py-4 bg-slate-50 flex justify-end gap-3 flex-shrink-0">
-                        <button onClick={() => setShowNewQuoteModal(false)} className="px-5 py-2.5 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-100 text-sm transition-colors">İptal</button>
+                        <button onClick={() => { setShowNewQuoteModal(false); setEditingQuoteId(null); }} className="px-5 py-2.5 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-100 text-sm transition-colors">İptal</button>
                         <button
                             onClick={handleSaveQuote}
                             disabled={quoteSaving}
                             className="px-6 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-black rounded-xl shadow-md transition-all text-sm flex items-center gap-2 disabled:opacity-60"
                         >
-                            {quoteSaving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Kaydediliyor...</> : <><span className="material-symbols-outlined text-base">save</span>Kaydet</>}
+                            {quoteSaving
+                                ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Kaydediliyor...</>
+                                : <><span className="material-symbols-outlined text-base">save</span>{editingQuoteId ? 'Güncelle' : 'Kaydet'}</>
+                            }
                         </button>
                     </div>
                 </div>
@@ -2293,8 +2461,8 @@ body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:#f1f5f9; 
             const grand = net + vat;
             const isExpired = q.valid_until && new Date(q.valid_until) < new Date() && q.status === 'Beklemede';
             return (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[96vh] flex flex-col overflow-hidden">
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[70] p-2">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[95vw] max-h-[98vh] flex flex-col overflow-hidden">
                         {/* Modal Header Bar */}
                         <div className="bg-gradient-to-r from-violet-700 to-purple-700 px-6 py-3 flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center gap-3">
@@ -2407,39 +2575,52 @@ body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:#f1f5f9; 
                         </div>
 
                         {/* Footer Butonlar */}
-                        <div className="border-t border-slate-200 px-6 py-4 bg-white flex items-center justify-between flex-shrink-0">
-                            <div className="flex gap-2">
+                        <div className="border-t border-slate-200 px-4 py-3 bg-white flex items-center justify-between flex-shrink-0 flex-wrap gap-2">
+                            <div className="flex gap-2 flex-wrap">
                                 {q.status !== 'Satışa Çevrildi' && q.status !== 'Reddedildi' && (
                                     <button
                                         onClick={() => { priceQuotesAPI.update(q.id, { status: 'Onaylandı' }).then(() => { setSelectedQuote(prev => ({ ...prev, status: 'Onaylandı' })); loadQuotes(); }); }}
-                                        className="px-4 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-xl text-sm transition-colors"
+                                        className="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs transition-colors"
                                     >✓ Onayla</button>
                                 )}
                                 {q.status !== 'Satışa Çevrildi' && q.status !== 'Reddedildi' && (
                                     <button
                                         onClick={() => { priceQuotesAPI.update(q.id, { status: 'Reddedildi' }).then(() => { setSelectedQuote(prev => ({ ...prev, status: 'Reddedildi' })); loadQuotes(); }); }}
-                                        className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded-xl text-sm transition-colors"
+                                        className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded-lg text-xs transition-colors"
                                     >✗ Reddet</button>
                                 )}
+                                {q.status !== 'Satışa Çevrildi' && (
+                                    <button
+                                        onClick={() => openEditQuoteModal(q)}
+                                        className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition-colors flex items-center gap-1"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">edit</span>Düzenle
+                                    </button>
+                                )}
                             </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setShowViewQuoteModal(false)} className="px-5 py-2.5 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-100 text-sm transition-colors">Kapat</button>
+                            <div className="flex gap-2 flex-wrap">
+                                <button onClick={() => setShowViewQuoteModal(false)} className="px-4 py-1.5 border border-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-100 text-xs transition-colors">Kapat</button>
                                 <button
                                     onClick={() => printQuote(q)}
-                                    className="px-5 py-2.5 bg-gradient-to-r from-slate-700 to-slate-900 hover:from-slate-800 hover:to-black text-white font-bold rounded-xl shadow-md transition-all text-sm flex items-center gap-2"
+                                    className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-lg shadow transition-all text-xs flex items-center gap-1"
                                 >
-                                    <span className="material-symbols-outlined text-base">print</span>
-                                    Yazdır (A5)
+                                    <span className="material-symbols-outlined text-sm">print</span>A5
+                                </button>
+                                <button
+                                    onClick={() => printQuoteA4(q)}
+                                    className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-lg shadow transition-all text-xs flex items-center gap-1"
+                                >
+                                    <span className="material-symbols-outlined text-sm">print</span>A4
                                 </button>
                                 {q.status !== 'Satışa Çevrildi' && (
                                     <button
                                         onClick={() => handleConvertToSale(q)}
                                         disabled={quoteConverting}
-                                        className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black rounded-xl shadow-md transition-all text-sm flex items-center gap-2 disabled:opacity-60"
+                                        className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black rounded-lg shadow transition-all text-xs flex items-center gap-1 disabled:opacity-60"
                                     >
                                         {quoteConverting
-                                            ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>İşleniyor...</>
-                                            : <><span className="material-symbols-outlined text-base">shopping_cart_checkout</span>Satışa Çevir (Açık Hesap)</>
+                                            ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>İşleniyor...</>
+                                            : <><span className="material-symbols-outlined text-sm">shopping_cart_checkout</span>Satışa Çevir</>
                                         }
                                     </button>
                                 )}
