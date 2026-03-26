@@ -482,13 +482,14 @@ export default function SalesPage() {
 <meta charset="utf-8"/>
 <title>Fiyat Teklifi - ${q.quote_number}</title>
 <style>
-@page { size: A5; margin: 0; }
+@page { size: A5; margin: 5mm; }
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:#f1f5f9; }
 @media print { body { background:white !important; } .no-print { display:none !important; } }
-.a5 { width:148mm; min-height:210mm; background:white; padding:6mm 6mm; margin:0 auto; display:flex; flex-direction:column; position:relative; overflow:hidden; }
+.a5 { width:100%; background:white; padding:3mm 3mm; margin:0 auto; display:flex; flex-direction:column; position:relative; overflow:hidden; }
 .wm { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-30deg); font-size:160px; color:rgba(124,58,237,0.04); pointer-events:none; user-select:none; display:${ci.showWatermark ? 'block' : 'none'}; }
-.th { text-transform:uppercase; font-size:0.62rem; letter-spacing:0.05em; color:#000; border:1px solid #000; padding:4px; text-align:center; }
+.th { text-transform:uppercase; font-size:0.62rem; letter-spacing:0.05em; color:#000; border:1px solid #000; padding:3px; text-align:center; }
+.totals-block { page-break-inside: avoid; break-inside: avoid; }
 </style>
 </head>
 <body style="padding:4mm;">
@@ -496,7 +497,7 @@ body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:#f1f5f9; 
   <div class="wm">TEKLİF</div>
 
   <!-- HEADER -->
-  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6mm; position:relative; z-index:1;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:3mm; position:relative; z-index:1;">
     <!-- Sol: Logo + Firma -->
     <div style="width:60%; display:flex; flex-direction:column; align-items:flex-start; gap:2px;">
       ${ci.logo_url
@@ -517,7 +518,7 @@ body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:#f1f5f9; 
   </div>
 
   <!-- MÜŞTERİ -->
-  <div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:6px; padding:4mm; margin-bottom:4mm; position:relative; z-index:1;">
+  <div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:6px; padding:2mm 3mm; margin-bottom:2mm; position:relative; z-index:1;">
     <div style="font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:#7c3aed; margin-bottom:2px;">Teklif Verilen Firma</div>
     <div style="font-size:13px; font-weight:900; color:#1e293b;">${q.customer_name || '—'}</div>
   </div>
@@ -539,8 +540,8 @@ body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:#f1f5f9; 
   </div>
 
   <!-- TOPLAMLAR -->
-  <div style="position:relative; z-index:1; margin-top:4mm; display:flex; justify-content:flex-end;">
-    <div style="width:58%; border-top:2px solid #7c3aed; padding-top:3mm;">
+  <div class="totals-block" style="position:relative; z-index:1; margin-top:2mm; display:flex; justify-content:flex-end;">
+    <div style="width:58%; border-top:2px solid #7c3aed; padding-top:2mm;">
       <div style="display:flex; justify-content:space-between; font-size:10px; color:#555; margin-bottom:2px;">
         <span>Ara Toplam (KDV Hariç)</span><span style="font-weight:600;">${net.toFixed(2)} TL</span>
       </div>
@@ -554,7 +555,7 @@ body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:#f1f5f9; 
 
   ${q.notes ? `
   <!-- NOTLAR -->
-  <div style="position:relative; z-index:1; margin-top:4mm; border-top:1px solid #e2e8f0; padding-top:3mm;">
+  <div style="position:relative; z-index:1; margin-top:2mm; border-top:1px solid #e2e8f0; padding-top:2mm;">
     <div style="font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:#92400e; margin-bottom:2px;">Notlar / Koşullar</div>
     <div style="font-size:9px; color:#555; white-space:pre-wrap;">${q.notes}</div>
   </div>` : ''}
@@ -1995,11 +1996,26 @@ body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:#f1f5f9; 
                             </button>
                         </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4">
+                    <div className="flex-1 overflow-y-auto p-4 relative">
                         {quotesLoading ? (
-                            <div className="text-center py-16 text-slate-400">
-                                <div className="w-10 h-10 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin mx-auto mb-3"></div>
-                                Yükleniyor...
+                            <div className="absolute inset-0 bg-white flex flex-col items-center justify-center z-10">
+                                <div className="relative w-full max-w-xs flex flex-col items-center justify-center">
+                                    <div className="relative mb-8">
+                                        <div className="absolute inset-0 bg-violet-600/20 rounded-full blur-2xl animate-pulse"></div>
+                                        <div className="relative w-20 h-20 flex items-center justify-center border border-violet-100 rounded-full bg-white/80 shadow-sm">
+                                            <span className="material-symbols-outlined text-4xl text-violet-600" style={{fontVariationSettings:"'FILL' 0,'wght' 300"}}>request_quote</span>
+                                        </div>
+                                    </div>
+                                    <h2 className="text-xl font-light tracking-[0.25em] uppercase mb-3 text-center text-slate-800">
+                                        Fiyat Teklifleri<br /><span className="font-semibold text-violet-600">Yükleniyor</span>
+                                    </h2>
+                                    <div className="w-48 mt-4">
+                                        <div className="relative h-[2px] w-full bg-violet-100 rounded-full overflow-hidden">
+                                            <div className="absolute top-0 h-full bg-violet-600 rounded-full animate-[progress_1.5s_ease-in-out_infinite]" style={{animation:'progress 1.5s ease-in-out infinite'}}></div>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-slate-400 mt-3 tracking-wider">Lütfen bekleyiniz...</p>
+                                </div>
                             </div>
                         ) : quotes.length === 0 ? (
                             <div className="text-center py-16 text-slate-400">
