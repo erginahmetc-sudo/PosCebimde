@@ -1650,19 +1650,28 @@ export const campaignsAPI = {
 
         const { product_codes, customer_ids, tiers, ...rest } = campaign;
         // customer_ids ve tiers doğrudan campaigns satırına güncellenir
+        const finalCustomerIds = customer_ids !== undefined ? customer_ids : [];
         const campaignData = {
             ...rest,
             tiers: tiers || [],
-            customer_ids: customer_ids !== undefined ? customer_ids : [],
+            customer_ids: finalCustomerIds,
         };
 
-        const { error } = await supabase
+        console.log('[campaignsAPI.update] id:', id, 'customer_ids gönderilen:', finalCustomerIds);
+
+        const { data: updatedRows, error } = await supabase
             .from('campaigns')
             .update(campaignData)
             .eq('id', id)
-            .eq('company_code', companyCode);
+            .eq('company_code', companyCode)
+            .select('id, customer_ids');
+
+        console.log('[campaignsAPI.update] DB cevabı:', updatedRows, 'hata:', error);
 
         if (error) throw { response: { data: { message: error.message || 'Kampanya güncellenemedi.' } } };
+        if (!updatedRows || updatedRows.length === 0) {
+            console.warn('[campaignsAPI.update] UYARI: Hiç satır güncellenmedi! id:', id, 'company_code:', companyCode);
+        }
 
         // campaign_products güncelle
         if (product_codes !== undefined) {
