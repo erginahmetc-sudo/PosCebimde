@@ -1820,6 +1820,57 @@ export const adminLicensesAPI = {
     },
 };
 
+export const priceQuotesAPI = {
+    getAll: async () => {
+        const companyCode = getCurrentCompanyCode();
+        if (!companyCode) return response({ success: true, data: [] });
+        const { data, error } = await supabase
+            .from('price_quotes')
+            .select('*')
+            .eq('company_code', companyCode)
+            .order('created_at', { ascending: false });
+        return response({ success: true, data: data || [] }, error);
+    },
+    create: async (quote) => {
+        const companyCode = getCurrentCompanyCode();
+        const quoteNumber = `TKL-${Date.now().toString().slice(-8)}`;
+        const { data, error } = await supabase
+            .from('price_quotes')
+            .insert([{
+                company_code: companyCode,
+                quote_number: quoteNumber,
+                customer_id: quote.customer_id || null,
+                customer_name: quote.customer_name || '',
+                items: quote.items || [],
+                subtotal: quote.subtotal || 0,
+                vat_total: quote.vat_total || 0,
+                total: quote.total || 0,
+                valid_until: quote.valid_until || null,
+                notes: quote.notes || '',
+                status: 'Beklemede'
+            }])
+            .select()
+            .single();
+        if (error) throw error;
+        return response({ success: true, data });
+    },
+    update: async (id, updates) => {
+        const { data, error } = await supabase
+            .from('price_quotes')
+            .update({ ...updates, updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .select()
+            .single();
+        if (error) throw error;
+        return response({ success: true, data });
+    },
+    delete: async (id) => {
+        const { error } = await supabase.from('price_quotes').delete().eq('id', id);
+        if (error) throw error;
+        return response({ success: true });
+    }
+};
+
 export default {
     get: async () => ({ data: {} }),
     post: async () => ({ data: {} }),
