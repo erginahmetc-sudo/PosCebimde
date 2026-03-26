@@ -1839,7 +1839,7 @@ export const priceQuotesAPI = {
             .insert([{
                 company_code: companyCode,
                 quote_number: quoteNumber,
-                customer_id: quote.customer_id || null,
+                customer_id: (quote.customer_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(quote.customer_id)) ? quote.customer_id : null,
                 customer_name: quote.customer_name || '',
                 items: quote.items || [],
                 subtotal: quote.subtotal || 0,
