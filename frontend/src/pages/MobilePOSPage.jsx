@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
-import { productsAPI, salesAPI, customersAPI, shortcutsAPI, settingsAPI, heldSalesAPI } from '../services/api';
+import { productsAPI, salesAPI, customersAPI, shortcutsAPI, settingsAPI, heldSalesAPI, campaignsAPI } from '../services/api';
 import { birFaturaAPI } from '../services/birFaturaService';
 import { useAuth } from '../context/AuthContext';
 import StatusModal from '../components/modals/StatusModal';
@@ -40,6 +40,8 @@ export default function MobilePOSPage() {
     const [heldSales, setHeldSales] = useState([]);
     const [showWaitlistModal, setShowWaitlistModal] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [activeCampaigns, setActiveCampaigns] = useState([]);
+    const [appliedCampaignNames, setAppliedCampaignNames] = useState([]);
 
     const [modalValue, setModalValue] = useState('');
     const [productToAdd, setProductToAdd] = useState(null);
@@ -80,7 +82,68 @@ export default function MobilePOSPage() {
         loadCustomers();
         loadShortcuts();
         loadHeldSales();
+        loadCampaigns();
     }, []);
+
+    const loadCampaigns = async () => {
+        try {
+            const res = await campaignsAPI.getActive();
+            setActiveCampaigns(res.data?.campaigns || []);
+        } catch (e) {
+            console.error('Kampanyalar yüklenirken hata:', e);
+        }
+    };
+
+    // Sepet veya müşteri değişince kampanya iskontolarını otomatik uygula
+    useEffect(() => {
+        if (activeCampaigns.length === 0 || cart.length === 0) {
+            setAppliedCampaignNames([]);
+            return;
+        }
+        const selectedCustomerObj = customers.find(c => c.name === selectedCustomer);
+        const customerId = selectedCustomerObj?.id || null;
+
+        const getBestTierDiscount = (tiers, quantity) => {
+            if (!tiers || tiers.length === 0) return 0;
+            let best = 0;
+            for (const tier of tiers) {
+                const min = parseInt(tier.min_qty) || 1;
+                const max = tier.max_qty ? parseInt(tier.max_qty) : Infinity;
+                if (quantity >= min && quantity <= max && tier.discount_rate > best) best = tier.discount_rate;
+            }
+            if (best === 0) {
+                for (const tier of tiers) {
+                    const min = parseInt(tier.min_qty) || 1;
+                    if (quantity >= min && tier.discount_rate > best) best = tier.discount_rate;
+                }
+            }
+            return best;
+        };
+
+        const applied = [];
+        const newCart = cart.map(item => {
+            let bestDiscount = item.discount_rate || 0;
+            for (const campaign of activeCampaigns) {
+                if (!campaign.product_codes?.includes(item.stock_code)) continue;
+                const isToptanSatis = selectedCustomer === 'Toptan Satış';
+                const customerEligible =
+                    !campaign.customer_ids || campaign.customer_ids.length === 0 ||
+                    (isToptanSatis && campaign.customer_ids.includes('__toptan_satis__')) ||
+                    (customerId && campaign.customer_ids.includes(customerId));
+                if (!customerEligible) continue;
+                const tierDiscount = getBestTierDiscount(campaign.tiers, item.quantity);
+                if (tierDiscount > bestDiscount) {
+                    bestDiscount = tierDiscount;
+                    if (!applied.includes(campaign.name)) applied.push(campaign.name);
+                }
+            }
+            return { ...item, discount_rate: bestDiscount };
+        });
+
+        setAppliedCampaignNames(applied);
+        const hasChanged = newCart.some((item, i) => item.discount_rate !== cart[i].discount_rate);
+        if (hasChanged) setCart(newCart);
+    }, [activeCampaigns, selectedCustomer, customers, cart.map(i => i.stock_code + ':' + i.quantity).join(',')]);
 
     const loadHeldSales = async () => {
         try {
@@ -831,6 +894,14 @@ export default function MobilePOSPage() {
                             </button>
                         </div>
 
+                        {/* Kampanya Bildirimi */}
+                        {appliedCampaignNames.length > 0 && (
+                            <div className="flex items-center gap-1 bg-green-100 border border-green-300 text-green-800 text-xs rounded-lg px-3 py-1.5 mb-2 flex-wrap">
+                                <span className="text-sm">🎯</span>
+                                <span className="font-semibold">Kampanya:</span>
+                                <span>{appliedCampaignNames.join(', ')}</span>
+                            </div>
+                        )}
                         {/* Total */}
                         <div className="flex justify-between items-center bg-yellow-300 rounded-lg p-4 mb-3">
                             <span className="text-lg">Genel Toplam</span>

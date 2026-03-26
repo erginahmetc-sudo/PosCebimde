@@ -117,11 +117,28 @@ export const AuthProvider = ({ children }) => {
                         localStorage.setItem('pos_settings_ask_quantity', settings['pos_settings_ask_quantity']);
                     }
 
-                    // 5. Company Info
+                    // 5. Company Info — individual keys (POS pages use these)
                     if (settings['company_name']) localStorage.setItem('company_name', settings['company_name']);
                     if (settings['company_address']) localStorage.setItem('company_address', settings['company_address']);
                     if (settings['company_phone']) localStorage.setItem('company_phone', settings['company_phone']);
                     if (settings['company_logo']) localStorage.setItem('company_logo', settings['company_logo']);
+
+                    // 6. Sync receipt_design_config (used by ReceiptDesignerModal & SalesPage print)
+                    try {
+                        const existingCfgStr = localStorage.getItem('receipt_design_config');
+                        const existingCfg = existingCfgStr ? JSON.parse(existingCfgStr) : {};
+                        const merged = {
+                            ...existingCfg,
+                            name: settings['company_name'] || existingCfg.name || '',
+                            address: settings['company_address'] || existingCfg.address || '',
+                            phone: settings['company_phone'] || existingCfg.phone || '',
+                            logo_url: settings['company_logo'] || existingCfg.logo_url || null,
+                            logo_text: (settings['company_name'] || existingCfg.name || 'A').charAt(0).toUpperCase(),
+                        };
+                        if (!merged.type) merged.type = 'custom_html_a5';
+                        if (merged.showWatermark === undefined) merged.showWatermark = true;
+                        localStorage.setItem('receipt_design_config', JSON.stringify(merged));
+                    } catch (e) { /* ignore */ }
 
                     console.log('Company settings synchronized to localStorage');
                 }
@@ -251,6 +268,22 @@ export const AuthProvider = ({ children }) => {
                 if (settings['company_address']) localStorage.setItem('company_address', settings['company_address']);
                 if (settings['company_phone']) localStorage.setItem('company_phone', settings['company_phone']);
                 if (settings['company_logo']) localStorage.setItem('company_logo', settings['company_logo']);
+                // receipt_design_config senkronizasyonu
+                try {
+                    const existingCfgStr = localStorage.getItem('receipt_design_config');
+                    const existingCfg = existingCfgStr ? JSON.parse(existingCfgStr) : {};
+                    const merged = {
+                        ...existingCfg,
+                        name: settings['company_name'] || existingCfg.name || '',
+                        address: settings['company_address'] || existingCfg.address || '',
+                        phone: settings['company_phone'] || existingCfg.phone || '',
+                        logo_url: settings['company_logo'] || existingCfg.logo_url || null,
+                        logo_text: (settings['company_name'] || existingCfg.name || 'A').charAt(0).toUpperCase(),
+                    };
+                    if (!merged.type) merged.type = 'custom_html_a5';
+                    if (merged.showWatermark === undefined) merged.showWatermark = true;
+                    localStorage.setItem('receipt_design_config', JSON.stringify(merged));
+                } catch (e) { /* ignore */ }
             }
         } catch (e) {
             console.error("Login settings sync error", e);
