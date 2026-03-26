@@ -559,11 +559,6 @@ body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:#f1f5f9; 
     <div style="font-size:9px; color:#555; white-space:pre-wrap;">${q.notes}</div>
   </div>` : ''}
 
-  <!-- ALT FOOTER -->
-  <div style="position:relative; z-index:1; margin-top:auto; padding-top:4mm; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
-    <div style="font-size:8px; color:#999;">Bu teklif ${validStr} tarihine kadar geçerlidir.</div>
-    <div style="font-size:8px; color:#999;">${ci.name}</div>
-  </div>
 </div>
 <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 800); }</script>
 </body>
