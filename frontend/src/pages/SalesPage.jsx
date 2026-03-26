@@ -427,6 +427,152 @@ export default function SalesPage() {
         try { await priceQuotesAPI.delete(id); loadQuotes(); } catch (e) { alert('Silme hatası: ' + e.message); }
     };
 
+    const printQuote = (q) => {
+        const savedConfig = localStorage.getItem('receipt_design_config');
+        let ci = { name: 'Firma Adı', address: '', phone: '', logo_text: 'F', logo_url: '', showWatermark: true };
+        if (savedConfig) { try { ci = { ...ci, ...JSON.parse(savedConfig) }; } catch (e) {} }
+
+        const dateStr = q.created_at ? new Date(q.created_at).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR');
+        const validStr = q.valid_until ? new Date(q.valid_until).toLocaleDateString('tr-TR') : '—';
+
+        const items = q.items || [];
+        let net = 0, vat = 0;
+        const itemsHtml = items.map((item, idx) => {
+            const qty = parseFloat(item.quantity) || 0;
+            const pr = parseFloat(item.price) || 0;
+            const disc = parseFloat(item.discount_rate) || 0;
+            const rate = parseFloat(item.vat_rate) || 0;
+            const lineTotal = pr * qty * (1 - disc / 100);
+            const unitNet = item.is_vat_inc ? pr / (1 + rate / 100) : pr;
+            const lineNet = unitNet * qty * (1 - disc / 100);
+            net += lineNet;
+            vat += lineNet * (rate / 100);
+            return `<tr>
+                <td style="padding:4px 4px; border-bottom:1px solid #000; border-top:1px solid #000; border-left:1px solid #000; font-size:10px;">
+                    <span style="display:block;">${item.name.substring(0, 40)}</span>
+                    ${item.stock_code ? `<span style="font-size:8px;color:#666;">${item.stock_code}</span>` : ''}
+                </td>
+                <td style="padding:4px 4px; border-bottom:1px solid #000; border-top:1px solid #000; text-align:center; font-size:10px;">${qty}</td>
+                <td style="padding:4px 4px; border-bottom:1px solid #000; border-top:1px solid #000; text-align:right; font-size:10px;">${pr.toFixed(2)}</td>
+                ${disc > 0 ? `<td style="padding:4px 4px; border-bottom:1px solid #000; border-top:1px solid #000; text-align:center; font-size:10px; color:#c00;">%${disc}</td>` : `<td style="padding:4px 4px; border-bottom:1px solid #000; border-top:1px solid #000; text-align:center; font-size:10px; color:#999;">—</td>`}
+                <td style="padding:4px 4px; border-bottom:1px solid #000; border-top:1px solid #000; border-right:1px solid #000; text-align:right; font-weight:bold; font-size:10px;">${lineTotal.toFixed(2)}</td>
+            </tr>`;
+        }).join('');
+        const grand = net + vat;
+
+        const vatBreakdown = {};
+        items.forEach(item => {
+            const qty = parseFloat(item.quantity) || 0;
+            const pr = parseFloat(item.price) || 0;
+            const disc = parseFloat(item.discount_rate) || 0;
+            const rate = parseFloat(item.vat_rate) || 0;
+            const unitNet = item.is_vat_inc ? pr / (1 + rate / 100) : pr;
+            const lineNet = unitNet * qty * (1 - disc / 100);
+            if (!vatBreakdown[rate]) vatBreakdown[rate] = 0;
+            vatBreakdown[rate] += lineNet * (rate / 100);
+        });
+        const vatRows = Object.entries(vatBreakdown).map(([rate, amt]) =>
+            `<div style="display:flex;justify-content:space-between;font-size:9px;color:#555;">
+                <span>KDV %${rate}</span><span>${amt.toFixed(2)} TL</span>
+            </div>`).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"/>
+<title>Fiyat Teklifi - ${q.quote_number}</title>
+<style>
+@page { size: A5; margin: 0; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:#f1f5f9; }
+@media print { body { background:white !important; } .no-print { display:none !important; } }
+.a5 { width:148mm; min-height:210mm; background:white; padding:6mm 6mm; margin:0 auto; display:flex; flex-direction:column; position:relative; overflow:hidden; }
+.wm { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-30deg); font-size:160px; color:rgba(124,58,237,0.04); pointer-events:none; user-select:none; display:${ci.showWatermark ? 'block' : 'none'}; }
+.th { text-transform:uppercase; font-size:0.62rem; letter-spacing:0.05em; color:#000; border:1px solid #000; padding:4px; text-align:center; }
+</style>
+</head>
+<body style="padding:4mm;">
+<div class="a5">
+  <div class="wm">TEKLİF</div>
+
+  <!-- HEADER -->
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6mm; position:relative; z-index:1;">
+    <!-- Sol: Logo + Firma -->
+    <div style="width:60%; display:flex; flex-direction:column; align-items:flex-start; gap:2px;">
+      ${ci.logo_url
+        ? `<img src="${ci.logo_url}" style="height:28px; object-fit:contain; margin-bottom:2px;" />`
+        : `<div style="background:#7c3aed; color:white; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:13px; margin-bottom:2px;">${ci.logo_text}</div>`
+      }
+      <div style="font-size:13px; font-weight:900; color:#1e293b; text-transform:uppercase; letter-spacing:0.03em;">${ci.name}</div>
+      ${ci.address ? `<div style="font-size:9px; color:#555; margin-top:1px;">${ci.address}</div>` : ''}
+      ${ci.phone ? `<div style="font-size:9px; color:#555;">${ci.phone}</div>` : ''}
+    </div>
+    <!-- Sağ: Teklif Bilgisi -->
+    <div style="width:38%; text-align:right;">
+      <div style="font-size:22px; font-weight:900; color:#7c3aed; letter-spacing:0.08em; line-height:1;">TEKLİF</div>
+      <div style="font-size:11px; font-weight:700; font-family:monospace; color:#1e293b; margin-top:2px;">${q.quote_number}</div>
+      <div style="font-size:9px; color:#555; margin-top:3px;">Tarih: ${dateStr}</div>
+      <div style="font-size:9px; color:${q.valid_until && new Date(q.valid_until) < new Date() ? '#dc2626' : '#059669'}; font-weight:700;">Geçerlilik: ${validStr}</div>
+    </div>
+  </div>
+
+  <!-- MÜŞTERİ -->
+  <div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:6px; padding:4mm; margin-bottom:4mm; position:relative; z-index:1;">
+    <div style="font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:#7c3aed; margin-bottom:2px;">Teklif Verilen Firma</div>
+    <div style="font-size:13px; font-weight:900; color:#1e293b;">${q.customer_name || '—'}</div>
+  </div>
+
+  <!-- ÜRÜN TABLOSU -->
+  <div style="position:relative; z-index:1; flex:1;">
+    <table style="width:100%; border-collapse:collapse; font-size:10px;">
+      <thead>
+        <tr>
+          <th class="th" style="text-align:left; width:40%;">Ürün / Hizmet</th>
+          <th class="th" style="width:10%;">Adet</th>
+          <th class="th" style="width:17%; text-align:right;">Birim Fiyat</th>
+          <th class="th" style="width:10%;">İsk.%</th>
+          <th class="th" style="width:18%; text-align:right;">Tutar (TL)</th>
+        </tr>
+      </thead>
+      <tbody>${itemsHtml}</tbody>
+    </table>
+  </div>
+
+  <!-- TOPLAMLAR -->
+  <div style="position:relative; z-index:1; margin-top:4mm; display:flex; justify-content:flex-end;">
+    <div style="width:58%; border-top:2px solid #7c3aed; padding-top:3mm;">
+      <div style="display:flex; justify-content:space-between; font-size:10px; color:#555; margin-bottom:2px;">
+        <span>Ara Toplam (KDV Hariç)</span><span style="font-weight:600;">${net.toFixed(2)} TL</span>
+      </div>
+      ${vatRows}
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:3mm; padding-top:2mm; border-top:1px solid #ddd6fe;">
+        <span style="font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:0.08em; color:#7c3aed;">GENEL TOPLAM</span>
+        <span style="font-size:18px; font-weight:900; color:#7c3aed;">${grand.toFixed(2)} TL</span>
+      </div>
+    </div>
+  </div>
+
+  ${q.notes ? `
+  <!-- NOTLAR -->
+  <div style="position:relative; z-index:1; margin-top:4mm; border-top:1px solid #e2e8f0; padding-top:3mm;">
+    <div style="font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:#92400e; margin-bottom:2px;">Notlar / Koşullar</div>
+    <div style="font-size:9px; color:#555; white-space:pre-wrap;">${q.notes}</div>
+  </div>` : ''}
+
+  <!-- ALT FOOTER -->
+  <div style="position:relative; z-index:1; margin-top:auto; padding-top:4mm; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+    <div style="font-size:8px; color:#999;">Bu teklif ${validStr} tarihine kadar geçerlidir.</div>
+    <div style="font-size:8px; color:#999;">${ci.name}</div>
+  </div>
+</div>
+<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 800); }</script>
+</body>
+</html>`;
+
+        const w = window.open('', '_blank', 'width=800,height=1100');
+        if (w) { w.document.write(html); w.document.close(); }
+    };
+
     const handleConvertToSale = async (quote) => {
         if (!window.confirm(`"${quote.customer_name}" firmasına ₺${(quote.total || 0).toFixed(2)} tutarındaki teklif Açık Hesap olarak satışa çevrilecek. Onaylıyor musunuz?`)) return;
         setQuoteConverting(true);
@@ -2267,6 +2413,13 @@ export default function SalesPage() {
                             </div>
                             <div className="flex gap-2">
                                 <button onClick={() => setShowViewQuoteModal(false)} className="px-5 py-2.5 border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-100 text-sm transition-colors">Kapat</button>
+                                <button
+                                    onClick={() => printQuote(q)}
+                                    className="px-5 py-2.5 bg-gradient-to-r from-slate-700 to-slate-900 hover:from-slate-800 hover:to-black text-white font-bold rounded-xl shadow-md transition-all text-sm flex items-center gap-2"
+                                >
+                                    <span className="material-symbols-outlined text-base">print</span>
+                                    Yazdır (A5)
+                                </button>
                                 {q.status !== 'Satışa Çevrildi' && (
                                     <button
                                         onClick={() => handleConvertToSale(q)}
