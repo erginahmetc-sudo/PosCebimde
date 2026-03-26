@@ -1638,9 +1638,12 @@ export const campaignsAPI = {
 
         // 3. Insert campaign customers
         if (customer_ids && customer_ids.length > 0) {
-            const customerRows = customer_ids.map(cid => ({ campaign_id: campaignId, customer_id: cid }));
+            const customerRows = customer_ids.map(cid => ({ campaign_id: campaignId, customer_id: String(cid) }));
             const { error: custError } = await supabase.from('campaign_customers').insert(customerRows);
-            if (custError) console.error('campaign_customers insert error:', custError);
+            if (custError) {
+                console.error('campaign_customers INSERT hatası:', custError);
+                throw { response: { data: { message: 'Müşteriler kaydedilemedi: ' + custError.message } } };
+            }
         }
 
         return { data: { success: true, id: campaignId } };
@@ -1664,19 +1667,29 @@ export const campaignsAPI = {
 
         // 2. Replace campaign products
         if (product_codes !== undefined) {
-            await supabase.from('campaign_products').delete().eq('campaign_id', id);
+            const { error: delProdErr } = await supabase.from('campaign_products').delete().eq('campaign_id', id);
+            if (delProdErr) console.error('campaign_products DELETE hatası:', delProdErr);
             if (product_codes.length > 0) {
                 const rows = product_codes.map(sc => ({ campaign_id: id, stock_code: sc }));
-                await supabase.from('campaign_products').insert(rows);
+                const { error: insProdErr } = await supabase.from('campaign_products').insert(rows);
+                if (insProdErr) console.error('campaign_products INSERT hatası:', insProdErr);
             }
         }
 
         // 3. Replace campaign customers
         if (customer_ids !== undefined) {
-            await supabase.from('campaign_customers').delete().eq('campaign_id', id);
+            const { error: delCustErr } = await supabase.from('campaign_customers').delete().eq('campaign_id', id);
+            if (delCustErr) {
+                console.error('campaign_customers DELETE hatası:', delCustErr);
+                throw { response: { data: { message: 'Müşteri listesi silinemedi: ' + delCustErr.message } } };
+            }
             if (customer_ids.length > 0) {
-                const rows = customer_ids.map(cid => ({ campaign_id: id, customer_id: cid }));
-                await supabase.from('campaign_customers').insert(rows);
+                const rows = customer_ids.map(cid => ({ campaign_id: id, customer_id: String(cid) }));
+                const { error: insCustErr } = await supabase.from('campaign_customers').insert(rows);
+                if (insCustErr) {
+                    console.error('campaign_customers INSERT hatası:', insCustErr);
+                    throw { response: { data: { message: 'Müşteriler kaydedilemedi: ' + insCustErr.message } } };
+                }
             }
         }
 
