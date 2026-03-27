@@ -120,7 +120,7 @@ export default function LoginPage() {
                     <div className="z-10">
                         {/* Brand Logo */}
                         <div className="flex items-center gap-3 mb-16">
-                            <img src="/logo.png" alt="PosCebimde" className="w-10 h-10 object-contain rounded-xl" />
+                            <img src="/logo-v3.png" alt="PosCebimde" className="w-10 h-10 object-contain rounded-xl" />
                             <span className="text-2xl font-bold text-slate-800 tracking-tight">PosCebimde</span>
                         </div>
                         {/* Hero Text */}

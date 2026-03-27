@@ -35,7 +35,7 @@ export default function Layout({ children }) {
             <header className="h-16 flex items-center justify-between px-6 bg-white border-b border-slate-200 z-50 flex-none shadow-sm">
                 {/* Left Side: Logo */}
                 <div className="flex items-center gap-2 w-auto lg:w-1/4">
-                    <img src="/logo.png?v=3" alt="Poscebimde Logo" className="h-10 w-auto object-contain" />
+                    <img src="/logo-v3.png" alt="Poscebimde Logo" className="h-10 w-auto object-contain" />
                 </div>
 
                 {/* Center: Desktop Navigation */}
