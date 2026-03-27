@@ -65,11 +65,7 @@ export default function ResetPasswordPage() {
                 <div className="mb-8 text-center">
                     {/* Logo */}
                     <div className="flex items-center justify-center gap-3 mb-6">
-                        <div className="w-10 h-10 teal-gradient rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/20">
-                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path>
-                            </svg>
-                        </div>
+                        <img src="/logo.png" alt="PosCebimde" className="w-10 h-10 object-contain rounded-xl" />
                         <span className="text-2xl font-bold text-slate-800 tracking-tight">PosCebimde</span>
                     </div>
                     <h2 className="text-3xl font-bold text-slate-900 mb-2">Yeni Şifre Belirle</h2>
