@@ -26,7 +26,7 @@ export default function LandingPage() {
                             to="/register"
                             className="px-4 sm:px-6 py-2 sm:py-2.5 teal-gradient text-white font-bold rounded-xl shadow-lg shadow-teal-500/30 hover:shadow-teal-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-xs sm:text-sm no-underline whitespace-nowrap"
                         >
-                            Ücretsiz Dene
+                            30 Gün Ücretsiz Dene
                         </Link>
                     </div>
                 </div>
@@ -54,7 +54,7 @@ export default function LandingPage() {
                                 to="/register"
                                 className="w-full sm:w-auto px-8 py-4 teal-gradient text-white font-bold rounded-2xl shadow-lg shadow-teal-500/30 hover:shadow-teal-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2 group no-underline"
                             >
-                                <span>Hemen Ücretsiz Dene</span>
+                                <span>30 Gün Ücretsiz Dene</span>
                                 <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
                             </Link>
                             <Link
@@ -189,7 +189,7 @@ export default function LandingPage() {
                         to="/register"
                         className="inline-flex items-center gap-2 px-8 py-4 bg-white text-teal-700 font-bold rounded-2xl hover:bg-teal-50 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 shadow-lg group no-underline"
                     >
-                        <span>Hemen Ücretsiz Dene</span>
+                        <span>30 Gün Ücretsiz Dene</span>
                         <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
                     </Link>
                 </div>
