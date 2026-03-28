@@ -13,16 +13,16 @@ export default function LandingPage() {
 
             {/* Navbar */}
             <header className="relative z-20 w-full">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <img src="/logo-v3.png" alt="PosCebimde" className="w-10 h-10 object-contain rounded-xl" />
-                        <span className="text-2xl font-bold text-slate-800 tracking-tight">PosCebimde</span>
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0 shrink-0">
+                        <img src="/logo-v3.png" alt="PosCebimde" className="w-9 h-9 sm:w-10 sm:h-10 object-contain rounded-xl shrink-0" />
+                        <span className="text-lg sm:text-2xl font-bold text-slate-800 tracking-tight">PosCebimde</span>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                         {isAuthenticated ? (
                             <Link
                                 to="/pos"
-                                className="px-6 py-2.5 teal-gradient text-white font-bold rounded-xl shadow-lg shadow-teal-500/30 hover:shadow-teal-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-sm no-underline"
+                                className="px-4 sm:px-6 py-2 sm:py-2.5 teal-gradient text-white font-bold rounded-xl shadow-lg shadow-teal-500/30 hover:shadow-teal-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-xs sm:text-sm no-underline whitespace-nowrap"
                             >
                                 Panele Git
                             </Link>
@@ -30,13 +30,13 @@ export default function LandingPage() {
                             <>
                                 <Link
                                     to="/login"
-                                    className="px-5 py-2.5 text-slate-600 hover:text-teal-600 font-semibold text-sm transition-colors no-underline"
+                                    className="px-3 sm:px-5 py-2 sm:py-2.5 text-slate-600 hover:text-teal-600 font-semibold text-xs sm:text-sm transition-colors no-underline whitespace-nowrap"
                                 >
                                     Giriş Yap
                                 </Link>
                                 <Link
                                     to="/register"
-                                    className="px-6 py-2.5 teal-gradient text-white font-bold rounded-xl shadow-lg shadow-teal-500/30 hover:shadow-teal-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-sm no-underline"
+                                    className="px-4 sm:px-6 py-2 sm:py-2.5 teal-gradient text-white font-bold rounded-xl shadow-lg shadow-teal-500/30 hover:shadow-teal-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-xs sm:text-sm no-underline whitespace-nowrap"
                                 >
                                     Ücretsiz Dene
                                 </Link>
