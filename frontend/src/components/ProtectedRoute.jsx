@@ -18,7 +18,7 @@ export default function ProtectedRoute({ children, permission, superAdminOnly })
     }
 
     if (superAdminOnly && !isSuperAdmin) {
-        return <Navigate to="/" replace />;
+        return <Navigate to="/pos" replace />;
     }
 
     if (permission && !hasPermission(permission)) {

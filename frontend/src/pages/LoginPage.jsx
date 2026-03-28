@@ -74,7 +74,7 @@ export default function LoginPage() {
             if (verifyResponse.status === 200) {
                 const userData = verifyResponse.data.user;
                 await login(userData);
-                navigate('/');
+                navigate('/pos');
             }
         } catch (err) {
             const message = err.response?.data?.message ||

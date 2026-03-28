@@ -9,6 +9,7 @@ import RegisterPage from './pages/RegisterPage';
 import EmailSuccessPage from './pages/EmailSuccessPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 
+import LandingPage from './pages/LandingPage';
 import NewPOSPage from './pages/NewPOSPage';
 import MobilePOSPage from './pages/MobilePOSPage';
 import MobileProductsPage from './pages/MobileProductsPage';
@@ -31,6 +32,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/email-success" element={<EmailSuccessPage />} />
@@ -39,7 +41,7 @@ function App() {
 
           {/* Protected Routes */}
           <Route
-            path="/"
+            path="/pos"
             element={
               <ProtectedRoute permission="can_view_pos">
                 <Layout>
@@ -190,7 +192,7 @@ function App() {
           />
 
           {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/pos" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import KeyboardShortcutsModal from './modals/KeyboardShortcutsModal';
 
 const menuItems = [
-    { path: '/', label: 'Satış', icon: 'shopping_cart', permission: 'can_view_pos' },
+    { path: '/pos', label: 'Satış', icon: 'shopping_cart', permission: 'can_view_pos' },
     { path: '/products', label: 'Ürünler', icon: 'inventory_2', permission: 'can_view_products' },
     { path: '/customers', label: 'Bakiyeler', icon: 'groups', permission: 'can_view_customers' },
     { path: '/sales', label: 'Satışlar', icon: 'receipt_long', permission: 'can_view_sales' },
@@ -21,7 +21,7 @@ export default function Layout({ children }) {
     const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
     // Check if we are on the POS page to remove default padding/margins
-    const isPOSPage = location.pathname === '/';
+    const isPOSPage = location.pathname === '/pos';
     // Sales page also needs full width but allows window scrolling
     const isSalesPage = location.pathname === '/sales';
 

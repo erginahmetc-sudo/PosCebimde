@@ -658,7 +658,7 @@ export default function MobilePOSPage() {
                 >
                     &times;
                 </button>
-                <Link to="/" className="px-8 py-3 text-lg text-gray-400 hover:text-white transition-colors no-underline">
+                <Link to="/pos" className="px-8 py-3 text-lg text-gray-400 hover:text-white transition-colors no-underline">
                     🏠 Ana Sayfa
                 </Link>
                 <Link to="/customers" className="px-8 py-3 text-lg text-gray-400 hover:text-white transition-colors no-underline">
